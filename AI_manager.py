@@ -2,16 +2,36 @@ import json
 import os
 import time
 from dotenv import load_dotenv
-from google import genai
+from openai import (OpenAI, APIConnectionError, AuthenticationError, 
+                    BadRequestError, NotFoundError, RateLimitError, APIStatusError)
 
 #region API config
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise ValueError("GEMINI_API_KEY not found")
-client = genai.Client(api_key=api_key)
+def create_ai_client():
+    api_key = os.getenv("API_KEY")
+    base_url= os.getenv("API_URL")
+
+    if not api_key:
+        raise ValueError("API_KEY not found in environment file")
+    
+    if not base_url:
+            raise ValueError("API_URL not found in environment file")
+
+    return OpenAI(
+        base_url=base_url,
+        api_key=api_key
+    )
+
+def get_ai_model():
+    ai_model = os.getenv("AI_MODEL")
+
+    if not ai_model:
+        raise ValueError("AI_MODEL not found in environment file")
+
+    return ai_model
 #endregion
 
+#TODO: proper data fetching from IO Manager
 #region data fetching
 def get_household_profile(user_id):
     return {
@@ -208,13 +228,15 @@ def get_recommendation_schema():
                         "confidence_score",
                         "confidence_level",
                         "reason"
-                    ]
+                    ],
+                    "additionalProperties": False
                 }
             }
         },
         "required": [
             "recommendations"
-        ]
+        ],
+        "additionalProperties": False
     }
 #endregion
 
@@ -327,20 +349,68 @@ Do not add items that are not present in the planned grocery list.
 #endregion
 
 #region Calling AI API
-def call_gemini_api(prompt):
-    interaction = client.interactions.create(
-        model="gemini-3.8-flash",
-        input=prompt,
-        response_format={
-            "type": "text",
-            "mime_type": "application/json",
-            "schema": get_recommendation_schema()
-        }
-    )
-    return interaction.output_text
+def call_ai_api(prompt):
+    try:
+        client = create_ai_client()
+        ai_model = get_ai_model()
+
+        update_ai_status("Request sent. Waiting for AI response...")
+        start_time = time.time()
+
+        response = client.chat.completions.create(
+            model=ai_model,
+            messages=[{"role": "user","content": prompt}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "food_waste_recommendations",
+                    "strict": True,
+                    "schema": get_recommendation_schema()
+                }
+            }
+        )
+        elapsed_time = time.time() - start_time
+
+        update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
+
+        return get_ai_response_content(response), None
+    except Exception as error:
+        return None, handle_ai_exception(error)
 #endregion
 
-#region (TO BE Pass to Logic manager) bussiness rule
+#region get Response Content
+def get_ai_response_content(response):
+    if not response.choices:
+        raise ValueError("AI returned no response choices.")
+    content = response.choices[0].message.content
+    if not content:
+        raise ValueError("AI returned an empty response.")
+    return content
+#endregion
+
+#region API Response Error Handling
+def handle_ai_exception(error):
+    if isinstance(error, AuthenticationError):
+        return(f"Error: AI API authentication failed.\nCheck API_KEY in the environment file.")
+    elif isinstance(error, NotFoundError):
+        return ("Error: The configured AI model is unavailable or does not exist.")
+    elif isinstance(error, RateLimitError):
+        return("AI service is temporarily rate-limited.\nThe selected free model may currently be busy.\nPlease try again later.")
+    elif isinstance(error, APIConnectionError):
+        return("Error: Could not connect to Configured API URL.\nCheck API_URL and internet connectivity.")
+    elif isinstance(error, BadRequestError):
+        return("Error: OpenRouter rejected the request.\nCheck the model, prompt or response schema.")
+    elif isinstance(error, APIStatusError):
+        return (f"Error: AI API has returned HTTP Error Code: {error.status_code}.")
+    return(f"Unexpected AI API error: {error}")
+#endregion
+
+#region AI STATUS UPDATE
+def update_ai_status(message):
+    print(f"[AI STATUS] {message}")
+#endregion
+
+#region [DEV ONLY] (TO BE MOVE to Logic manager) bussiness rule
 def get_expected_confidence_level(score):
     if score < 0.50:
         return "LOW"
@@ -384,34 +454,49 @@ def validate_business_rules(item):
     return True
 #endregion
 
-#region (TO BE Pass to Logic manager) bussiness rule
+#region [DEV ONLY] TO BE MOVE to Logic manager) bussiness rule
 def process_ai_response(ai_response):
     try:
         data = json.loads(ai_response)
 
     except json.JSONDecodeError:
-        print("Error: Gemini returned invalid JSON.")
+        print("Error: AI returned invalid JSON Response.")
         print(ai_response)
         return []
 
-    recommendations = data.get("recommendations", [])
-
+    if isinstance(data, dict):
+        recommendations = data.get("recommendations")
+        if not isinstance(recommendations, list):
+            return [], ("AI response does not contain a valid\n'recommendations' list.")
+    # Fallback: AI returned the list directly
+    elif isinstance(data, list):
+        recommendations = data
+    else:
+        return [], (f"Unsupported AI response structure:\n {type(data).__name__}")
+    
     valid_results = []
-
     for item in recommendations:
+        if not isinstance(item, dict):
+            return [], (f"Invalid recommendation structure.\nExpected object, received {type(item).__name__}.")
         if validate_business_rules(item):
             valid_results.append(item)
-
         else:
-            print(
-                f"Invalid business rule result for "
-                f"{item.get('item', 'Unknown')}"
-            )
+            print(f"Invalid business rule result for {item.get('item', 'Unknown')}")
+        for item in recommendations:
+            if not isinstance(item, dict):
+                continue
+        try:
+            if validate_business_rules(item):
+                valid_results.append(item)
+        except (KeyError, TypeError, ValueError) as error:
+            return [], (f"Invalid recommendation data: {error}")
+    if not valid_results:
+        return [], "There were no valid AI suggestions found."
 
-    return valid_results
+    return valid_results, None
 #endregion
 
-#region display final output
+#region [DEV ONLY] display final output
 def display_recommendations(recommendations):
     if not recommendations:
         print("No recommendations available.")
@@ -421,44 +506,60 @@ def display_recommendations(recommendations):
     print("=" * 60)
 
     for item in recommendations:
+        if not isinstance(item, dict):
+            print("Error: Invalid recommendation format.")
+            return
         print(f"Item: {item['item']}")
-        print(f"Planned Quantity: {item['planned_quantity']}")
+        print(f"Planned Quantity: {item['planned_quantity']} {item['unit']}")
         print(f"Recommendation: {item['recommendation']}")
-        print(
-            f"Recommended Quantity: "
-            f"{item['recommended_quantity']}"
-        )
-        print(
-            f"Food Waste Risk: "
-            f"{item['food_waste_risk']}"
-        )
-        print(
-            f"Confidence Score: "
-            f"{item['confidence_score']:.2f}"
-        )
-        print(
-            f"Confidence Level: "
-            f"{item['confidence_level']}"
-        )
+        print(f"Recommended Quantity: {item['recommended_quantity']} {item['unit']}")
+        print(f"Food Waste Risk: {item['food_waste_risk']}")
+        print(f"Confidence Score: {item['confidence_score']:.2f}")
+        print(f"Confidence Level: {item['confidence_level']}")
         print(f"Reason: {item['reason']}")
         print("-" * 60)
 #endregion
 
-#region main ai process calling
+#region [DEV ONLY] main ai process calling
 def ai_main():
     user_id = 1
+
+    update_ai_status("Fetching household data...")
     household_profile = get_household_profile(user_id)
     consumption_log = get_consumption_log(user_id)
     purchase_stock = get_grocery_input()
-    data = prepare_data(
-        household_profile,
-        consumption_log,
-        purchase_stock
-    )
+
+    update_ai_status("Preparing AI input...")
+    data = prepare_data(household_profile, consumption_log, purchase_stock)
+    
+    update_ai_status("Building AI prompt...")
     prompt = build_ai_prompt(data)
-    ai_response = call_gemini_api(prompt)
-    recommendations = process_ai_response(ai_response)
+
+    update_ai_status("Sending prompt to AI...")
+    ai_response, error = call_ai_api(prompt)
+
+    #region [DEV] DEBUG PREVIEW AI RESPONSE
+    print("\n[DEV] RAW AI RESPONSE:")
+    print(ai_response)
+    print("\n")
+    #endregion
+
+    if error: 
+        update_ai_status("AI request failed.")
+        print(error) 
+        return
+    
+    update_ai_status("Validating AI output...")
+    recommendations, error = process_ai_response(ai_response)
+    if error:
+        update_ai_status("AI output validation failed.")
+        print(error)
+        return
+
+    update_ai_status("Preparing recommendation output...")
     display_recommendations(recommendations)
+    
+    update_ai_status("Completed.")
 #endregion
 
 if __name__ == "__main__":
