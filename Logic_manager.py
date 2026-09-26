@@ -1,0 +1,129 @@
+import json 
+import statistics
+
+def get_user_input(): #simulate I/O layer
+    item = input("Item: ")
+    unit = input("Unit: ")
+
+    while True:
+        try:
+            planned_quantity = round(float(input("Planned quantity: ")), 2) #round input off to 2d.p
+            if planned_quantity < 0:
+                print("Quantity cannot be negative.")
+                continue
+            else:
+                break
+        except ValueError:
+            print("Please enter a valid number.")
+
+    return { # return a dictionary = passing data between functions easy
+        "item": item,
+        "unit": unit,
+        "planned_quantity": planned_quantity
+    }    
+
+#check_over_under, first logic function 
+def check_over_under(planned_quantity, recommended_quantity):
+
+    if planned_quantity > recommended_quantity:
+        return "over"
+
+    elif planned_quantity < recommended_quantity:
+        return "under"
+
+    else:
+        return "good"
+
+
+#second logic funciton 
+def give_recommendation(user_input, ai_data):
+
+    result = check_over_under(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"]
+    )
+
+    return {
+        "result": result,
+        "advice": ai_data["reason"],
+        "waste_risk": None, #tTo be added
+        "confidence_score": None #to be added 
+    }
+
+#first confidence score function, some funky math going on here
+def calculate_historical_data_completeness(data, item_name):
+    purchase_count = 0 #int value
+
+    for row in data: 
+        if row["Item_Name"].lower() == item_name.lower(): #each seperate time user goes to NTUC to buy, CS increases
+            purchase_count += 1
+
+    k = 8 #arbitary value i smoked out to control how fast completeness is given
+    # K is inverse to the rate CS grows 
+
+    completeness_score = purchase_count / (purchase_count + k) #keeping score <=1.0
+    return completeness_score
+
+
+#second confidence score function taking into account S/D
+def calculate_historical_data_consistency(data,item_name):
+    quantities = [] #list to feed into stats funciton later
+    for row in data: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
+        if row["Item_name"].lower() == item_name.lower():
+            quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
+
+    sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
+
+    if len(quantities) < 2: #can't calculate s/d with one value
+        return 0.0 
+   
+    mean = statistics.mean(quantities)  
+
+    if mean == 0: #so our program dont commit suicide by living with zero
+        return 1.0
+
+    cv = sd / mean #calculating relative standard deviation 
+
+    consistency_score = 1 / (1 + cv) #keeping score <=1.0
+
+    return consistency_score
+
+def calculate_confidence_score(completeness_score,consistency_score):
+    confidence_score = completeness_score * consistency_score #will add more scores if needed
+    return round(confidence_score, 3) #round off to 3 d.p in case of irrational number
+
+
+# ---------------V V V  execution code  V V V ---------------  
+
+
+#load dummy AI data (subjected to changes)
+with open("sampleAioutput.json","r") as file: #open .json with "read" mode as variable file
+    data = json.load(file) #json.load converts json to python
+
+
+#getting user input (for testing purpose, I/O layer exists!)
+while True:
+    user_input = get_user_input()
+
+    ai_data = None
+
+    for recommendation in data["recommendations"]:
+        if (    #checking if Ai recommendation exist for user input (in case AI omits)
+            recommendation["item"].lower() == user_input["item"].lower()
+            and 
+            recommendation ["unit"].lower() == user_input["unit"].lower()
+        ):
+            ai_data = recommendation
+            break
+
+    if ai_data is None:
+        print("No AI recommendation found for this item")
+    else:
+        result = give_recommendation(user_input, ai_data)
+
+        print("\n--- Recommendation ---")
+        print(f"Result: {result['result']}")
+        print(f"Advice: {result['advice']}")
+        print(f"Waste risk: {result['waste_risk']}")
+        print(f"Confidence score: {result['confidence_score']}")
+
