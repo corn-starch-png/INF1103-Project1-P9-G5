@@ -1,0 +1,32 @@
+{
+  "recommendations": [
+    {
+      "item": "Milk",
+      "planned_quantity": 3,
+      "unit": "cartons",
+      "recommended_quantity": 1,
+      "reason": "Average weekly consumption is 2 cartons; with 1 carton in stock, only 1 more is needed, but the plan calls for 3 cartons."
+    },
+    {
+      "item": "Bread",
+      "planned_quantity": 2,
+      "unit": "loaves",
+      "recommended_quantity": 0.67,
+      "reason": "Average weekly consumption is ~1.67 loaves; with 1 loaf in stock, about 0.67 loaf is needed, yet the plan is for 2 loaves."
+    },
+    {
+      "item": "Eggs",
+      "planned_quantity": 12,
+      "unit": "pieces",
+      "recommended_quantity": 3,
+      "reason": "Average weekly consumption is 11 pieces; with 8 pieces in stock, 3 more are required, but the plan is for 12 pieces."
+    },
+    {
+      "item": "Chicken",
+      "planned_quantity": 0.5,
+      "unit": "kg",
+      "recommended_quantity": 1.1,
+      "reason": "Average weekly consumption is 1.1 kg; with no stock, 1.1 kg is needed, exceeding the planned 0.5 kg."
+    }
+  ]
+}
