@@ -34,5 +34,19 @@ def load_database(folder='database'):
                 database[file[:-4]] = file_data
     return database
 
+
+def save_database(database, folder='database'):
+    # Implementation for saving the database
+    for file, data in database.items():
+        filename = os.path.join(folder, f'{file}.csv')
+        if data:
+            header = data[0].keys()
+            with open(filename, 'w') as f:
+                f.write(','.join(header) + '\n')  # Write the header
+                for row in data:
+                    f.write(','.join(str(row[h]) for h in header) + '\n')  # Write each row
+
+
 create_database()  # Create the database if it doesn't exist
 database = load_database('sample_database')  # Load the database into memory
+save_database(database, 'database')  # Save the database to the specified folder
