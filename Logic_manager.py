@@ -24,13 +24,13 @@ def get_user_input(): #simulate I/O layer
 
 #check_over_under, first logic function 
 def check_over_under(planned_quantity, recommended_quantity):
-
+    #waste risk  = high
     if planned_quantity > recommended_quantity:
         return "over"
-
+    #waste risk = low
     elif planned_quantity < recommended_quantity:
         return "under"
-
+    #waste risk = medium
     else:
         return "good"
 
