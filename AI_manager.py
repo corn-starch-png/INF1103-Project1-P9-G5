@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
@@ -180,39 +181,9 @@ def get_recommendation_schema():
                         "unit": {
                             "type": "string"
                         },
-                        "recommendation": {
-                            "type": "string",
-                            "enum": [
-                                "BUY_MORE",
-                                "BUY_AS_PLANNED",
-                                "BUY_LESS",
-                                "DO_NOT_BUY"
-                            ]
-                        },
                         "recommended_quantity": {
                             "type": "number",
                             "minimum": 0
-                        },
-                        "food_waste_risk": {
-                            "type": "string",
-                            "enum": [
-                                "LOW",
-                                "MEDIUM",
-                                "HIGH"
-                            ]
-                        },
-                        "confidence_score": {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0
-                        },
-                        "confidence_level": {
-                            "type": "string",
-                            "enum": [
-                                "LOW",
-                                "MEDIUM",
-                                "HIGH"
-                            ]
                         },
                         "reason": {
                             "type": "string"
@@ -222,11 +193,7 @@ def get_recommendation_schema():
                         "item",
                         "planned_quantity",
                         "unit",
-                        "recommendation",
                         "recommended_quantity",
-                        "food_waste_risk",
-                        "confidence_score",
-                        "confidence_level",
                         "reason"
                     ],
                     "additionalProperties": False
@@ -246,8 +213,8 @@ def build_ai_prompt(data):
 You are a household food waste recommendation assistant.
 
 Analyse the provided household information and generate
-purchase recommendations for every item in the planned
-grocery list.
+a recommended purchase quantity for every item in the
+planned grocery list.
 
 Use ONLY the information provided below.
 
@@ -261,7 +228,7 @@ PLANNED PURCHASES AND CURRENT STOCK:
 {data["purchase_stock"]}
 
 ASSESSMENT CRITERIA:
-Consider:
+For each item, consider:
 1. Historical consumption of the item
 2. Current quantity already in stock
 3. Planned purchase quantity
@@ -269,76 +236,25 @@ Consider:
 5. Consistency or variation in past consumption
 6. Amount and quality of available historical data
 
-RECOMMENDATION MEANINGS:
+RECOMMENDED QUANTITY:
+The recommended_quantity represents the amount the household
+should purchase.
 
-BUY_MORE
-Use when the planned quantity appears lower than the
-household's expected requirement.
-
-BUY_AS_PLANNED
-Use when the planned quantity reasonably matches expected
-consumption after considering current stock.
-
-BUY_LESS
-Use when the planned quantity appears higher than expected
-consumption and reducing it may lower food waste risk.
-
-DO_NOT_BUY
-Use when current stock appears sufficient and purchasing
-additional units may create unnecessary surplus.
-
-RECOMMENDED QUANTITY RULES:
-- recommended_quantity means the amount the user should buy
-- never return a negative quantity
-- DO_NOT_BUY must return 0
-- BUY_LESS must return less than planned_quantity
-- BUY_AS_PLANNED must equal planned_quantity
-- BUY_MORE must return more than planned_quantity
-
-FOOD WASTE RISK:
-Assess the likelihood that unused or excess food will remain
-after considering historical consumption, current stock and
-planned purchases.
-
-Do not automatically assign HIGH food waste risk just because
-the recommendation is BUY_LESS.
-
-CONFIDENCE SCORE:
-confidence_score must represent how strongly the available
-evidence supports the recommendation.
-
-Consider:
-- amount of historical data available
-- consistency of historical consumption
-- completeness of household information
-- completeness of current stock information
-- how clearly planned quantity differs from expected usage
-- whether multiple data sources support the same conclusion
-
-Confidence guidance:
-
-LOW: 0.00 to 0.49
-Use when data is limited, missing, inconsistent or weak.
-
-MEDIUM: 0.50 to 0.79
-Use when sufficient information exists but some uncertainty remains.
-
-HIGH: 0.80 to 1.00
-Use only when sufficient historical data exists, consumption
-patterns are relatively consistent, stock information is
-available, and the evidence strongly supports the recommendation.
-
-Do not assign HIGH confidence if the available information is
-insufficient, incomplete, contradictory or highly inconsistent.
+The recommended quantity should:
+- never be negative
+- use the same unit as the planned purchase
+- consider current stock before recommending additional purchases
+- reflect historical consumption where sufficient data is available
+- avoid unnecessary excess that may contribute to food waste
 
 REASON:
-Provide a short 1-2 sentence explanation.
+Provide a short 1-2 sentence explanation for each recommended quantity.
 
 The reason should:
-- reference relevant consumption, stock, planned quantity
-  or household information
-- explain the main factor affecting the recommendation
-- mention uncertainty when confidence is LOW
+- reference relevant consumption history, current stock,
+  planned quantity, or household information
+- explain the main factor affecting the recommended quantity
+- mention uncertainty if the available information is limited
 - not contain information that was not provided
 
 Generate exactly one recommendation for every item in the
@@ -346,6 +262,35 @@ planned grocery list.
 
 Do not add items that are not present in the planned grocery list.
 """
+#endregion
+
+#region Check AI API Connection
+def check_api_conn():
+    api_key = os.getenv("API_KEY")
+    conn_url= os.getenv("API_CONN_URL")
+
+    if not api_key:
+        raise ValueError("API_KEY not found in environment file")
+    if not conn_url:
+            raise ValueError("API_CONN_URL not found in environment file")
+    
+    headers = {"Authorization": f"Bearer {api_key}" }
+
+    try:
+        response = requests.get(conn_url, headers=headers,timeout=10)
+        if response.status_code == 200:
+            return True, "API Connection Establish. API Key Valid."
+        if response.status_code == 501:
+            return False, "AI API authentication failed. API KEY Not Valid."
+        if response.status_code == 500:
+            return False, "API Server Error."
+        return False, (f"AI API connection failed. HTTP status: {response.status_code}")
+    except requests.exceptions.Timeout:
+        return False, "AI API connection timed out."
+    except requests.exceptions.ConnectionError:
+        return False, "Unable to connect to AI API."
+    except requests.exceptions.RequestException as error:
+        return False, (f"AI API connection error: {error}")
 #endregion
 
 #region Calling AI API
@@ -369,8 +314,9 @@ def call_ai_api(prompt):
                 }
             }
         )
+        
         elapsed_time = time.time() - start_time
-
+        print(response.to_json)
         update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
 
         return get_ai_response_content(response), None
@@ -410,51 +356,7 @@ def update_ai_status(message):
     print(f"[AI STATUS] {message}")
 #endregion
 
-#region [DEV ONLY] (TO BE MOVE to Logic manager) bussiness rule
-def get_expected_confidence_level(score):
-    if score < 0.50:
-        return "LOW"
-
-    if score < 0.80:
-        return "MEDIUM"
-
-    return "HIGH"
-
-def validate_business_rules(item):
-    planned = item["planned_quantity"]
-    recommended = item["recommended_quantity"]
-    recommendation = item["recommendation"]
-
-    score = item["confidence_score"]
-    level = item["confidence_level"]
-
-    # Recommendation quantity rules
-    if recommendation == "DO_NOT_BUY":
-        if recommended != 0:
-            return False
-
-    elif recommendation == "BUY_LESS":
-        if recommended >= planned:
-            return False
-
-    elif recommendation == "BUY_AS_PLANNED":
-        if recommended != planned:
-            return False
-
-    elif recommendation == "BUY_MORE":
-        if recommended <= planned:
-            return False
-
-    # Confidence level must match score
-    expected_level = get_expected_confidence_level(score)
-
-    if level != expected_level:
-        return False
-
-    return True
-#endregion
-
-#region [DEV ONLY] TO BE MOVE to Logic manager) bussiness rule
+#region Process AI output
 def process_ai_response(ai_response):
     try:
         data = json.loads(ai_response)
@@ -471,57 +373,25 @@ def process_ai_response(ai_response):
     # Fallback: AI returned the list directly
     elif isinstance(data, list):
         recommendations = data
+        data = {"recommendations": recommendations}
     else:
         return [], (f"Unsupported AI response structure:\n {type(data).__name__}")
     
-    valid_results = []
-    for item in recommendations:
-        if not isinstance(item, dict):
-            return [], (f"Invalid recommendation structure.\nExpected object, received {type(item).__name__}.")
-        if validate_business_rules(item):
-            valid_results.append(item)
-        else:
-            print(f"Invalid business rule result for {item.get('item', 'Unknown')}")
-        for item in recommendations:
-            if not isinstance(item, dict):
-                continue
-        try:
-            if validate_business_rules(item):
-                valid_results.append(item)
-        except (KeyError, TypeError, ValueError) as error:
-            return [], (f"Invalid recommendation data: {error}")
-    if not valid_results:
-        return [], "There were no valid AI suggestions found."
-
-    return valid_results, None
-#endregion
-
-#region [DEV ONLY] display final output
-def display_recommendations(recommendations):
-    if not recommendations:
-        print("No recommendations available.")
-        return
-
-    print("\nGROCERY RECOMMENDATIONS")
-    print("=" * 60)
-
-    for item in recommendations:
-        if not isinstance(item, dict):
-            print("Error: Invalid recommendation format.")
-            return
-        print(f"Item: {item['item']}")
-        print(f"Planned Quantity: {item['planned_quantity']} {item['unit']}")
-        print(f"Recommendation: {item['recommendation']}")
-        print(f"Recommended Quantity: {item['recommended_quantity']} {item['unit']}")
-        print(f"Food Waste Risk: {item['food_waste_risk']}")
-        print(f"Confidence Score: {item['confidence_score']:.2f}")
-        print(f"Confidence Level: {item['confidence_level']}")
-        print(f"Reason: {item['reason']}")
-        print("-" * 60)
+    return data, None
 #endregion
 
 #region [DEV ONLY] main ai process calling
 def ai_main():
+    update_ai_status("Checking AI API connection...")
+    connected, errMsg = check_api_conn()
+
+    if not connected: 
+        update_ai_status("AI API connection failed.")
+        print(errMsg) 
+        return
+    update_ai_status("AI API connection successful.")
+    print("\n")
+    
     user_id = 1
 
     update_ai_status("Fetching household data...")
@@ -555,9 +425,7 @@ def ai_main():
         update_ai_status("AI output validation failed.")
         print(error)
         return
-
-    update_ai_status("Preparing recommendation output...")
-    display_recommendations(recommendations)
+    print(recommendations)
     
     update_ai_status("Completed.")
 #endregion
