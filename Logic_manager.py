@@ -24,16 +24,41 @@ def get_user_input(): #simulate I/O layer
 
 #check_over_under, first logic function 
 def check_over_under(planned_quantity, recommended_quantity):
-    #waste risk  = high
+    
     if planned_quantity > recommended_quantity:
         return "over"
-    #waste risk = low
+   
     elif planned_quantity < recommended_quantity:
         return "under"
-    #waste risk = medium
+   
     else:
         return "good"
 
+#calculating expiry risk to determine if food waste is high/medium/low
+def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife):
+    # checking status of planned quantity and recommended quantity
+    status = check_over_under(planned_quantity, recommended_quantity)
+    if status == "over":
+        #to prevent division errors while handling zero consumption rate
+        if dailyConsumptionRate <= 0:
+            return "High Food Waste"
+        
+        #calculation of time required to consume the total amount
+        timeToConsume = (
+            ("current_quantity" #take from stock.csv 
+            + planned_quantity ) / dailyConsumptionRate
+        )
+        
+        # evaluating risk of food expiry
+        if timeToConsume > shelfLife:
+            return "High Food wWaste"
+        else:
+            return "Medium Food Waste"
+        
+    else:
+        # if check_over_under is "under" and "good"
+        return "Low Food Waste"
+    
 
 #second logic funciton 
 def give_recommendation(user_input, ai_data):
