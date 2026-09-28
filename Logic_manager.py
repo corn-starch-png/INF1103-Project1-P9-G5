@@ -51,7 +51,7 @@ def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumption
         
         # evaluating risk of food expiry
         if timeToConsume > shelfLife:
-            return "High Food wWaste"
+            return "High Food Waste"
         else:
             return "Medium Food Waste"
         
@@ -71,7 +71,7 @@ def give_recommendation(user_input, ai_data):
     return {
         "result": result,
         "advice": ai_data["reason"],
-        "waste_risk": None, #tTo be added
+        "waste_risk": None, #To be added 
         "confidence_score": None #to be added 
     }
 
