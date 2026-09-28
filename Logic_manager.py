@@ -34,6 +34,16 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
+#calculating daily consumption rate
+'''def consumptionRate():
+     daily consumption rate:
+total quantity consumed / no.of days 
+
+#calculation for shelf life of item
+def shelfLife():
+    Expiry date = Purchase Date'''
+
+
 #calculating expiry risk to determine if food waste is high/medium/low
 def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife):
     # checking status of planned quantity and recommended quantity
