@@ -1,26 +1,26 @@
 import os
 
+files = {
+    'consumption_history.csv': 'Date_Range,Item_Name,Quantity,Unit,Remarks',
+    'household_info.csv': 'Person_ID,Age,Gender,Dietary_Restriction',
+    'stock.csv': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date'
+}
 
 
-def create_database():
+
+def create_database(folder='database'):
     # Implementation for creating the database
-    folder, files = 'database', ['consumption_history.csv', 'household_info.csv', 'stock.csv']
-    header = ['Date_Range,Item_Name,Quantity,Unit,Remarks',
-              'Person_ID,Age,Gender,Dietary_Restriction',
-              'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date']
-
     if not os.path.exists(folder):
-        os.makedirs('database', exist_ok=True)
+        os.makedirs(folder, exist_ok=True)
     for file in files:
         filename = os.path.join(folder, file)
         if not os.path.exists(filename):
             with open(filename, 'w') as f:
-                f.write(header[files.index(file)] + '\n')  # Write the header to each file
+                f.write(files[file] + '\n')  # Write the header to each file
 
 
 def load_database(folder='database'):
     # Implementation for loading the database
-    files = ['consumption_history.csv', 'household_info.csv', 'stock.csv']
     database = {}
     for file in files:
         filename = os.path.join(folder, file)
@@ -49,4 +49,5 @@ def save_database(database, folder='database'):
 
 create_database()  # Create the database if it doesn't exist
 database = load_database('sample_database')  # Load the database into memory
+print(database)  # Print the loaded database for verification
 save_database(database, 'database')  # Save the database to the specified folder
