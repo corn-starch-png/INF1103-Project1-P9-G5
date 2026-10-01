@@ -54,10 +54,12 @@ def check_data(text, filename):
 def create_database(folder='database'):
     # Implementation for creating the database
     if not os.path.exists(folder):
+        print(f"Database not found. Creating database folder: {folder}")
         os.makedirs(folder, exist_ok=True)
     for file in files:
         filename = os.path.join(folder, file)
         if not os.path.exists(filename):
+            print(f"File {filename} not found. Creating file: {filename}")
             with open(filename, 'w') as f:
                 f.write(files[file] + '\n')  # Write the header to each file
 
@@ -90,7 +92,14 @@ def load_database(folder='database'):
                         continue
                     file_data.append(dict(zip(header.split(','), line)))
                 database[file[:-4]] = file_data
-    return database, errors
+    if not errors:
+        print("Database loaded successfully.")
+    else:
+        print("****************** Errors encountered during loading ******************")
+        for error in errors:
+            print(error)  # Print any errors encountered during loading
+        print("***********************************************************************")
+    return database
 
 
 def save_database(database, folder='database'):
@@ -104,10 +113,3 @@ def save_database(database, folder='database'):
                 for row in data:
                     f.write(','.join(str(row[h]) for h in header) + '\n')  # Write each row
 
-
-create_database()  # Create the database if it doesn't exist
-database, errors = load_database('sample_database')  # Load the database into memory
-for error in errors:
-    print(error)  # Print any errors encountered during loading
-print(database)  # Print the loaded database for verification
-save_database(database, 'database')  # Save the database to the specified folder
