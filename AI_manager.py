@@ -46,80 +46,101 @@ def get_household_profile(user_id):
 
 def get_consumption_log(user_id):
     return [
+        #unit - l
         {
             "item": "Milk",
             "week": "Week 1",
             "consumed_quantity": 2,
-            "unit": "cartons"
+            "unit": "L",
+            "remarks": ""
         },
         {
             "item": "Milk",
-            "week": "Week 2",
-            "consumed_quantity": 2,
-            "unit": "cartons"
-        },
-        {
-            "item": "Milk",
-            "week": "Week 3",
-            "consumed_quantity": 2,
-            "unit": "cartons"
-        },
-
-        {
-            "item": "Bread",
-            "week": "Week 1",
-            "consumed_quantity": 2,
-            "unit": "loaves"
-        },
-        {
-            "item": "Bread",
             "week": "Week 2",
             "consumed_quantity": 1,
-            "unit": "loaves"
+            "unit": "L",
+            "remarks": ""
         },
         {
-            "item": "Bread",
+            "item": "Milk",
             "week": "Week 3",
             "consumed_quantity": 2,
-            "unit": "loaves"
+            "unit": "L",
+            "remarks": ""
         },
-
+        #unit - count
         {
             "item": "Eggs",
             "week": "Week 1",
-            "consumed_quantity": 10,
-            "unit": "pieces"
+            "consumed_quantity": 11,
+            "unit": "count",
+            "remarks": ""
         },
         {
             "item": "Eggs",
             "week": "Week 2",
             "consumed_quantity": 12,
-            "unit": "pieces"
+            "unit": "count",
+            "remarks": ""
         },
         {
             "item": "Eggs",
             "week": "Week 3",
             "consumed_quantity": 11,
-            "unit": "pieces"
+            "unit": "count",
+            "remarks": ""
         },
-
+        #unit - kg
         {
             "item": "Chicken",
             "week": "Week 1",
-            "consumed_quantity": 1.0,
-            "unit": "kg"
+            "consumed_quantity": 1.5,
+            "unit": "kg",
+            "remarks": ""
         },
         {
             "item": "Chicken",
             "week": "Week 2",
             "consumed_quantity": 1.2,
-            "unit": "kg"
+            "unit": "kg",
+            "remarks": ""
         },
         {
             "item": "Chicken",
             "week": "Week 3",
             "consumed_quantity": 1.1,
-            "unit": "kg"
+            "unit": "kg",
+            "remarks": ""
+        },
+        #test fanta
+        {
+            "item": "Fanta",
+            "week": "Week 1",
+            "consumed_quantity": 1,
+            "unit": "L",
+            "remarks": ""
+        },
+        {
+            "item": "Fanta",
+            "week": "Week 2",
+            "consumed_quantity": 3,
+            "unit": "L",
+            "remarks": ""
+        },
+        #test apple
+        {
+            "item": "Apple",
+            "week": "Week 1",
+            "consumed_quantity": 12,
+            "unit": "count",
+            "remarks": ""
+        },
+        {
+            "item": "Apple",
+            "week": "Week 2",
+            "consumed_quantity": 14,
+            "unit": "count",
+            "remarks": ""
         }
     ]
 
@@ -129,26 +150,40 @@ def get_grocery_input():
             "item": "Milk",
             "current_stock": 1,
             "planned_quantity": 3,
-            "unit": "cartons"
-        },
-        {
-            "item": "Bread",
-            "current_stock": 1,
-            "planned_quantity": 2,
-            "unit": "loaves"
+            "unit": "L",
+            "remarks": ""
         },
         {
             "item": "Eggs",
             "current_stock": 8,
             "planned_quantity": 12,
-            "unit": "pieces"
+            "unit": "count",
+            "remarks": ""
         },
         {
             "item": "Chicken",
             "current_stock": 0,
             "planned_quantity": 0.5,
-            "unit": "kg"
+            "unit": "kg",
+            "remarks": ""
+        },
+        #Anomaly (party - more people)
+        {
+            "item": "Fanta",
+            "current_stock": 0,
+            "planned_quantity": 30,
+            "unit": "L",
+            "remarks": "House party with 100 guests on monday"
+        },
+        #Anomaly (vacation - less people)
+        {
+            "item": "Apple",
+            "current_stock": 0,
+            "planned_quantity": 13,
+            "unit": "count",
+            "remarks": "Parents left for holiday on wednesday "
         }
+        
     ]
 #endregion
 
@@ -217,6 +252,8 @@ a recommended purchase quantity for every item in the
 planned grocery list.
 
 Use ONLY the information provided below.
+Do not assume missing household information, consumption data,
+stock levels, or future events that are not explicitly provided.
 
 HOUSEHOLD PROFILE:
 {data["household_profile"]}
@@ -229,38 +266,49 @@ PLANNED PURCHASES AND CURRENT STOCK:
 
 ASSESSMENT CRITERIA:
 For each item, consider:
-1. Historical consumption of the item
-2. Current quantity already in stock
+1. Historical consumption
+2. Current stock
 3. Planned purchase quantity
 4. Household size and characteristics, where relevant
 5. Consistency or variation in past consumption
 6. Amount and quality of available historical data
+7. Remarks provided for the item
+
+REMARKS:
+- Before calculating the recommended_quantity, check the item's remarks.
+- If a remark describes a temporary or unusual change in the household's needs, prioritise that information when making the recommendation.
+- Use the remark together with other relevant information, including current stock, planned quantity, and consumption history.
+- If no remark is provided, base the recommendation on the other available information.
 
 RECOMMENDED QUANTITY:
-The recommended_quantity represents the amount the household
-should purchase.
-
+The recommended_quantity represents the amount the household should purchase.
 The recommended quantity should:
-- never be negative
-- use the same unit as the planned purchase
 - consider current stock before recommending additional purchases
 - reflect historical consumption where sufficient data is available
+- account for relevant remarks and temporary changes in needs
 - avoid unnecessary excess that may contribute to food waste
+- never be negative
 
-REASON:
-Provide a short 1-2 sentence explanation for each recommended quantity.
+QUANTITY RULES:
+The only valid units are "count", "kg", and "L".
 
-The reason should:
-- reference relevant consumption history, current stock,
-  planned quantity, or household information
-- explain the main factor affecting the recommended quantity
-- mention uncertainty if the available information is limited
-- not contain information that was not provided
+If the unit is "count":
+- recommended_quantity must be a whole number
+- do not recommend fractional quantities
 
-Generate exactly one recommendation for every item in the
-planned grocery list.
+If the unit is "kg" or "L":
+- decimal quantities are allowed when appropriate
+- avoid unnecessary precision
 
-Do not add items that are not present in the planned grocery list.
+The recommended_quantity must use the same unit as the planned purchase.
+
+OUTPUT RULES:
+- Keep item, planned_quantity, and unit exactly as provided.
+- Do not modify or recalculate planned_quantity.
+- Only calculate recommended_quantity and reason.
+- Generate exactly one recommendation for every item in the planned grocery list.
+- Do not add items that are not present in the planned grocery list.
+
 """
 #endregion
 
@@ -382,6 +430,7 @@ def process_ai_response(ai_response):
 
 #region [DEV ONLY] main ai process calling
 def ai_main():
+
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
 
