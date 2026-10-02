@@ -69,9 +69,25 @@ def check_over_under(planned_quantity, recommended_quantity):
     return round(total_quantity / total_days, 3)   '''  
 
 #calculation for shelf life of item
-def shelfLife(purchaseDate, expiryDate, item_name):
+'''def shelfLife(purchaseDate, expiryDate, item_name):
     # Expiry date - Purchase Date
-
+    with open(csv_path, mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            # Strip whitespace around column keys and values
+            clean_row = {k.strip(): v.strip() for k, v in row.items()}
+            
+            if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                purchase_dt = datetime.strptime(clean_row["Purchase_Date"], "%Y-%m-%d")
+                expiry_dt = datetime.strptime(clean_row["Expiry_Date"], "%Y-%m-%d")
+                
+                # Total shelf life (from purchase to expiry)
+                total_shelf_life = (expiry_dt - purchase_dt).days
+                return total_shelf_life
+    #if item not found         
+    return None   '''         
+                
 
 #calculating expiry risk to determine if food waste is high/medium/low
 def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife):
@@ -111,7 +127,7 @@ def give_recommendation(user_input, ai_data):
         user_input["planned_quantity"],
         ai_data["recommended_quantity"],
         "current_quanity",#to be added
-        dailyConsumptionRate, # to be calculated
+        "dailyConsumptionRate", # to be calculated
         "shelfLife" #to be calculated
     )
     
