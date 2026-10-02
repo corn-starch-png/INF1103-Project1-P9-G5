@@ -1,5 +1,7 @@
 import json 
 import statistics
+#import csv
+from datetime import datetime
 
 def get_user_input(): #simulate I/O layer
     item = input("Item: ")
@@ -34,14 +36,41 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
-#calculating daily consumption rate
-'''def consumptionRate():
-     daily consumption rate:
-total quantity consumed / no.of days 
+#calculating consumption rate
+'''def dailyConsumptionRate(item_name, csv_path="database_path"):
+    #daily consumption rate = total quantity consumed / no.of days 
+    total_quantity = 0.0
+    total_days = 0.0
+
+    with open(csv_path, mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            # Strip whitespace from keys and values to avoid mismatch issues
+            clean_row = {k.strip(): v.strip() for k, v in row.items()}
+            
+            # Match the item name (case-insensitive)
+            if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                # Parse days: "5d" -> 5.0
+                days_str = clean_row["Date_Range"].lower().replace("d", "").strip()
+                days = float(days_str)
+                
+                # Parse quantity: e.g. "1" -> 1.0
+                quantity = float(clean_row["Quantity"])
+                
+                total_quantity += quantity
+                total_days += days
+
+    # Prevent division by zero if days is 0 or item not found
+    if total_days <= 0:
+        return 0.0
+
+    # Daily consumption rate = Total Quantity / Total Days
+    return round(total_quantity / total_days, 3)   '''  
 
 #calculation for shelf life of item
-def shelfLife():
-    Expiry date = Purchase Date'''
+def shelfLife(purchaseDate, expiryDate, item_name):
+    # Expiry date - Purchase Date
 
 
 #calculating expiry risk to determine if food waste is high/medium/low
