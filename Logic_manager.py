@@ -90,7 +90,7 @@ def shelfLife(item_name, csv_path="sample_database/stock.csv"):
                 
 
 #calculating expiry risk to determine if food waste is high/medium/low
-def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife):
+def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife,csv_path="sample_database/stick.csv"):
     # checking status of planned quantity and recommended quantity
     status = check_over_under(planned_quantity, recommended_quantity)
     if status == "over":
@@ -98,11 +98,19 @@ def calculateExpiryRisk(planned_quantity, recommended_quantity, dailyConsumption
         if dailyConsumptionRate <= 0:
             return "High Food Waste"
         
-        #calculation of time required to consume the total amount
+        current_quantity = 0.0
+        with open(csv_path, mode="r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                clean_row = {k.strip(): v.strip() for k, v in row.items()}
+                if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                    current_quantity = float(clean_row["Quantity"])
+                    break
+
+        # 2. Calculation of time required to consume the total amount
         timeToConsume = (
-            ("current_quantity" #take from stock.csv 
-            + planned_quantity ) / dailyConsumptionRate
-        )
+            current_quantity + planned_quantity
+        ) / dailyConsumptionRate
         
         # evaluating risk of food expiry
         if timeToConsume > shelfLife:
