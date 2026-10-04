@@ -107,8 +107,25 @@ def save_database(database, folder='database'):
         json.dump(database, f)
     print(f"Database saved successfully to {filename}.")
 
+#temporary code to load the kcal.csv file into a dictionary for testing purposes
+def load_kcal_database():
+    cal_db={}
+    with open('sample_database/kcal.csv', 'r') as f:
+        header = f.readline()  # Skip the header line
+        print(header.strip())  # Print the header of the kcal.csv file
+        column_names = header.replace('\n', '').split(',')  # Split the header into individual column names
+        for line in f:
+            print(line.strip())  # Print each line of the kcal.csv file
+            cal_values = line.strip().split(',')  # Split each line into individual values
+            cal_values[1] = int(cal_values[1]) 
+            cal_values[2] = int(cal_values[2]) 
+            cal_db[cal_values[0]] = {column_names[i]: cal_values[i] for i in range(1, len(column_names))}  # Create a dictionary for each food item with its corresponding values
+    print(cal_db)  # Print the entire kcal database dictionary for verification
+    return cal_db
 '''
 check_database()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
 save_database(database, 'database')  # Save the database to the specified folder
 '''
+
+
