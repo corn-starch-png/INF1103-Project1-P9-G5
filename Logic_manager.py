@@ -1,5 +1,6 @@
 import json 
 import statistics
+from datetime import datetime
 
 def get_user_input(): #simulate I/O layer
     item = input("Item: ")
@@ -24,16 +25,67 @@ def get_user_input(): #simulate I/O layer
 
 #check_over_under, first logic function 
 def check_over_under(planned_quantity, recommended_quantity):
-
+    
     if planned_quantity > recommended_quantity:
         return "over"
-
+   
     elif planned_quantity < recommended_quantity:
         return "under"
-
+   
     else:
         return "good"
 
+# calculation for shelf life of item
+def shelfLife(item_name, json_path="sample_database/stock.json"):
+    # Expiry date - Purchase Date
+    with open(json_path, mode="r", encoding="utf-8") as file:
+        data = json.load(file)
+        
+        for item in data.get("stock", []):
+            if item["Item_Name"].strip().lower() == item_name.strip().lower():
+                purchaseDate = datetime.strptime(item["Purchase_Date"].strip(), "%Y-%m-%d")
+                expiryDate = datetime.strptime(item["Expiry_Date"].strip(), "%Y-%m-%d")
+                
+                # Total shelf life (from purchase to expiry)
+                total_shelf_life = (expiryDate - purchaseDate).days
+                return total_shelf_life
+                
+    # if item not found         
+    return None      
+
+
+# calculating expiry risk to determine if food waste is high/medium/low
+def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, shelfLife, json_path="sample_database/stock.json"):
+    # checking status of planned quantity and recommended quantity
+    status = check_over_under(planned_quantity, recommended_quantity)
+    if status == "over":
+        # to prevent division errors while handling zero consumption rate
+        if "Ai output consumption rate" <= 0:
+            return "High Food Waste"
+        
+        # retrieve quantity of item from db
+        current_quantity = 0.0
+        with open(json_path, mode="r", encoding="utf-8") as file:
+            data = json.load(file)
+            for item in data.get("stock", []):
+                if item["Item_Name"].strip().lower() == item_name.strip().lower():
+                    current_quantity = float(item["Quantity"])
+                    break
+
+        # 2. Calculation of time required to consume the total amount
+        timeToConsume = (
+            current_quantity + planned_quantity
+        ) / "Ai output consumption rate"
+        
+        # evaluating risk of food expiry
+        if timeToConsume > shelfLife:
+            return "High Food Waste"
+        else:
+            return "Medium Food Waste"
+        
+    else:
+        # if check_over_under is "under" and "good"
+        return "Low Food Waste"
 
 #second logic funciton 
 def give_recommendation(user_input, ai_data):
@@ -43,10 +95,18 @@ def give_recommendation(user_input, ai_data):
         ai_data["recommended_quantity"]
     )
 
+    waste_risk = calculateExpiryRisk(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"],
+        "current_quanity",#to be added
+        "Ai output consumption rate", # to be calculated
+        "shelfLife" #to be calculated
+    )
+    
     return {
         "result": result,
         "advice": ai_data["reason"],
-        "waste_risk": None, #tTo be added
+        "waste_risk": None, #To be added 
         "confidence_score": None #to be added 
     }
 
