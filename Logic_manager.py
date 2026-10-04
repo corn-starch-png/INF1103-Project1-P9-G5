@@ -36,38 +36,6 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
-#calculating consumption rate
-def dailyConsumptionRate(item_name, csv_path="sample_database/consumption_history.csv"):
-    #daily consumption rate = total quantity consumed / no.of days 
-    total_quantity = 0.0
-    total_days = 0.0
-
-    with open(csv_path, mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        
-        for row in reader:
-            # Strip whitespace from keys and values to avoid mismatch issues
-            clean_row = {k.strip(): v.strip() for k, v in row.items()}
-            
-            # Match the item name (case-insensitive)
-            if clean_row["Item_Name"].lower() == item_name.strip().lower():
-                # Parse days: "5d" -> 5.0
-                days_str = clean_row["Date_Range"].lower().replace("d", "").strip()
-                days = float(days_str)
-                
-                # Parse quantity: e.g. "1" -> 1.0
-                quantity = float(clean_row["Quantity"])
-                
-                total_quantity += quantity
-                total_days += days
-
-    # Prevent division by zero if days is 0 or item not found
-    if total_days <= 0:
-        return 0.0
-
-    # Daily consumption rate = Total Quantity / Total Days
-    return round(total_quantity / total_days, 3)
-
 #calculation for shelf life of item
 def shelfLife(item_name, csv_path="sample_database/stock.csv"):
     # Expiry date - Purchase Date
@@ -90,12 +58,12 @@ def shelfLife(item_name, csv_path="sample_database/stock.csv"):
                 
 
 #calculating expiry risk to determine if food waste is high/medium/low
-def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, dailyConsumptionRate, shelfLife,csv_path="sample_database/stick.csv"):
+def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, shelfLife,csv_path="sample_database/stick.csv"):
     # checking status of planned quantity and recommended quantity
     status = check_over_under(planned_quantity, recommended_quantity)
     if status == "over":
         #to prevent division errors while handling zero consumption rate
-        if dailyConsumptionRate <= 0:
+        if "Ai output consumption rate" <= 0:
             return "High Food Waste"
         
         current_quantity = 0.0
@@ -110,7 +78,7 @@ def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, daily
         # 2. Calculation of time required to consume the total amount
         timeToConsume = (
             current_quantity + planned_quantity
-        ) / dailyConsumptionRate
+        ) / "Ai output consumption rate"
         
         # evaluating risk of food expiry
         if timeToConsume > shelfLife:
@@ -135,7 +103,7 @@ def give_recommendation(user_input, ai_data):
         user_input["planned_quantity"],
         ai_data["recommended_quantity"],
         "current_quanity",#to be added
-        "dailyConsumptionRate", # to be calculated
+        "Ai output consumption rate", # to be calculated
         "shelfLife" #to be calculated
     )
     
