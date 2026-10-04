@@ -185,13 +185,81 @@ def get_grocery_input():
         }
         
     ]
+
+def get_fridge_stock():
+    return [
+    {
+        "Item_Name": "Rice",
+        "Quantity": 5,
+        "Unit": "kg",
+        "Purchase_Date": "2026-09-01",
+        "Expiry_Date": "2027-09-01"
+    },
+    {
+        "Item_Name": "Milk",
+        "Quantity": 6,
+        "Unit": "carton",
+        "Purchase_Date": "2026-09-20",
+        "Expiry_Date": "2026-10-04"
+    },
+    {
+        "Item_Name": "Milk",
+        "Quantity": 2,
+        "Unit": "carton",
+        "Purchase_Date": "2026-09-20",
+        "Expiry_Date": "2026-10-04"
+    },
+    {
+        "Item_Name": "Milk",
+        "Quantity": 1,
+        "Unit": "carton",
+        "Purchase_Date": "2026-09-20",
+        "Expiry_Date": "2026-10-04"
+    },
+    {
+        "Item_Name": "Milk",
+        "Quantity": 10,
+        "Unit": "carton",
+        "Purchase_Date": "2026-09-20",
+        "Expiry_Date": "2026-10-04"
+    },
+    {
+        "Item_Name": "Chicken",
+        "Quantity": 1,
+        "Unit": "kg",
+        "Purchase_Date": "2026-09-23",
+        "Expiry_Date": "2026-09-26"
+    },
+    {
+        "Item_Name": "Chicken",
+        "Quantity": 2,
+        "Unit": "kg",
+        "Purchase_Date": "2026-09-25",
+        "Expiry_Date": "2026-09-26"
+    },
+    {
+        "Item_Name": "Chicken",
+        "Quantity": 1.5,
+        "Unit": "kg",
+        "Purchase_Date": "2026-09-27",
+        "Expiry_Date": "2026-09-29"
+    },
+    {
+        "Item_Name": "Chicken",
+        "Quantity": 1,
+        "Unit": "kg",
+        "Purchase_Date": "2026-09-28",
+        "Expiry_Date": "2026-09-30"
+    }
+    ]
 #endregion
 
 #region data preparation
-def prepare_data(household_profile, consumption_log, grocery_input):
+def prepare_data(household_profile, consumption_log, fridge_stock, grocery_input):
     return {
         "household_profile": household_profile,
         "consumption_log": consumption_log,
+        "fridge_stock": fridge_stock,
         "purchase_stock": grocery_input
     }
 #endregion
@@ -220,6 +288,10 @@ def get_recommendation_schema():
                             "type": "number",
                             "minimum": 0
                         },
+                        "estimated_calories": {
+                            "type": "number",
+                            "minimum": 0
+                        },
                         "reason": {
                             "type": "string"
                         }
@@ -229,14 +301,20 @@ def get_recommendation_schema():
                         "planned_quantity",
                         "unit",
                         "recommended_quantity",
+                        "estimated_calories",
                         "reason"
                     ],
                     "additionalProperties": False
                 }
+            },
+            "total_estimated_calories": {
+                "type": "number",
+                "minimum": 0
             }
         },
         "required": [
-            "recommendations"
+            "recommendations",
+            "total_estimated_calories"
         ],
         "additionalProperties": False
     }
@@ -245,15 +323,13 @@ def get_recommendation_schema():
 #region ai prompt
 def build_ai_prompt(data):
     return f"""
-You are a household food waste recommendation assistant.
+You are the food waste recommendation assistant for a household.
 
-Analyse the provided household information and generate
-a recommended purchase quantity for every item in the
-planned grocery list.
+On the provided household information, perform an analysis and assign the amount of each item that is recommended to be bought in the grocery list planned.
 
-Use ONLY the information provided below.
-Do not assume missing household information, consumption data,
-stock levels, or future events that are not explicitly provided.
+You are required to use only the information provided below.
+
+Do not make any assumptions about household data, consumption data, stock data, future data, or nutritional data, if the information is not provided.
 
 HOUSEHOLD PROFILE:
 {data["household_profile"]}
@@ -261,36 +337,45 @@ HOUSEHOLD PROFILE:
 CONSUMPTION HISTORY:
 {data["consumption_log"]}
 
-PLANNED PURCHASES AND CURRENT STOCK:
+CURRENT FRIDGE STOCK:
+{data["fridge_stock"]}
+
+PLANNED PURCHASES:
 {data["purchase_stock"]}
 
 ASSESSMENT CRITERIA:
-For each item, consider:
+For every item consider:
 1. Historical consumption
-2. Current stock
+2. Current fridge stock
 3. Planned purchase quantity
-4. Household size and characteristics, where relevant
-5. Consistency or variation in past consumption
-6. Amount and quality of available historical data
-7. Remarks provided for the item
+4. Information about household size and household characteristics, where applicable
+5. Whether there has been consistency or variation in previous consumption
+6. The quantity and quality of the historical data available
+7. Comments given for the item
 
 REMARKS:
-- Before calculating the recommended_quantity, check the item's remarks.
-- If a remark describes a temporary or unusual change in the household's needs, prioritise that information when making the recommendation.
-- Use the remark together with other relevant information, including current stock, planned quantity, and consumption history.
-- If no remark is provided, base the recommendation on the other available information.
+- Before calculating the recommended_quantity, you should check the item's remarks.
+- If a remark describes a temporary or unusual change in the household's needs,
+When making the recommendation, give that information the top priority.
+- The note is to be considered along with other information that includes current stock levels, planned quantity, family situation, and previous usage records.
+- If there are no notes made, derive the conclusion based on other pieces of information available.
+- Do not invent any situations or changes in the family which are not stated here.
 
 RECOMMENDED QUANTITY:
-The recommended_quantity represents the amount the household should purchase.
-The recommended quantity should:
-- consider current stock before recommending additional purchases
+The amount that the household should buy is the recommended_quantity.
+
+The recommended quantity shall:
+- consider current fridge stock before recommending additional purchases
 - reflect historical consumption where sufficient data is available
 - account for relevant remarks and temporary changes in needs
 - avoid unnecessary excess that may contribute to food waste
 - never be negative
 
 QUANTITY RULES:
-The only valid units are "count", "kg", and "L".
+The only valid units are:
+- "count"
+- "kg"
+- "L"
 
 If the unit is "count":
 - recommended_quantity must be a whole number
@@ -300,15 +385,59 @@ If the unit is "kg" or "L":
 - decimal quantities are allowed when appropriate
 - avoid unnecessary precision
 
-The recommended_quantity must use the same unit as the planned purchase.
+The unit that is recommended quantity should be the same as the one used for the planned purchase.
+
+ESTIMATED CALORIES:
+For every item, estimate the total calories represented by the
+Using typical nutritional values to determine the recommended quantity.
+
+The calorie value is an estimate only and must not be presented
+as exact nutritional information.
+
+If exact nutrition information is not provided:
+- use a reasonable typical calorie value for the food item
+- base the estimate on the recommended_quantity and its unit
+- use common nutritional assumptions appropriate to the item
+- avoid unnecessary precision
+- do not claim that the estimate represents a specific brand or product
+- do not invent exact nutrition-label values
+
+For every recommendation provide:
+- estimated_calories
+
+The estimated_calories represents the estimated total calories for
+that item's recommended_quantity.
+
+Also calculate:
+- total_estimated_calories
+
+total_estimated_calories must be the sum of estimated_calories
+for all recommendation items.
+
+CALORIE UNIT:
+- All estimated calorie values must be expressed in kilocalories (kcal).
+- estimated_calories and total_estimated_calories must be numeric kcal values.
+- Do not return calories in cal, kJ, or any other unit.
+
+REASON:
+Provide an explanation in 1-2 sentences for each recommended quantity.
+
+The reason shall:
+- reference relevant consumption history, current fridge stock,
+planned quantity, household information or remarks
+- explain the main factor affecting the recommended quantity
+- mention uncertainty where available information is limited
+- not contain information that was not provided
+- not present estimated calorie information as exact
 
 OUTPUT RULES:
-- Keep item, planned_quantity, and unit exactly as provided.
-- Do not modify or recalculate planned_quantity.
-- Only calculate recommended_quantity and reason.
-- Generate exactly one recommendation for every item in the planned grocery list.
-- Do not add items that are not present in the planned grocery list.
-
+- retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
+- do not modify or recalculate planned_quantity
+- only calculate recommended_quantity, estimated_calories and reason for each item
+For each item on the planned grocery list, make exactly one recommendation.
+- Make sure not to include any items that are not on the grocery list.
+- do not take any items off the grocery list that was planned.
+The total estimated calories must equal the sum of all the estimated calories values.
 """
 #endregion
 
@@ -343,33 +472,41 @@ def check_api_conn():
 
 #region Calling AI API
 def call_ai_api(prompt):
-    try:
-        client = create_ai_client()
-        ai_model = get_ai_model()
+    client = create_ai_client()
+    ai_model = get_ai_model()
+    max_retries = int(os.getenv("MAX_RETRIES", 2))
 
-        update_ai_status("Request sent. Waiting for AI response...")
-        start_time = time.time()
+    for attempt in range(max_retries + 1):
+        try:
+            if attempt == 0:
+                update_ai_status("Request sent. Waiting for AI response...")
+            else:
+                update_ai_status(f"Retrying AI request. \n({attempt}/{max_retries})")
+            start_time = time.time()
 
-        response = client.chat.completions.create(
-            model=ai_model,
-            messages=[{"role": "user","content": prompt}],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "food_waste_recommendations",
-                    "strict": True,
-                    "schema": get_recommendation_schema()
+            response = client.chat.completions.create(
+                model=ai_model,
+                messages=[{"role": "user","content": prompt}],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "food_waste_recommendations",
+                        "strict": True,
+                        "schema": get_recommendation_schema()
+                    }
                 }
-            }
-        )
-        
-        elapsed_time = time.time() - start_time
-        print(response.to_json)
-        update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
-
-        return get_ai_response_content(response), None
-    except Exception as error:
-        return None, handle_ai_exception(error)
+            )
+            elapsed_time = time.time() - start_time
+            update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
+            content = get_ai_response_content(response)
+            return content, None
+        except Exception as error:
+            if (should_retry_ai_error(error) and attempt < max_retries):
+                retry_delay = 3 * (attempt + 1)
+                update_ai_status(f"Temporary AI error.\nRetrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                continue
+            return None, handle_ai_exception(error)
 #endregion
 
 #region get Response Content
@@ -399,6 +536,21 @@ def handle_ai_exception(error):
     return(f"Unexpected AI API error: {error}")
 #endregion
 
+#region AI Error Retry Logic
+def should_retry_ai_error(error):
+    if isinstance(error, RateLimitError):
+        return True
+    if isinstance(error, APIConnectionError):
+        return True
+    if isinstance(error, APIStatusError):
+        return error.status_code >= 500
+    # Handles:
+    # 1. AI returned no response choices.
+    # 2. AI returned an empty response.
+    if isinstance(error, ValueError):
+        return True
+    return False
+
 #region AI STATUS UPDATE
 def update_ai_status(message):
     print(f"[AI STATUS] {message}")
@@ -408,29 +560,41 @@ def update_ai_status(message):
 def process_ai_response(ai_response):
     try:
         data = json.loads(ai_response)
+    except (json.JSONDecodeError, TypeError):
+        return None, "AI returned invalid JSON response."
+    # Top-level response must be a dictionary
+    if not isinstance(data, dict):
+        return None, (f"Invalid AI response structure. \nExpected dict, received {type(data).__name__}.")
+    # Validate recommendations list
+    recommendations = data.get("recommendations")
+    if not isinstance(recommendations, list):
+        return None, ("AI response does not contain a valid 'recommendations' list.")
+    # Validate each recommendation object
+    for item in recommendations:
+        if not isinstance(item, dict):
+            return None, (f"Invalid recommendation structure. \nExpected dict, received {type(item).__name__}.")
+        estimated_calories = item.get("estimated_calories")
+        if not isinstance(estimated_calories, (int, float)):
+            return None, (f"estimated_calories for {item.get('item', 'Unknown')} must be numeric.")
+        if estimated_calories < 0:
+            return None, (f"estimated_calories for {item.get('item', 'Unknown')} cannot be negative.")
 
-    except json.JSONDecodeError:
-        print("Error: AI returned invalid JSON Response.")
-        print(ai_response)
-        return []
+    # Validate total estimated calories
+    total_calories = data.get("total_estimated_calories")
+    if not isinstance(total_calories, (int, float)):
+        return None, ("total_estimated_calories must be numeric.")
+    if total_calories < 0:
+        return None, ("total_estimated_calories cannot be negative.")
 
-    if isinstance(data, dict):
-        recommendations = data.get("recommendations")
-        if not isinstance(recommendations, list):
-            return [], ("AI response does not contain a valid\n'recommendations' list.")
-    # Fallback: AI returned the list directly
-    elif isinstance(data, list):
-        recommendations = data
-        data = {"recommendations": recommendations}
-    else:
-        return [], (f"Unsupported AI response structure:\n {type(data).__name__}")
-    
+    # Validate total against item calorie sum
+    calculated_total = sum(item["estimated_calories"] for item in recommendations)
+    if abs(calculated_total - total_calories) > 0.01:
+        return None, ("total_estimated_calories does not match the sum of estimated_calories.")
     return data, None
 #endregion
 
 #region [DEV ONLY] main ai process calling
 def ai_main():
-
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
 
@@ -442,14 +606,14 @@ def ai_main():
     print("\n")
     
     user_id = 1
-
     update_ai_status("Fetching household data...")
     household_profile = get_household_profile(user_id)
     consumption_log = get_consumption_log(user_id)
+    fridge_stock = get_fridge_stock()
     purchase_stock = get_grocery_input()
 
     update_ai_status("Preparing AI input...")
-    data = prepare_data(household_profile, consumption_log, purchase_stock)
+    data = prepare_data(household_profile, consumption_log, fridge_stock, purchase_stock)
     
     update_ai_status("Building AI prompt...")
     prompt = build_ai_prompt(data)
@@ -457,25 +621,22 @@ def ai_main():
     update_ai_status("Sending prompt to AI...")
     ai_response, error = call_ai_api(prompt)
 
-    #region [DEV] DEBUG PREVIEW AI RESPONSE
-    print("\n[DEV] RAW AI RESPONSE:")
-    print(ai_response)
-    print("\n")
-    #endregion
-
     if error: 
         update_ai_status("AI request failed.")
         print(error) 
         return
     
     update_ai_status("Validating AI output...")
-    recommendations, error = process_ai_response(ai_response)
+    ai_output, error = process_ai_response(ai_response)
     if error:
         update_ai_status("AI output validation failed.")
         print(error)
         return
+    recommendations = ai_output.get("recommendations", [])
+    total_estimated_calories = ai_output.get("total_estimated_calories", 0)
     print(recommendations)
-    
+    print(f"Total Estimated Calories: {total_estimated_calories} kcal")
+
     update_ai_status("Completed.")
 #endregion
 
