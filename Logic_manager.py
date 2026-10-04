@@ -66,6 +66,7 @@ def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, shelf
         if "Ai output consumption rate" <= 0:
             return "High Food Waste"
         
+        #retrieve quantity of item from db
         current_quantity = 0.0
         with open(csv_path, mode="r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
