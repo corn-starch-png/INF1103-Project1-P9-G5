@@ -78,12 +78,44 @@ def check_data(record, table):
         return False, "Data length is incorrect"
 
 
+def check_database(database):
+    errors = []
+    for table in file_structure:
+        if table not in database:
+            errors.append(f"Missing table '{table}' in the database.")
+            database[table] = []  # Initialize missing tables with an empty list
+            continue
+        for entry in database[table]:
+            if not isinstance(entry, dict):
+                errors.append(f"Invalid entry in table '{table}': {entry}. Expected a dictionary.")
+                database[table].remove(entry)  # Remove invalid entries
+                continue
+
+            #check if all expected keys are present in the entry
+            expected_keys = file_structure[table].split(',')
+            missing_key=False
+            for key in expected_keys:
+                if key not in entry:
+                    errors.append(f"Missing key '{key}' in entry {entry} of table '{table}'.")
+                    missing_key = True
+            if missing_key:
+                database[table].remove(entry)  # Remove invalid entries
+                continue
+
+            # Validate the data types of each entry in the table
+            check_result, error_message = check_data(entry, table)
+            if not check_result:
+                errors.append(f"Invalid data in table '{table}': {entry}. Error: {error_message}")
+                database[table].remove(entry)  # Remove invalid entries
+    return database, errors
+
+
 def create_empty_database():
     # Create an empty database structure
     return {file: [] for file in file_structure}
 
 
-def check_database(folder='database'):
+def database_exists(folder='database'):
     # Implementation for creating the database
     if not os.path.exists(folder):
         print(f"Database not found. Creating database folder: {folder}")
@@ -111,35 +143,8 @@ def load_database(folder='database'):
         errors.append(f"File {filename} not found. Initializing with an empty database.")
         database = create_empty_database()  # Initialize with an empty database if the file doesn't exist
 
-    #TODO: Add validation for the loaded data to ensure it matches the expected structure and types
-    for table in file_structure:
-        if table not in database:
-            errors.append(f"Missing table '{table}' in the database. Initializing with an empty list.")
-            database[table] = []  # Initialize missing tables with an empty list
-
-        for entry in database[table]:
-            if not isinstance(entry, dict):
-                errors.append(f"Invalid entry in table '{table}': {entry}. Expected a dictionary.")
-                database[table].remove(entry)  # Remove invalid entries
-                continue
-
-            #check if all expected keys are present in the entry
-            expected_keys = file_structure[table].split(',')
-            skip_flag = False
-            for key in expected_keys:
-                if key not in entry:
-                    errors.append(f"Missing key '{key}' in entry {entry} of table '{table}'.")
-                    database[table].remove(entry)  # Remove invalid entries
-                    skip_flag = True
-                    break
-            if skip_flag:
-                continue
-
-            # Validate the data types of each entry in the table
-            check_result, error_message = check_data(entry, table)
-            if not check_result:
-                errors.append(f"Invalid data in table '{table}': {entry}. Error: {error_message}")
-                database[table].remove(entry)  # Remove invalid entries
+    database, validation_errors = check_database(database)
+    errors.extend(validation_errors)  # Add any validation errors to the errors list
                     
     if not errors:
         print("Database loaded successfully.")
@@ -158,6 +163,12 @@ def save_database(database, folder='database'):
         json.dump(database, f)
     print(f"Database saved successfully to {filename}.")
 
+
+
+
+
+
+#--------------------------------------for testing----------------------------------------------
 #temporary code to load the kcal.csv file into a dictionary for testing purposes
 def load_kcal_database():
     cal_db={}
@@ -172,11 +183,10 @@ def load_kcal_database():
     print(cal_db)  # Print the entire kcal database dictionary for verification
     return cal_db
 
-
-
-check_database()  # Ensure the database folder and file exist
+'''
+database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
 save_database(database, 'database')  # Save the database to the specified folder
-
+'''
 
 
