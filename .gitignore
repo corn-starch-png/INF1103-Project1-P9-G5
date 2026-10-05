@@ -1,4 +1,2 @@
-database/consumption_history.csv
-database/household_info.csv
-database/stock.csv
+database/
 __pycache__/
