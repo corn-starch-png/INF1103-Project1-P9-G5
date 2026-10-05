@@ -36,7 +36,7 @@ def check_over_under(planned_quantity, recommended_quantity):
         return "good"
 
 # calculation for shelf life of item
-def shelfLife(item_name, json_path="sample_database/stock.json"):
+def shelf_life(item_name, json_path="sample_database/stock.json"):
     # Expiry date - Purchase Date
     with open(json_path, mode="r", encoding="utf-8") as file:
         data = json.load(file)
@@ -55,7 +55,7 @@ def shelfLife(item_name, json_path="sample_database/stock.json"):
 
 
 # calculating expiry risk to determine if food waste is high/medium/low
-def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, shelfLife, json_path="sample_database/stock.json"):
+def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, shelf_life, json_path="sample_database/stock.json"):
     # checking status of planned quantity and recommended quantity
     status = check_over_under(planned_quantity, recommended_quantity)
     if status == "over":
@@ -73,12 +73,12 @@ def calculateExpiryRisk(item_name, planned_quantity, recommended_quantity, shelf
                     break
 
         # 2. Calculation of time required to consume the total amount
-        timeToConsume = (
+        time_to_consume = (
             current_quantity + planned_quantity
         ) / "Ai output consumption rate"
         
         # evaluating risk of food expiry
-        if timeToConsume > shelfLife:
+        if time_to_consume > shelf_life:
             return "High Food Waste"
         else:
             return "Medium Food Waste"
@@ -95,7 +95,7 @@ def give_recommendation(user_input, ai_data):
         ai_data["recommended_quantity"]
     )
 
-    waste_risk = calculateExpiryRisk(
+    waste_risk = calculate_expiry_risk(
         user_input["planned_quantity"],
         ai_data["recommended_quantity"],
         "current_quanity",#to be added
