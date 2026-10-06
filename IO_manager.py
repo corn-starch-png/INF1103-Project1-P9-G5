@@ -1,44 +1,3 @@
-# Backup code for multi user
-# user_list = {}
-# print("Welcome to the Waste Management System!")
-# new_user = input("Are you a new user? (yes/no): ").strip().lower()
-# if new_user == "yes":
-#     username = input("Please enter your username to use for future logins: ").strip()
-#     age = input("Please enter your age: ").strip()
-#     gender = input("Please enter your gender: ").strip()
-#     Dietary_restrictions = input("Please enter your dietary restrictions (if any): ").strip()
-#     family = input("Please enter your family size including yourself: ").strip()
-#     user_list[username] = {
-#         "age": age,
-#         "gender": gender,
-#         "dietary_restrictions": Dietary_restrictions,
-#         "family_size": family,
-#         "family_members": {}
-#     }
-#     if family > 1:
-#         for i in range(int(family)-1):
-#             member_name = input(f"Please enter the name of family member {i + 1}: ").strip()
-#             age = input(f"Please enter the age of {member_name}: ").strip()
-#             gender = input(f"Please enter the gender of {member_name}: ").strip()
-#             dietary_restrictions = input(f"Please enter the dietary restrictions of {member_name} (if any): ").strip()
-#             user_list[username]["family_members"][i +1] = {
-#                 "name": member_name,
-#                 "age": age,
-#                 "gender": gender,
-#                 "dietary_restrictions": dietary_restrictions
-#             }
-    
-            
-#     print(f"User {username} registered successfully!")
-
-# else:
-#     username = input("Please enter your username: ").strip()
-#     if username in user_list:
-#         print(f"Welcome back, {username}!")
-#     else:
-#         print("Username not found. Please register as a new user.")
-
-
 user_check = {}
 remaining_items = []
 valid_units = ["kg", "g", "l", "ml", "pcs"]
@@ -46,11 +5,37 @@ valid_units = ["kg", "g", "l", "ml", "pcs"]
 print("Welcome to the Waste Management System!")
 
 if user_check == {}:
-    name = input("Please enter your name: ").strip()
-    age = input("Please enter your age: ").strip()
-    gender = input("Please enter your gender: ").strip()
-    dietary_restrictions = input("Please enter your dietary restrictions (if any): ").strip()
-    family = int(input("Please enter your family size including yourself: ").strip())
+    valid_genders = ["male", "female"]
+ 
+    while True:
+        name = input("Please enter your name: ").strip()
+        if name != "":
+            break
+        print("Name can't be empty.")
+ 
+    while True:
+        age = input("Please enter your age: ").strip()
+        if age.isdigit() and int(age) <= 120:
+            age = int(age)
+            break
+        print("Please enter a valid age (whole number between 0 and 120).")
+ 
+    while True:
+        gender = input(f"Please enter your gender ({', '.join(valid_genders)}): ").strip().lower()
+        if gender in valid_genders:
+            break
+        print("Please enter male or female")
+ 
+    dietary_restrictions = input("Please enter your dietary restrictions (leave blank if none): ").strip()
+    if dietary_restrictions == "":
+        dietary_restrictions = "none"
+ 
+    while True:
+        family = input("Please enter your family size including yourself: ").strip()
+        if family.isdigit() and 1 <= int(family) <= 20:
+            family = int(family)
+            break
+        print("Please enter a whole number between 1 and 20.")
  
     user_check = {
         "name": name,
@@ -62,10 +47,29 @@ if user_check == {}:
     }
  
     for i in range(family - 1):
-        member_name = input(f"Please enter the name of family member {i + 1}: ").strip()
-        member_age = input(f"Please enter the age of {member_name}: ").strip()
-        member_gender = input(f"Please enter the gender of {member_name}: ").strip()
-        member_diet = input(f"Please enter the dietary restrictions of {member_name} (if any): ").strip()
+        while True:
+            member_name = input(f"Please enter the name of family member {i + 1}: ").strip()
+            if member_name != "":
+                break
+            print("Name can't be empty.")
+ 
+        while True:
+            member_age = input(f"Please enter the age of {member_name}: ").strip()
+            if member_age.isdigit() and int(member_age) <= 120:
+                member_age = int(member_age)
+                break
+            print("Please enter a valid age (whole number between 0 and 120).")
+ 
+        while True:
+            member_gender = input(f"Please enter the gender of {member_name} ({', '.join(valid_genders)}): ").strip().lower()
+            if member_gender in valid_genders:
+                break
+            print("Please enter male or female")
+ 
+        member_diet = input(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ").strip()
+        if member_diet == "":
+            member_diet = "none"
+ 
         user_check["family_members"][i + 1] = {
             "name": member_name,
             "age": member_age,
