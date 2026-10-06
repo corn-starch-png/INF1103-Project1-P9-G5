@@ -1,12 +1,13 @@
 import os
 import json
 
-db_filename = 'db.json'
-file_structure = {
+DB_FILENAME = 'db.json'
+FILE_STRUCTURE = {
     'consumption_history': 'Date_Range,Item_Name,Quantity,Unit,Remarks',
     'household_info': 'Person_ID,Age,Gender,Dietary_Restriction',
     'stock': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date'
 }
+KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 
 
 def check_data(record, table):
@@ -80,7 +81,7 @@ def check_data(record, table):
 
 def check_database(database):
     errors = []
-    for table in file_structure:
+    for table in FILE_STRUCTURE:
         if table not in database:
             errors.append(f"Missing table '{table}' in the database.")
             database[table] = []  # Initialize missing tables with an empty list
@@ -92,7 +93,7 @@ def check_database(database):
                 continue
 
             #check if all expected keys are present in the entry
-            expected_keys = file_structure[table].split(',')
+            expected_keys = FILE_STRUCTURE[table].split(',')
             missing_key=False
             for key in expected_keys:
                 if key not in entry:
@@ -112,7 +113,7 @@ def check_database(database):
 
 def create_empty_database():
     # Create an empty database structure
-    return {file: [] for file in file_structure}
+    return {file: [] for file in FILE_STRUCTURE}
 
 
 def database_exists(folder='database'):
@@ -120,7 +121,7 @@ def database_exists(folder='database'):
     if not os.path.exists(folder):
         print(f"Database not found. Creating database folder: {folder}")
         os.makedirs(folder, exist_ok=True)
-    filename = os.path.join(folder, db_filename)
+    filename = os.path.join(folder, DB_FILENAME)
     if not os.path.exists(filename):
         print(f"File {filename} not found. Creating file: {filename}")
         with open(filename, 'w') as f:
@@ -131,7 +132,7 @@ def load_database(folder='database'):
     
     # Implementation for loading the database
     errors = []
-    filename = os.path.join(folder, db_filename)
+    filename = os.path.join(folder, DB_FILENAME)
     if os.path.exists(filename):
         with open(filename, 'r') as f:
             try:
@@ -158,7 +159,7 @@ def load_database(folder='database'):
 
 def save_database(database, folder='database'):
     # Implementation for saving the database
-    filename = os.path.join(folder, db_filename)
+    filename = os.path.join(folder, DB_FILENAME)
     with open(filename, 'w') as f:
         json.dump(database, f)
     print(f"Database saved successfully to {filename}.")
@@ -179,7 +180,7 @@ def load_kcal_database():
             cal_values = line.strip().split(',')  # Split each line into individual values
             cal_values[1] = int(cal_values[1]) 
             cal_values[2] = int(cal_values[2]) 
-            cal_db[cal_values[0]] = {column_names[i]: cal_values[i] for i in range(1, len(column_names))}  # Create a dictionary for each food item with its corresponding values
+            cal_db[int(cal_values[0])] = {column_names[i]: cal_values[i] for i in range(1, len(column_names))}  # Create a dictionary for each food item with its corresponding values
     print(cal_db)  # Print the entire kcal database dictionary for verification
     return cal_db
 
@@ -188,5 +189,5 @@ database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
 save_database(database, 'database')  # Save the database to the specified folder
 '''
-
+load_kcal_database()  # Load the kcal database for testing purposes
 

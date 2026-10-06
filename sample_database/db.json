@@ -5,15 +5,15 @@
         {"Date_Range": 1, "Item_Name": "Chicken", "Quantity": 5, "Unit": "kg", "Remarks": "20paxGathering"}
     ], 
     "household_info": [
-        {"Person_ID": 1, "Age": 45, "Gender": "Male", "Dietary_Restriction": "None"}, 
-        {"Person_ID": 2, "Age": 42, "Gender": "Female", "Dietary_Restriction": "Vegetarian"}, 
-        {"Person_ID": 3, "Age": 16, "Gender": "Male", "Dietary_Restriction": "None"}
+        {"Person_ID": 1, "Name": "John Doe", "Age": 45, "Gender": "Male", "Dietary_Restriction": "None"}, 
+        {"Person_ID": 2, "Name": "Jane Smith", "Age": 42, "Gender": "Female", "Dietary_Restriction": "Vegetarian"}, 
+        {"Person_ID": 3, "Name": "Bob Johnson", "Age": 16, "Gender": "Male", "Dietary_Restriction": "None"}
     ], 
     "stock": [
         {"Item_Name": "Rice", "Quantity": 5, "Unit": "kg", "Purchase_Date": "2026-09-01", "Expiry_Date": "2027-09-01"}, 
-        {"Item_Name": "Milk", "Quantity": 6, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04"}, 
-        {"Item_Name": "Milk", "Quantity": 2, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04"}, 
-        {"Item_Name": "Milk", "Quantity": 1, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04"}, 
+        {"Item_Name": "Milk", "Quantity": 6, "Unit": "carton", "Purchase_Date": "", "Expiry_Date": "2026-10-04"}, 
+        {"Item_Name": "Milk", "Quantity": 2, "Unit": "carton", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05"}, 
+        {"Item_Name": "Milk", "Quantity": 1, "Unit": "carton", "Purchase_Date": "2026-09-22", "Expiry_Date": "2026-10-06"}, 
         {"Item_Name": "Milk", "Quantity": 10, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04"}, 
         {"Item_Name": "Chicken", "Quantity": 1, "Unit": "kg", "Purchase_Date": "2026-09-23", "Expiry_Date": "2026-09-26"}, 
         {"Item_Name": "Chicken", "Quantity": 2, "Unit": "kg", "Purchase_Date": "2026-09-25", "Expiry_Date": "2026-09-26"}, 
