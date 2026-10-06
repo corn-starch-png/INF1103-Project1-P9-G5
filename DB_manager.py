@@ -177,6 +177,38 @@ def get_all_quantity(database, item_name):
     return total_quantity
 
 
+def update_consumption_history(database, update_list):
+    for item in update_list:
+        database.get('consumption_history', []).append(item)  # Append each item in the update list to the consumption_history table
+    return database
+
+
+def add_to_fridge(database, update_list):
+    for item in update_list:
+        if item.get("Purchase_Date") and item.get("Expiry_Date"):
+            database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
+    return database
+
+
+def remove_from_fridge(database, update_list):  
+    for item in update_list:
+        amount_to_remove = item.get('Quantity', 0)
+        for entry in database.get('fridge', []).copy():  # Use copy() to avoid modifying the list while iterating
+            if entry.get('Item_Name').lower() == item.get('Item_Name').lower():
+                if entry.get('Quantity') >= amount_to_remove:
+                    entry['Quantity'] -= amount_to_remove
+                    amount_to_remove = 0
+                    if entry['Quantity'] == 0:
+                        database.get('fridge', []).remove(entry)
+                else:
+                    amount_to_remove -= entry.get('Quantity')
+                    database.get('fridge', []).remove(entry)
+                if amount_to_remove == 0:
+                    break
+            
+
+    return database 
+
 
 #--------------------------------------for testing----------------------------------------------
 #temporary code to load the kcal.csv file into a dictionary for testing purposes
@@ -196,7 +228,8 @@ def load_kcal_database():
 
 database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
-
+record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Date_Range": 5, "Remarks": "None"}]
+database = remove_from_fridge(database, record)
 #print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
 
 save_database(database, 'database')  # Save the database to the specified folder
