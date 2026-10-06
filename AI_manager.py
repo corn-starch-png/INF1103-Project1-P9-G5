@@ -758,6 +758,7 @@ def ai_main():
     ai_recommendations, error  = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
     if error:
         print(f"Error: {error}")
+        return
     recommendations = ai_recommendations.get("recommendations", [])
     total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
 
@@ -765,5 +766,7 @@ def ai_main():
     print(f"Total Estimated Calories: {total_estimated_calories}")
 #endregion
 
-if __name__ == "__main__":
-    ai_main()
+#region [DEV ONLY] main ai process calling
+#if __name__ == "__main__":
+#    ai_main()
+#endregion

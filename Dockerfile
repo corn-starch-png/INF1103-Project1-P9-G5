@@ -11,4 +11,3 @@ COPY . .
 #main application building
 #[DEV] Change the second parameter for testing specific file
 #CMD ["python", "main.py"]
-CMD ["python", "AI_manager.py"]
