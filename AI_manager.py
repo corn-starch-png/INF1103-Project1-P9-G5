@@ -1,3 +1,4 @@
+from datetime import date
 import json
 import os
 import time
@@ -33,116 +34,149 @@ def get_ai_model():
 #endregion
 
 #TODO: proper data fetching from IO Manager
-#region data fetching
-def get_household_profile(user_id):
-    return {
-        "user_id": user_id,
-        "household_size": 4,
-        "adults": 2,
-        "children": 2,
-        "dietary_preferences": [],
-        "notes": "Household usually cooks at home on weekdays."
+#[DEV] region data fetching
+def get_household_info():
+    return {"consumption_history": [
+        {"Person_ID": 1, "Name": "John Doe", "Age": 45, "Gender": "Male", "Dietary_Restriction": "None"}, 
+        {"Person_ID": 2, "Name": "Jane Smith", "Age": 42, "Gender": "Female", "Dietary_Restriction": "Vegetarian"}, 
+        {"Person_ID": 3, "Name": "Bob Johnson", "Age": 16, "Gender": "Male", "Dietary_Restriction": "None"}
+    ]
     }
 
-def get_consumption_log(user_id):
-    return [
-        #unit - l
-        {
-            "item": "Milk",
-            "week": "Week 1",
-            "consumed_quantity": 2,
-            "unit": "L",
-            "remarks": ""
-        },
-        {
-            "item": "Milk",
-            "week": "Week 2",
-            "consumed_quantity": 1,
-            "unit": "L",
-            "remarks": ""
-        },
-        {
-            "item": "Milk",
-            "week": "Week 3",
-            "consumed_quantity": 2,
-            "unit": "L",
-            "remarks": ""
-        },
-        #unit - count
-        {
-            "item": "Eggs",
-            "week": "Week 1",
-            "consumed_quantity": 11,
-            "unit": "count",
-            "remarks": ""
-        },
-        {
-            "item": "Eggs",
-            "week": "Week 2",
-            "consumed_quantity": 12,
-            "unit": "count",
-            "remarks": ""
-        },
-        {
-            "item": "Eggs",
-            "week": "Week 3",
-            "consumed_quantity": 11,
-            "unit": "count",
-            "remarks": ""
-        },
-        #unit - kg
-        {
-            "item": "Chicken",
-            "week": "Week 1",
-            "consumed_quantity": 1.5,
-            "unit": "kg",
-            "remarks": ""
-        },
-        {
-            "item": "Chicken",
-            "week": "Week 2",
-            "consumed_quantity": 1.2,
-            "unit": "kg",
-            "remarks": ""
-        },
-        {
-            "item": "Chicken",
-            "week": "Week 3",
-            "consumed_quantity": 1.1,
-            "unit": "kg",
-            "remarks": ""
-        },
-        #test fanta
-        {
-            "item": "Fanta",
-            "week": "Week 1",
-            "consumed_quantity": 1,
-            "unit": "L",
-            "remarks": ""
-        },
-        {
-            "item": "Fanta",
-            "week": "Week 2",
-            "consumed_quantity": 3,
-            "unit": "L",
-            "remarks": ""
-        },
-        #test apple
-        {
-            "item": "Apple",
-            "week": "Week 1",
-            "consumed_quantity": 12,
-            "unit": "count",
-            "remarks": ""
-        },
-        {
-            "item": "Apple",
-            "week": "Week 2",
-            "consumed_quantity": 14,
-            "unit": "count",
-            "remarks": ""
-        }
-    ]
+def get_consumption_history():
+    return {"consumption_history": [
+            {
+                "Date_Range": 5,
+                "Item_Name": "Milk",
+                "Quantity": 1.5,
+                "Unit": "L",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Milk",
+                "Quantity": 1.8,
+                "Unit": "L",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Milk",
+                "Quantity": 1.6,
+                "Unit": "L",
+                "Remarks": "None"
+            },
+
+            {
+                "Date_Range": 5,
+                "Item_Name": "Eggs",
+                "Quantity": 10,
+                "Unit": "count",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Eggs",
+                "Quantity": 12,
+                "Unit": "count",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Eggs",
+                "Quantity": 11,
+                "Unit": "count",
+                "Remarks": "None"
+            },
+
+            {
+                "Date_Range": 5,
+                "Item_Name": "Chicken",
+                "Quantity": 1.2,
+                "Unit": "kg",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Chicken",
+                "Quantity": 1.4,
+                "Unit": "kg",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Chicken",
+                "Quantity": 5,
+                "Unit": "kg",
+                "Remarks": "20pax Gathering"
+            },
+
+            {
+                "Date_Range": 5,
+                "Item_Name": "Fanta",
+                "Quantity": 1,
+                "Unit": "L",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Fanta",
+                "Quantity": 1.5,
+                "Unit": "L",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Fanta",
+                "Quantity": 8,
+                "Unit": "L",
+                "Remarks": "Birthday party"
+            },
+
+            {
+                "Date_Range": 5,
+                "Item_Name": "Apple",
+                "Quantity": 12,
+                "Unit": "count",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Apple",
+                "Quantity": 14,
+                "Unit": "count",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Apple",
+                "Quantity": 6,
+                "Unit": "count",
+                "Remarks": "Parents away for part of the period"
+            },
+            {
+                "Date_Range": 5,
+                "Item_Name": "Rice",
+                "Quantity": 0.8,
+                "Unit": "kg",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 10,
+                "Item_Name": "Rice",
+                "Quantity": 1.0,
+                "Unit": "kg",
+                "Remarks": "None"
+            },
+            {
+                "Date_Range": 15,
+                "Item_Name": "Rice",
+                "Quantity": 0.9,
+                "Unit": "kg",
+                "Remarks": "None"
+            }
+        ]
+    }
 
 def get_grocery_input():
     return [
@@ -167,7 +201,6 @@ def get_grocery_input():
             "unit": "kg",
             "remarks": ""
         },
-        #Anomaly (party - more people)
         {
             "item": "Fanta",
             "current_stock": 0,
@@ -175,19 +208,24 @@ def get_grocery_input():
             "unit": "L",
             "remarks": "House party with 100 guests on monday"
         },
-        #Anomaly (vacation - less people)
         {
             "item": "Apple",
             "current_stock": 0,
             "planned_quantity": 13,
             "unit": "count",
-            "remarks": "Parents left for holiday on wednesday "
+            "remarks": "Parents left for holiday on wednesday"
+        },
+        {
+            "item": "Rice",
+            "current_stock": 4,
+            "planned_quantity": 2,
+            "unit": "kg",
+            "remarks": ""
         }
-        
     ]
 
 def get_fridge_stock():
-    return [
+    return {"fridge_stock": [
     {
         "Item_Name": "Rice",
         "Quantity": 5,
@@ -252,15 +290,19 @@ def get_fridge_stock():
         "Expiry_Date": "2026-09-30"
     }
     ]
+    }
 #endregion
 
+#For main.py to prepare data for AI processing
 #region data preparation
-def prepare_data(household_profile, consumption_log, fridge_stock, grocery_input):
+def prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input, current_date=None, next_purchase_date=None):
     return {
-        "household_profile": household_profile,
-        "consumption_log": consumption_log,
+        "household_info": household_info,
+        "consumption_history": consumption_history,
         "fridge_stock": fridge_stock,
-        "purchase_stock": grocery_input
+        "planned_grocery_list": grocery_list_input,
+        "current_date": current_date,
+        "next_purchase_date": next_purchase_date
     }
 #endregion
 
@@ -288,6 +330,10 @@ def get_recommendation_schema():
                             "type": "number",
                             "minimum": 0
                         },
+                        "consumption_rate": {
+                            "type": "number",
+                            "minimum": 0
+                        },
                         "estimated_calories": {
                             "type": "number",
                             "minimum": 0
@@ -301,6 +347,7 @@ def get_recommendation_schema():
                         "planned_quantity",
                         "unit",
                         "recommended_quantity",
+                        "consumption_rate",
                         "estimated_calories",
                         "reason"
                     ],
@@ -332,26 +379,35 @@ You are required to use only the information provided below.
 Do not make any assumptions about household data, consumption data, stock data, future data, or nutritional data, if the information is not provided.
 
 HOUSEHOLD PROFILE:
-{data["household_profile"]}
+{data["household_info"]}
 
 CONSUMPTION HISTORY:
-{data["consumption_log"]}
+{data["consumption_history"]}
 
 CURRENT FRIDGE STOCK:
 {data["fridge_stock"]}
 
 PLANNED PURCHASES:
-{data["purchase_stock"]}
+{data["planned_grocery_list"]}
+
+CURRENT DATE:
+{data["current_date"]}
+
+PLANNED NEXT PURCHASE DATE:
+{data["next_purchase_date"]}
+
 
 ASSESSMENT CRITERIA:
 For every item consider:
 1. Historical consumption
-2. Current fridge stock
-3. Planned purchase quantity
-4. Information about household size and household characteristics, where applicable
-5. Whether there has been consistency or variation in previous consumption
-6. The quantity and quality of the historical data available
-7. Comments given for the item
+2. Weekly consumption rate
+3. Current fridge stock
+4. Planned purchase quantity
+5. Number of days until the next planned purchase
+6. Household size and household characteristics, where applicable
+7. Consistency or variation in previous consumption
+8. Quantity and quality of historical data available
+9. Remarks provided for the item
 
 REMARKS:
 - Before calculating the recommended_quantity, you should check the item's remarks.
@@ -429,6 +485,46 @@ planned quantity, household information or remarks
 - mention uncertainty where available information is limited
 - not contain information that was not provided
 - not present estimated calorie information as exact
+
+PURCHASE PERIOD:
+- Use CURRENT DATE and PLANNED NEXT PURCHASE DATE to determine
+  how many days the recommended purchase needs to cover.
+- Consider whether existing fridge stock is likely to last until
+  the next planned purchase date.
+- Do not assume another grocery purchase will occur before the
+  planned next purchase date.
+
+WEEKLY CONSUMPTION RATE:
+For all items that are supposed to be purchased,
+compute the consumption rate.
+
+Consumption rate is the estimated amount that
+is consumed within a period of 7 days.
+
+A Consumption History entry comprises of:
+- Date Range: number of days in the record
+- Quantity: amount of consumption in the Date_Range
+- Unit: unit of measurement
+
+When normalising consumption for a historical record:
+
+weekly_rate = (Quantity / Date_Range) * 7
+
+Where there are several historical records for a product:
+- Calculate the weekly_rate for each relevant record
+- Look out for remarks of any unusual or special consumption
+- Do not use an unusual event as the normal consumption
+  pattern of the household, unless the unusual circumstances
+  apply to the upcoming purchase cycle
+- Find the appropriate consumption_rate from the normalised
+  historical data provided
+
+The resulting consumption rate:
+- Must reflect the consumption rate per 7 days
+- Should have the same unit of base as the item
+- Cannot be less than zero
+- Can be in decimals
+- Should not be unnecessarily precise
 
 OUTPUT RULES:
 - retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
@@ -556,6 +652,19 @@ def update_ai_status(message):
     print(f"[AI STATUS] {message}")
 #endregion
 
+#region AI Text clean up
+def clean_ai_text(text):
+    if not isinstance(text, str):
+        return text
+
+    return (
+        text
+        .replace("\u202f", " ")
+        .replace("\u00a0", " ")
+        .replace("\u2011", "-")
+    )
+#endregion
+
 #region Process AI output
 def process_ai_response(ai_response):
     try:
@@ -573,6 +682,7 @@ def process_ai_response(ai_response):
     for item in recommendations:
         if not isinstance(item, dict):
             return None, (f"Invalid recommendation structure. \nExpected dict, received {type(item).__name__}.")
+        item["reason"] = clean_ai_text(item.get("reason", ""))
         estimated_calories = item.get("estimated_calories")
         if not isinstance(estimated_calories, (int, float)):
             return None, (f"estimated_calories for {item.get('item', 'Unknown')} must be numeric.")
@@ -593,51 +703,66 @@ def process_ai_response(ai_response):
     return data, None
 #endregion
 
-#region [DEV ONLY] main ai process calling
-def ai_main():
+#region Functions to be implemented for main.py to call AI_manager.py
+# To use functions to get specific data from the AI output, you can implement the following functions in main.py:
+# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
+# recommendations = ai_recommendations.get("recommendations", [])
+# total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
+def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date):
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
 
+    # Check if the connection to the AI API is successful
     if not connected: 
         update_ai_status("AI API connection failed.")
         print(errMsg) 
-        return
+        return None, errMsg
     update_ai_status("AI API connection successful.")
-    print("\n")
     
-    user_id = 1
-    update_ai_status("Fetching household data...")
-    household_profile = get_household_profile(user_id)
-    consumption_log = get_consumption_log(user_id)
-    fridge_stock = get_fridge_stock()
-    purchase_stock = get_grocery_input()
-
     update_ai_status("Preparing AI input...")
-    data = prepare_data(household_profile, consumption_log, fridge_stock, purchase_stock)
-    
+    # Prepare data for AI processing
+    data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
+
     update_ai_status("Building AI prompt...")
+    #build the prompt for AI processing
     prompt = build_ai_prompt(data)
 
     update_ai_status("Sending prompt to AI...")
+    #Output of the AI response
     ai_response, error = call_ai_api(prompt)
 
     if error: 
         update_ai_status("AI request failed.")
         print(error) 
-        return
+        return None, error
     
     update_ai_status("Validating AI output...")
+    # Process and validate the AI response
     ai_output, error = process_ai_response(ai_response)
     if error:
         update_ai_status("AI output validation failed.")
         print(error)
-        return
-    recommendations = ai_output.get("recommendations", [])
-    total_estimated_calories = ai_output.get("total_estimated_calories", 0)
-    print(recommendations)
-    print(f"Total Estimated Calories: {total_estimated_calories} kcal")
+        return None, error
 
-    update_ai_status("Completed.")
+    return ai_output, None
+#endregion
+
+#region [DEV ONLY] main ai process calling
+def ai_main():
+    household_info = get_household_info()
+    consumption_history = get_consumption_history()
+    fridge_stock = get_fridge_stock()
+    purchase_stock = get_grocery_input()
+    current_date = date.today().isoformat()
+    next_purchase_date = "2026-10-13"
+    ai_recommendations, error  = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
+    if error:
+        print(f"Error: {error}")
+    recommendations = ai_recommendations.get("recommendations", [])
+    total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
+
+    print(f"AI Recommendations: {json.dumps(recommendations, indent=2)}")
+    print(f"Total Estimated Calories: {total_estimated_calories}")
 #endregion
 
 if __name__ == "__main__":
