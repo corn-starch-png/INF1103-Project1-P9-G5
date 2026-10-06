@@ -50,7 +50,7 @@ def check_data(record, table):
             return False, "Invalid Unit"
         return True, None
 
-    elif table == 'household_info' and data_length == 4:
+    elif table == 'household_info' and data_length == 5:
         # Check if Person_ID and Age is an integer
         if not check_integer(record["Person_ID"]):
             return False, "Person_ID must be an integer"
@@ -69,7 +69,7 @@ def check_data(record, table):
         if not check_unit(record["Unit"]):
             return False, "Invalid Unit."
         #check if Purchase_Date and Expiry_Date are valid dates
-        if not check_date(record["Purchase_Date"]):
+        if not check_date(record["Purchase_Date"]) and record["Purchase_Date"] != "":
             return False, "Invalid Purchase_Date format, must be YYYY-MM-DD"
         if not check_date(record["Expiry_Date"]):
             return False, "Invalid Expiry_Date format, must be YYYY-MM-DD"
@@ -184,10 +184,10 @@ def load_kcal_database():
     print(cal_db)  # Print the entire kcal database dictionary for verification
     return cal_db
 
-'''
+
 database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
 save_database(database, 'database')  # Save the database to the specified folder
-'''
+
 load_kcal_database()  # Load the kcal database for testing purposes
 
