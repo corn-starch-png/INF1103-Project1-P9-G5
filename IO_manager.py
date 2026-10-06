@@ -36,7 +36,28 @@ def ask_add_another():
             return more in ["yes", "y"]
         print("Please answer yes or no.")
  
+ 
+# Ask for a date in YYYY-MM-DD format and check it is a real date.
+def enter_date(question):
+    while True:
+        text = input(question).strip()
+        parts = text.split("-")
+        valid = (len(parts) == 3 and len(parts[0]) == 4 and len(parts[1]) == 2 and len(parts[2]) == 2
+                 and parts[0].isdigit() and parts[1].isdigit() and parts[2].isdigit())
+        if valid:
+            year = int(parts[0])
+            month = int(parts[1])
+            day = int(parts[2])
+            is_leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
+            days_in_month = [31, 29 if is_leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+            valid = 1 <= month <= 12 and 1 <= day <= days_in_month[month - 1]
+        if valid:
+            return text
+        print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
+ 
+ 
 # Collect a new user's profile and their family members' details.
+# Returns a list in the database's household_info format (the user is Person_ID 1).
 def create_profile():
     while True:
         name = input("Please enter your name: ").strip()
@@ -59,7 +80,7 @@ def create_profile():
  
     dietary_restrictions = input("Please enter your dietary restrictions (leave blank if none): ").strip()
     if dietary_restrictions == "":
-        dietary_restrictions = "none"
+        dietary_restrictions = "None"
  
     while True:
         family = input("Please enter your family size including yourself: ").strip()
@@ -99,7 +120,7 @@ def create_profile():
  
         member_diet = input(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ").strip()
         if member_diet == "":
-            member_diet = "none"
+            member_diet = "None"
  
         user_check["family_members"][i + 1] = {
             "name": member_name,
@@ -109,10 +130,31 @@ def create_profile():
         }
  
     print(f"User {name} registered successfully!")
-    return user_check
+ 
+    # Convert into the database's household_info format
+    household_info = [{
+        "Person_ID": 1,
+        "Name": user_check["name"],
+        "Age": user_check["age"],
+        "Gender": user_check["gender"].capitalize(),
+        "Dietary_Restriction": user_check["dietary_restrictions"]
+    }]
+ 
+    for number in user_check["family_members"]:
+        member = user_check["family_members"][number]
+        household_info.append({
+            "Person_ID": number + 1,
+            "Name": member["name"],
+            "Age": member["age"],
+            "Gender": member["gender"].capitalize(),
+            "Dietary_Restriction": member["dietary_restrictions"]
+        })
+ 
+    return household_info
  
  
-# For new users: Check the food items they already have at home.
+# For new users: Collect the food items they already have at home, with expiry dates.
+# Returns a list in the database's fridge format (Purchase_Date is left blank).
 def enter_home_items():
     while True:
         has_items = input("\nDo you have any food items at home you want to add? (yes/no): ").strip().lower()
@@ -127,41 +169,61 @@ def enter_home_items():
     print("\nEnter the items you currently have at home.")
     while True:
         item = enter_item()
-        item["used"] = 0.0
-        remaining_items.append(item)
-        print(f"Added {item['quantity']} {item['unit']} of {item['name']} to your home items.")
+        expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
+ 
+        remaining_items.append({
+            "Item_Name": item["name"],
+            "Quantity": item["quantity"],
+            "Unit": item["unit"],
+            "Purchase_Date": "",
+            "Expiry_Date": expiry_date
+        })
+        print(f"Added {item['quantity']} {item['unit']} of {item['name']} (expires {expiry_date}) to your home items.")
         if not ask_add_another():
             break
  
     return remaining_items
  
  
-# For returning users: Ask how much of each previous item is left.
+# For returning users: Ask how much of each item they consumed since last visit.
+# Batches of the same item (e.g. several Milk entries) are combined into one question.
+# Returns a list of {"Item_Name", "Consumed", "Unit"} for the database to remove.
 def update_consumption(previous_inventory):
-    remaining_items = []
+    consumed_items = []
     if not previous_inventory:
-        return remaining_items
+        return consumed_items
  
-    print("\nUpdate Consumption.")
+    # Add up the total of each item across all its batches
+    totals = {}
     for item in previous_inventory:
+        key = (item["Item_Name"].lower(), item["Unit"])
+        if key in totals:
+            totals[key]["Quantity"] += item["Quantity"]
+        else:
+            totals[key] = {"Item_Name": item["Item_Name"], "Quantity": item["Quantity"], "Unit": item["Unit"]}
+
+    print("\nUpdate Consumption.")
+    for key in totals:
+        name = totals[key]["Item_Name"]
+        total = round(totals[key]["Quantity"], 2)
+        unit = totals[key]["Unit"]
         while True:
-            text = input(f"How much {item['name']} is left? (you had {item['quantity']} {item['unit']}): ").strip()
+            text = input(f"How much {name} did you consume? (you have {total} {unit}): ").strip()
             if not text.replace(".", "", 1).isdigit():
                 print("Please enter a valid number.")
-            elif float(text) > item["quantity"]:
-                print(f"That's more than you had ({item['quantity']}). Please try again.")
+            elif float(text) > total:
+                print(f"That's more than you have ({total} {unit}). Please try again.")
             else:
-                left = float(text)
+                consumed = float(text)
                 break
- 
-        remaining_items.append({
-            "name": item["name"],
-            "quantity": left,
-            "unit": item["unit"],
-            "used": item["quantity"] - left
+
+        consumed_items.append({
+            "Item_Name": name,
+            "Consumed": consumed,
+            "Unit": unit
         })
  
-    return remaining_items
+    return consumed_items
  
  
 # Collect the groceries the user plans to buy, until they say they are done.
@@ -171,8 +233,21 @@ def enter_grocery_list():
  
     while True:
         item = enter_item()
-        grocery_list.append(item)
-        print(f"Added {item['quantity']} {item['unit']} of {item['name']}.")
+ 
+        # If the same item with the same unit was already entered, add to it
+        found = False
+        for existing in grocery_list:
+            if existing["name"].lower() == item["name"].lower() and existing["unit"] == item["unit"]:
+                existing["quantity"] += item["quantity"]
+                found = True
+                print(f"{existing['name']} is already in your list. "
+                      f"Total is now {existing['quantity']} {existing['unit']}.")
+                break
+ 
+        if not found:
+            grocery_list.append(item)
+            print(f"Added {item['quantity']} {item['unit']} of {item['name']}.")
+ 
         if not ask_add_another():
             break
  
@@ -197,15 +272,15 @@ def ask_days_until_next():
             return int(text)
         print("Please enter a whole number between 1 and 365.")
  
-
+ 
 # Print the start-up welcome message.
 def show_welcome():
     print("Welcome to the Waste Management System!")
  
  
-# Print the welcome-back message for a returning user.
-def show_welcome_back(user_check):
-    print(f"Welcome back, {user_check['name']}!")
+# Print the welcome-back message for a returning user (Person_ID 1 is the user).
+def show_welcome_back(household_info):
+    print(f"Welcome back, {household_info[0]['Name']}!")
  
  
 # =====================================================================
@@ -213,17 +288,19 @@ def show_welcome_back(user_check):
 # =====================================================================
  
 if __name__ == "__main__":
-    user_check = {}          # change to {"name": "Test"} to test a returning user
-    previous_inventory = []  # e.g. [{"name": "rice", "quantity": 5.0, "unit": "kg"}]
+    household_info = []      # change to [{"Person_ID": 1, "Name": "Test", "Age": 20, "Gender": "Male", "Dietary_Restriction": "None"}] to test a returning user
+    previous_inventory = []  # e.g. [{"Item_Name": "Milk", "Quantity": 2, "Unit": "carton", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05"}]
+    remaining_items = []
+    consumed_items = []
  
     show_welcome()
  
-    if user_check == {}:
-        user_check = create_profile()
+    if household_info == []:
+        household_info = create_profile()
         remaining_items = enter_home_items()
     else:
-        show_welcome_back(user_check)
-        remaining_items = update_consumption(previous_inventory)
+        show_welcome_back(household_info)
+        consumed_items = update_consumption(previous_inventory)
  
     grocery_list = enter_grocery_list()
  
@@ -232,8 +309,9 @@ if __name__ == "__main__":
  
  
     print("\n--- Test results ---")
-    print("user_check =", user_check)
+    print("household_info =", household_info)
     print("remaining_items =", remaining_items)
+    print("consumed_items =", consumed_items)
     print("grocery_list =", grocery_list)
     print("remarks =", remarks)
     print("days_until_next =", days_until_next)
