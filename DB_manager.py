@@ -165,7 +165,16 @@ def save_database(database, folder='database'):
     print(f"Database saved successfully to {filename}.")
 
 
-
+def get_all_quantity(database, item_name):
+    # Implementation for retrieving all quantities of a specific item from the fridge table
+    total_quantity = 0
+    for entry in database.get('fridge', []):
+        if entry.get('Item_Name').lower() == item_name.lower():
+            total_quantity += entry.get('Quantity')
+    for entry in database.get('consumption_history', []):
+        if entry.get('Item_Name').lower() == item_name.lower():
+            total_quantity += entry.get('Quantity')
+    return total_quantity
 
 
 
@@ -187,7 +196,10 @@ def load_kcal_database():
 
 database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
+
+#print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
+
 save_database(database, 'database')  # Save the database to the specified folder
 
-load_kcal_database()  # Load the kcal database for testing purposes
+#load_kcal_database()  # Load the kcal database for testing purposes
 
