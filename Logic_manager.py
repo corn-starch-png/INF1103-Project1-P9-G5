@@ -1,5 +1,6 @@
 import json 
 import statistics
+import csv
 from datetime import datetime
 
 def get_user_input(): #simulate I/O layer
@@ -35,32 +36,68 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
+#calculating consumption rate
+def dailyConsumptionRate(item_name, csv_path="sample_database/consumption_history.csv"):
+    #daily consumption rate = total quantity consumed / no.of days 
+    total_quantity = 0.0
+    total_days = 0.0
+
+    with open(csv_path, mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            # Strip whitespace from keys and values to avoid mismatch issues
+            clean_row = {k.strip(): v.strip() for k, v in row.items()}
+            
+            # Match the item name (case-insensitive)
+            if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                # Parse days: "5d" -> 5.0
+                days_str = clean_row["Date_Range"].lower().replace("d", "").strip()
+                days = float(days_str)
+                
+                # Parse quantity: e.g. "1" -> 1.0
+                quantity = float(clean_row["Quantity"])
+                
+                total_quantity += quantity
+                total_days += days
+
+    # Prevent division by zero if days is 0 or item not found
+    if total_days <= 0:
+        return 0.0
+
+    # Daily consumption rate = Total Quantity / Total Days
+    return round(total_quantity / total_days, 3)
+
+#calculation for shelf life of item
+def shelfLife(item_name, csv_path="sample_database/stock.csv"):
 # calculation for shelf life of item
 def shelf_life(item_name, json_path="sample_database/stock.json"):
     # Expiry date - Purchase Date
-    with open(json_path, mode="r", encoding="utf-8") as file:
-        data = json.load(file)
+    with open(csv_path, mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
         
-        for item in data.get("stock", []):
-            if item["Item_Name"].strip().lower() == item_name.strip().lower():
-                purchaseDate = datetime.strptime(item["Purchase_Date"].strip(), "%Y-%m-%d")
-                expiryDate = datetime.strptime(item["Expiry_Date"].strip(), "%Y-%m-%d")
+        for row in reader:
+            # Strip whitespace around column keys and values
+            clean_row = {k.strip(): v.strip() for k, v in row.items()}
+            
+            if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                purchaseDate = datetime.strptime(clean_row["Purchase_Date"], "%Y-%m-%d")
+                expiryDate = datetime.strptime(clean_row["Expiry_Date"], "%Y-%m-%d")
                 
                 # Total shelf life (from purchase to expiry)
                 total_shelf_life = (expiryDate - purchaseDate).days
                 return total_shelf_life
-                
-    # if item not found         
+    #if item not found         
     return None      
-
+                
 
 # calculating expiry risk to determine if food waste is high/medium/low
 def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, shelf_life, json_path="sample_database/stock.json"):
     # checking status of planned quantity and recommended quantity
     status = check_over_under(planned_quantity, recommended_quantity)
     if status == "over":
-        # to prevent division errors while handling zero consumption rate
-        if "Ai output consumption rate" <= 0:
+        #to prevent division errors while handling zero consumption rate
+        if dailyConsumptionRate <= 0:
             return "High Food Waste"
         
         # retrieve quantity of item from db
@@ -86,6 +123,7 @@ def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, she
     else:
         # if check_over_under is "under" and "good"
         return "Low Food Waste"
+    
 
 #second logic funciton 
 def give_recommendation(user_input, ai_data):
@@ -99,7 +137,7 @@ def give_recommendation(user_input, ai_data):
         user_input["planned_quantity"],
         ai_data["recommended_quantity"],
         "current_quanity",#to be added
-        "Ai output consumption rate", # to be calculated
+        "dailyConsumptionRate", # to be calculated
         "shelfLife" #to be calculated
     )
     
@@ -127,6 +165,8 @@ def calculate_historical_data_completeness(data, item_name):
 
 #second confidence score function taking into account S/D
 def calculate_historical_data_consistency(data,item_name):
+    fridge_file = open("fridge_history.json" , "r")
+    data = json.load(fridge_file)
     quantities = [] #list to feed into stats funciton later
     for row in data: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
         if row["Item_name"].lower() == item_name.lower():
@@ -139,7 +179,7 @@ def calculate_historical_data_consistency(data,item_name):
    
     mean = statistics.mean(quantities)  
 
-    if mean == 0: #so our program dont commit suicide by living with zero
+    if mean == 0: #so our program dont commit suicide by dividing with zero
         return 1.0
 
     cv = sd / mean #calculating relative standard deviation 
