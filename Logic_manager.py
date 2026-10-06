@@ -68,10 +68,9 @@ def dailyConsumptionRate(item_name, csv_path="sample_database/consumption_histor
     # Daily consumption rate = Total Quantity / Total Days
     return round(total_quantity / total_days, 3)
 
-#calculation for shelf life of item
-def shelfLife(item_name, csv_path="sample_database/stock.csv"):
+
 # calculation for shelf life of item
-def shelf_life(item_name, json_path="sample_database/stock.json"):
+# def shelf_life(item_name, json_path="sample_database/stock.json"):
     # Expiry date - Purchase Date
     with open(csv_path, mode="r", encoding="utf-8") as file:
         reader = csv.DictReader(file)
@@ -165,11 +164,11 @@ def calculate_historical_data_completeness(data, item_name):
 
 #second confidence score function taking into account S/D
 def calculate_historical_data_consistency(data,item_name):
-    fridge_file = open("fridge_history.json" , "r")
+    fridge_file = open("db.json" , "r")
     data = json.load(fridge_file)
     quantities = [] #list to feed into stats funciton later
     for row in data: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
-        if row["Item_name"].lower() == item_name.lower():
+        if row["Item_name"].lower() == item_name.lower() :
             quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
 
     sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
@@ -197,7 +196,7 @@ def calculate_confidence_score(completeness_score,consistency_score):
 
 
 #load dummy AI data (subjected to changes)
-with open("sampleAioutput.json","r") as file: #open .json with "read" mode as variable file
+with open("db","r") as file: #open .json with "read" mode as variable file
     data = json.load(file) #json.load converts json to python
 
 
