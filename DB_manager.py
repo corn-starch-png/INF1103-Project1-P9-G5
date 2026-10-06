@@ -5,8 +5,7 @@ DB_FILENAME = 'db.json'
 FILE_STRUCTURE = {
     'consumption_history': 'Date_Range,Item_Name,Quantity,Unit,Remarks',
     'household_info': 'Person_ID,Age,Gender,Dietary_Restriction',
-    'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date',
-    'fridge_history': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date'
+    'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date'
 }
 KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 
@@ -62,7 +61,7 @@ def check_data(record, table):
             return False, "Invalid Gender, must be either: ['Male', 'Female', 'Other']"
         return True, None
         
-    elif (table == 'fridge' or table == 'fridge_history') and data_length == 5:
+    elif table == 'fridge' and data_length == 5:
         # Check if Quantity can be converted to float
         if not check_float(record["Quantity"]):
             return False, "Quantity must be a number"

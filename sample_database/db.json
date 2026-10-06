@@ -1,8 +1,8 @@
 {
     "consumption_history": [
-        {"Date_Range": 5, "Item_Name": "milk", "Quantity": 1, "Unit": "carton", "Remarks": "None"}, 
-        {"Date_Range": 5, "Item_Name": "Rice", "Quantity": 0.1, "Unit": "kg", "Remarks": "None"}, 
-        {"Date_Range": 1, "Item_Name": "Chicken", "Quantity": 5, "Unit": "kg", "Remarks": "20paxGathering"}
+        {"Item_Name": "Milk", "Quantity": 1, "Unit": "carton", "Date_Range": 5, "Remarks": "None"}, 
+        {"Item_Name": "Rice", "Quantity": 0.1, "Unit": "kg", "Date_Range": 5, "Remarks": "None"}, 
+        {"Item_Name": "Chicken", "Quantity": 5, "Unit": "kg", "Date_Range": 1, "Remarks": "20paxGathering"}
     ], 
     "household_info": [
         {"Person_ID": 1, "Name": "John Doe", "Age": 45, "Gender": "Male", "Dietary_Restriction": "None"}, 
@@ -19,16 +19,5 @@
         {"Item_Name": "Chicken", "Quantity": 2, "Unit": "kg", "Purchase_Date": "2026-09-25", "Expiry_Date": "2026-09-26"}, 
         {"Item_Name": "Chicken", "Quantity": 1.5, "Unit": "kg", "Purchase_Date": "2026-09-27", "Expiry_Date": "2026-09-29"}, 
         {"Item_Name": "Chicken", "Quantity": 1, "Unit": "kg", "Purchase_Date": "2026-09-28", "Expiry_Date": "2026-09-30"}
-        ],
-    "fridge_history": [
-        {"Item_Name": "Rice", "Quantity": 5, "Unit": "kg", "Purchase_Date": "2026-09-01", "Expiry_Date": "2027-09-01"}, 
-        {"Item_Name": "Milk", "Quantity": 6, "Unit": "carton", "Purchase_Date": "", "Expiry_Date": "2026-10-04"}, 
-        {"Item_Name": "Milk", "Quantity": 2, "Unit": "carton", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05"}, 
-        {"Item_Name": "Milk", "Quantity": 1, "Unit": "carton", "Purchase_Date": "2026-09-22", "Expiry_Date": "2026-10-06"}, 
-        {"Item_Name": "Milk", "Quantity": 10, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04"}, 
-        {"Item_Name": "Chicken", "Quantity": 1, "Unit": "kg", "Purchase_Date": "2026-09-23", "Expiry_Date": "2026-09-26"}, 
-        {"Item_Name": "Chicken", "Quantity": 2, "Unit": "kg", "Purchase_Date": "2026-09-25", "Expiry_Date": "2026-09-26"}, 
-        {"Item_Name": "Chicken", "Quantity": 1.5, "Unit": "kg", "Purchase_Date": "2026-09-27", "Expiry_Date": "2026-09-29"}, 
-        {"Item_Name": "Chicken", "Quantity": 1, "Unit": "kg", "Purchase_Date": "2026-09-28", "Expiry_Date": "2026-09-30"}
-    ]
+        ]
 }
