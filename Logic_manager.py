@@ -196,8 +196,8 @@ def calculate_confidence_score(completeness_score,consistency_score):
 
 
 #load dummy AI data (subjected to changes)
-with open("db","r") as file: #open .json with "read" mode as variable file
-    data = json.load(file) #json.load converts json to python
+# with open("db","r") as file: #open .json with "read" mode as variable file
+#     data = json.load(file) #json.load converts json to python
 
 
 #getting user input (for testing purpose, I/O layer exists!)
