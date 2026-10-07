@@ -117,7 +117,7 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
         )
 
         # if calorie_surplus and expiry_risk == False
-        if calorie_surplus == False and expiry_risk == False:
+        if not calorie_surplus and not expiry_risk:
             print("Calling underbuy function")
             under_buy(
                 item_name=item_name,
