@@ -182,6 +182,16 @@ def get_all_quantity(database, item_name):
     return total_quantity
 
 
+def update_household_info(database, update_list):
+    for item in update_list:
+        check_result, error_message = check_data(item, 'household_info')
+        if not check_result:
+            print(f"Invalid data in household_info: {item}. Error: {error_message}")
+            continue  # Skip invalid entries
+        database.get('household_info', []).append(item)  # Append each item in the update list to the household_info table
+    return database
+
+
 def update_consumption_history(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'consumption_history')
@@ -203,6 +213,8 @@ def add_to_fridge(database, update_list):
 
 
 def remove_from_fridge(database, update_list):  
+    #does not require the update_list to be in the same order as the fridge table
+    # it will remove the quantity from the fridge table based on the item name and quantity specified in the update_list
     for item in update_list:
         amount_to_remove = item.get('Quantity', 0)
         for entry in database.get('fridge', []).copy():  # Use copy() to avoid modifying the list while iterating
@@ -241,8 +253,12 @@ def load_kcal_database():
 database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
 record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Date_Range": 5, "Remarks": "None"}]
+fridge_record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04", "Remarks": "None"}]
+house_record = [{"Person_ID": 4, "Name": "Bob Johnson", "Age": 99, "Gender": "Male", "Dietary_Restriction": "None"}]
+database = add_to_fridge(database, fridge_record)
 database = remove_from_fridge(database, record)
-#print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
+database = update_household_info(database, house_record)
+print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
 
 save_database(database, 'database')  # Save the database to the specified folder
 
