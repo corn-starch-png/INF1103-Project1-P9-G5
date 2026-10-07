@@ -37,7 +37,7 @@ def check_over_under(planned_quantity, recommended_quantity):
         return "good"
 
 
-# calculation for shelf life of item
+""" # calculation for shelf life of item
 # def shelf_life(item_name, json_path="sample_database/stock.json"):
     # Expiry date - Purchase Date
     with open(csv_path, mode="r", encoding="utf-8") as file:
@@ -89,7 +89,7 @@ def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, she
         
     else:
         # if check_over_under is "under" and "good"
-        return "Low Food Waste"
+        return "Low Food Waste" """
     
 
 #second logic funciton 
