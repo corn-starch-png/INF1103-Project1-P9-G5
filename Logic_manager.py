@@ -1,7 +1,7 @@
 import json 
 import statistics
 import csv
-from datetime import datetime
+from datetime import datetime,date,timedelta
 
 def get_user_input(): #simulate I/O layer
     item = input("Item: ")
@@ -131,12 +131,14 @@ def calculate_historical_data_completeness(data, item_name):
 
 
 #second confidence score function taking into account S/D
-def calculate_historical_data_consistency(data,item_name):
+def calculate_historical_data_consistency(item_name): #calculate for each item 
     fridge_file = open("db.json" , "r")
-    data = json.load(fridge_file)
+    database = json.load(fridge_file)
+    consumption_history = database["consumption_history"]
+    fridge = database["fridge"]
     quantities = [] #list to feed into stats funciton later
-    for row in data: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
-        if row["Item_name"].lower() == item_name.lower() :
+    for row in consumption_history: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
+        if row["Item_name"].lower() == item_name.lower() and row["Remarks"] == "None " : #find item, omit if remarks is ticked
             quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
 
     sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
@@ -160,37 +162,74 @@ def calculate_confidence_score(completeness_score,consistency_score):
     return round(confidence_score, 3) #round off to 3 d.p in case of irrational number
 
 
+#under_buy will pull from basket
+def under_buy(item_name, item_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate):
+    today = date.today()
+    # processing dates and calculating new variable with them
+    if daily_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
+
+        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+        estimated_day_to_consume = round(item_quantity / daily_consumption_rate)
+    
+        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        day_item_is_eaten = today + timedelta(day = estimated_day_to_consume)
+
+        #calculating Nth amount needed to not run out of food
+        next_purchase_date = datetime.striptime(next_purchase_date, "%Y-%m-%d").date()
+        days_to_next_purchase = next_purchase_date - today 
+        quantity_needed = daily_consumption_rate * days_to_next_purchase
+        amount_to_topup = quantity_needed - item_quantity
+
+        if day_item_is_eaten < item_expiry_date:
+            print(f"You will finish consuming {item_name} in {estimated_day_to_consume}.",
+                  f"You should buy {amount_to_topup}more to last till your next grocery run")
+
+        else:
+            return None
+
+    elif daily_consumption_rate <=0:
+        print("Consumption rate is 0, not enough to calculate underbuy!")
+
+
 # ---------------V V V  execution code  V V V ---------------  
 
 
-#load dummy AI data (subjected to changes)
-# with open("db","r") as file: #open .json with "read" mode as variable file
-#     data = json.load(file) #json.load converts json to python
 
+
+
+
+
+
+
+
+
+
+
+# ---------------V V V  Deprecated code  V V V ---------------  
 
 #getting user input (for testing purpose, I/O layer exists!)
-while True:
-    user_input = get_user_input()
+# while True:
+#     user_input = get_user_input()
 
-    ai_data = None
+#     ai_data = None
 
-    for recommendation in data["recommendations"]:
-        if (    #checking if Ai recommendation exist for user input (in case AI omits)
-            recommendation["item"].lower() == user_input["item"].lower()
-            and 
-            recommendation ["unit"].lower() == user_input["unit"].lower()
-        ):
-            ai_data = recommendation
-            break
+#     for recommendation in data["recommendations"]:
+#         if (    #checking if Ai recommendation exist for user input (in case AI omits)
+#             recommendation["item"].lower() == user_input["item"].lower()
+#             and 
+#             recommendation ["unit"].lower() == user_input["unit"].lower()
+#         ):
+#             ai_data = recommendation
+#             break
 
-    if ai_data is None:
-        print("No AI recommendation found for this item")
-    else:
-        result = give_recommendation(user_input, ai_data)
+#     if ai_data is None:
+#         print("No AI recommendation found for this item")
+#     else:
+#         result = give_recommendation(user_input, ai_data)
 
-        print("\n--- Recommendation ---")
-        print(f"Result: {result['result']}")
-        print(f"Advice: {result['advice']}")
-        print(f"Waste risk: {result['waste_risk']}")
-        print(f"Confidence score: {result['confidence_score']}")
+#         print("\n--- Recommendation ---")
+#         print(f"Result: {result['result']}")
+#         print(f"Advice: {result['advice']}")
+#         print(f"Waste risk: {result['waste_risk']}")
+#         print(f"Confidence score: {result['confidence_score']}")
 
