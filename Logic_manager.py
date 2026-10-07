@@ -1,6 +1,5 @@
 import json 
 import statistics
-import csv
 from datetime import datetime,date,timedelta
 from DB_manager import KCAL_TABLE
 
@@ -59,9 +58,9 @@ def calculate_family_weekly_kcal(family_member, KCAL_TABLE):
     return daily_total * 7    
 
 # calculating calories surplus
-def calories_surplus():   
+def calories_surplus(total_estimated_calories):   
     # get age and gender from db so can match calories from kcal.csv
-    with open("sample_database/db.json", "r") as file:
+    with open("./sample_database/db.json", "r") as file:
         household_data = json.load(file)
         household_info = household_data.get("household_info", household_data)
     
@@ -71,19 +70,63 @@ def calories_surplus():
     family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
     print("family weekly calorie:", family_weekly_calorie)
     
-    #get total estimated calories from AI output
-    with open("sampleAioutput.json", "r") as ai_output:
-        ai_calories = json.load(ai_output)
-        total_estimated_calories = ai_calories.get("total_estiamted_calories", 0)
     # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
     if total_estimated_calories > family_weekly_calorie:
-        exceed_calorie = total_estimated_calories > family_weekly_calorie    
-        print("Exceeded calories values by", exceed_calorie, "kcal")
+        exceed_calorie = total_estimated_calories - family_weekly_calorie    
+        print(f"Exceeded calories values by {exceed_calorie} kcal")
         return True
     else:
         return False
 
+# calculating risk of expiry
+def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
+    if estimated_consumption_rate > 0:
+        print("Consumption rate must be greater than 0.")
+        
+        today = date.today()
+        # calculation of daily consumption rate per day
+        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+        
+        # days taken to finish consuming the item
+        estimated_days_to_consume = round(planned_quantity / daily_consumption_rate)
+                    
+        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        #if the days taken to consume an item is greater than days to expire
+        if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
+            print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
+            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
+            return True
+        else:
+            return False 
+    else:
+        # estimated_consumption_rate <= 0:
+        print("Consumption rate cannot be 0")    
+        
+# evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
+def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
+        # calling calorie_surplus and expiry risk functions
+        calorie_surplus = calories_surplus(
+            total_estimated_calories=total_estimated_calories
+        )
+        expiry_risk = risk_of_expiry(
+            estimated_consumption_rate=estimated_consumption_rate,
+            planned_quantity=planned_quantity,
+            item_expiry_date=item_expiry_date,
+            item_name=item_name,
+            unit=unit
+        )
 
+        # if calorie_surplus and expiry_risk == False
+        if calorie_surplus == False and expiry_risk == False:
+            print("Calling underbuy function")
+            under_buy(
+                item_name=item_name,
+                planned_quantity=planned_quantity,
+                item_expiry_date=item_expiry_date,
+                next_purchase_date=next_purchase_date,
+                estimated_consumption_rate=estimated_consumption_rate
+        )
+      
 #second logic funciton 
 def give_recommendation(user_input, ai_data):
 
@@ -207,10 +250,6 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
 
 under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
 next_purchase_date = "2026-10-30", estimated_consumption_rate = 1.3)
-
-
-
-
 
 
 
