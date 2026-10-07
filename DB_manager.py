@@ -10,6 +10,9 @@ FILE_STRUCTURE = {
 KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 
 
+#checks if individual entries in the database have the correct data types and values
+#in-put: <dictionary> entry, <string> consumption_history/household_info/fridge
+#output: <boolean> True if the entry is valid, <string> error message if the entry is invalid else None
 def check_data(record, table):
     def check_integer(value):
         try:
@@ -84,6 +87,9 @@ def check_data(record, table):
         return False, "Data length is incorrect"
 
 
+#checks if the database dictionary has all the required tables and entries, and if the entries have the correct data types
+#in-put: <dictionary> database
+#output: <dictionary> database with problematic entries removed, <list> errors encountered during checking
 def check_database(database):
     errors = []
     for table in FILE_STRUCTURE:
@@ -116,11 +122,17 @@ def check_database(database):
     return database, errors
 
 
+#creates an empty database structure with the required tables and returns it
+#in-put: None
+#output: <dictionary> empty database structure
 def create_empty_database():
     # Create an empty database structure
     return {file: [] for file in FILE_STRUCTURE}
 
 
+#checks if the database folder and file exist, if not creates them
+#in-put: <string> folder to check for json db
+#output: None, Creates the database folder and file if they do not exist
 def database_exists(folder='database'):
     # Implementation for creating the database
     if not os.path.exists(folder):
@@ -133,9 +145,10 @@ def database_exists(folder='database'):
             json.dump(create_empty_database(), f)  # Create an empty JSON file with the required structure
 
 
+#Loads the database from a JSON file in the specified folder and checks for errors
+#in-put: <string> folder to load json db from
+#output: <dictionary> database prints out any errors encountered during loading
 def load_database(folder='database'):
-    
-    # Implementation for loading the database
     errors = []
     filename = os.path.join(folder, DB_FILENAME)
     if os.path.exists(filename):
@@ -162,6 +175,9 @@ def load_database(folder='database'):
     return database
 
 
+#saves the database dictionary to a JSON file in the specified folder
+#in-put: <dictionary> database, <string> folder to save json db to
+#output: None
 def save_database(database, folder='database'):
     # Implementation for saving the database
     filename = os.path.join(folder, DB_FILENAME)
@@ -170,6 +186,9 @@ def save_database(database, folder='database'):
     print(f"Database saved successfully to {filename}.")
 
 
+#returns the total quantity of the item in the fridge and consumption_history tables
+#in-put: <dictionary> database, <string> item_name
+#output: <integer> total quantity of the item in the fridge and consumption_history tables
 def get_all_quantity(database, item_name):
     # Implementation for retrieving all quantities of a specific item from the fridge table
     total_quantity = 0
@@ -182,6 +201,9 @@ def get_all_quantity(database, item_name):
     return total_quantity
 
 
+#adds dictionary item to the household_info table in the database dictionary
+#in-put: [{"Person_ID": <integer>, "Name": "<string>", "Age": <integer>, "Gender": "<string>", "Dietary_Restriction": "<string>"},...]
+#output: <dictionary> database 
 def update_household_info(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'household_info')
@@ -192,6 +214,9 @@ def update_household_info(database, update_list):
     return database
 
 
+#adds dictionary item to the consumption_history table in the database dictionary
+#in-put: [{"Item_Name": "<string>", "Quantity": <float>, "Unit": "<string>", "Date_Range": <integer>, "Remarks": "<string>"},...]
+#output: <dictionary> database 
 def update_consumption_history(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'consumption_history')
@@ -202,6 +227,9 @@ def update_consumption_history(database, update_list):
     return database
 
 
+#adds dictionary item to the fridge table in the database dictionary
+#in-put: [{"Item_Name": "<string>", "Quantity": <integer>, "Unit": "<string>", "Purchase_Date": "<YYYY-MM-DD>", "Expiry_Date": "<YYYY-MM-DD>", "Remarks": "<string>"},...]
+#output: <dictionary> database 
 def add_to_fridge(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'fridge')
@@ -212,9 +240,10 @@ def add_to_fridge(database, update_list):
     return database
 
 
+#removes the quantity from the fridge table FIFO order based on the item name and quantity specified in the update_list
+#in-put: [{"Item_Name": "<string>", "Quantity": <integer>,...},...]
+#output: <dictionary> database  
 def remove_from_fridge(database, update_list):  
-    #does not require the update_list to be in the same order as the fridge table
-    # it will remove the quantity from the fridge table based on the item name and quantity specified in the update_list
     for item in update_list:
         amount_to_remove = item.get('Quantity', 0)
         for entry in database.get('fridge', []).copy():  # Use copy() to avoid modifying the list while iterating
@@ -236,6 +265,7 @@ def remove_from_fridge(database, update_list):
 
 #--------------------------------------for testing----------------------------------------------
 #temporary code to load the kcal.csv file into a dictionary for testing purposes
+'''
 def load_kcal_database():
     cal_db={}
     with open('sample_database/kcal.csv', 'r') as f:
@@ -263,4 +293,4 @@ print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" f
 save_database(database, 'database')  # Save the database to the specified folder
 
 #load_kcal_database()  # Load the kcal database for testing purposes
-
+'''
