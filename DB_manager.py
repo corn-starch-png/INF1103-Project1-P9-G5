@@ -179,14 +179,21 @@ def get_all_quantity(database, item_name):
 
 def update_consumption_history(database, update_list):
     for item in update_list:
+        check_result, error_message = check_data(item, 'consumption_history')
+        if not check_result:
+            print(f"Invalid data in consumption_history: {item}. Error: {error_message}")
+            continue  # Skip invalid entries
         database.get('consumption_history', []).append(item)  # Append each item in the update list to the consumption_history table
     return database
 
 
 def add_to_fridge(database, update_list):
     for item in update_list:
-        if item.get("Purchase_Date") and item.get("Expiry_Date"):
-            database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
+        check_result, error_message = check_data(item, 'fridge')
+        if not check_result:
+            print(f"Invalid data in fridge: {item}. Error: {error_message}")
+            continue  # Skip invalid entries
+        database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
     return database
 
 
