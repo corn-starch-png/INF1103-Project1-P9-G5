@@ -62,10 +62,9 @@ def calories_surplus(total_estimated_calories):
     # get age and gender from db so can match calories from kcal.csv
     with open("./sample_database/db.json", "r") as file:
         household_data = json.load(file)
-        household_info = household_data.get("household_info", household_data)
     
     #extract name, gender from household info from db.json
-    family_member = household_info.get("household_info", [])
+    family_member = household_data.get("household_info", [])
     #calculate family weekly calorie
     family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
     print("family weekly calorie:", family_weekly_calorie)
