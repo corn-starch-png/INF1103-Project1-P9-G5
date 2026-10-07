@@ -1,32 +1,59 @@
 {
   "recommendations": [
-    { 
+    {
       "item": "Milk",
       "planned_quantity": 3,
-      "unit": "cartons",
-      "recommended_quantity": 1,
-      "reason": "Average weekly consumption is 2 cartons; with 1 carton in stock, only 1 more is needed, but the plan calls for 3 cartons."
-    },
-    {
-      "item": "Bread",
-      "planned_quantity": 2,
-      "unit": "loaves",
-      "recommended_quantity": 0.67,
-      "reason": "Average weekly consumption is ~1.67 loaves; with 1 loaf in stock, about 0.67 loaf is needed, yet the plan is for 2 loaves."
+      "unit": "L",
+      "recommended_quantity": 0.4,
+      "consumption_rate": 1.37,
+      "estimated_calories": 240,
+      "reason": "Based on an average weekly consumption of about 1.37 L and current stock of 1 L, an additional 0.4 L will cover needs until the next shop."
     },
     {
       "item": "Eggs",
       "planned_quantity": 12,
-      "unit": "pieces",
-      "recommended_quantity": 3,
-      "reason": "Average weekly consumption is 11 pieces; with 8 pieces in stock, 3 more are required, but the plan is for 12 pieces."
+      "unit": "count",
+      "recommended_quantity": 2,
+      "consumption_rate": 9.18,
+      "estimated_calories": 140,
+      "reason": "Weekly egg use averages ~9.2 units; with 8 units on hand, 2 more eggs are required to meet the upcoming week’s demand."
     },
     {
       "item": "Chicken",
       "planned_quantity": 0.5,
       "unit": "kg",
-      "recommended_quantity": 1.1,
-      "reason": "Average weekly consumption is 1.1 kg; with no stock, 1.1 kg is needed, exceeding the planned 0.5 kg."
+      "recommended_quantity": 1.3,
+      "consumption_rate": 1.33,
+      "estimated_calories": 2145,
+      "reason": "Normal weekly chicken consumption is about 1.3 kg and no usable stock remains, so 1.3 kg should be purchased."
+    },
+    {
+      "item": "Fanta",
+      "planned_quantity": 30,
+      "unit": "L",
+      "recommended_quantity": 30,
+      "consumption_rate": 1.23,
+      "estimated_calories": 12000,
+      "reason": "The remark indicates a house party for 100 guests, greatly raising drink needs; the planned 30 L is adopted to cover this event."
+    },
+    {
+      "item": "Apple",
+      "planned_quantity": 13,
+      "unit": "count",
+      "recommended_quantity": 5,
+      "consumption_rate": 4.43,
+      "estimated_calories": 475,
+      "reason": "With parents away, consumption drops to roughly one-third of the normal ~13.3 apples/week; 5 apples satisfy the reduced need given no current stock."
+    },
+    {
+      "item": "Rice",
+      "planned_quantity": 2,
+      "unit": "kg",
+      "recommended_quantity": 0,
+      "consumption_rate": 0.75,
+      "estimated_calories": 0,
+      "reason": "Weekly rice use is about 0.75 kg while 4 kg are already in stock, so no additional rice is required."
     }
-  ]
+  ],
+  "total_estimated_calories": 15000
 }
