@@ -2,6 +2,10 @@ import json
 import statistics
 import csv
 from datetime import datetime,date,timedelta
+#calling from AI manager?
+# recommendations = ai_recommendations.get("recommendations", [])
+from DB_manager import KCAL_TABLE
+
 
 def get_user_input(): #simulate I/O layer
     item = input("Item: ")
@@ -36,6 +40,51 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
+#CALORIE SURPLUS LOGIC --------------------   
+# eg. if user age is 20, will fall under 19 years old calorie intake
+def get_age_from_KCAL(age: int):
+    if age >= 60:
+        return 60
+    if age > 30:
+        return 30
+    if age >= 19:
+        return 19
+    return age
+
+# get each calorie from each family member
+def calculate_family_weekly_kcal(family_member, KCAL_TABLE):
+    daily_total = 0
+    for person in family_member:
+        age = get_age_from_KCAL(person["Age"])
+        gender = person["Gender"]
+        daily_total += KCAL_TABLE[age][gender] #male + female calorie
+    return daily_total * 7    
+
+# calculating calories surplus
+def calories_surplus():   
+    # get age and gender from db so can match calories from kcal.csv
+    with open("sample_database/db.json", "r") as file:
+        household_data = json.load(file)
+        household_info = household_data.get("household_info", household_data)
+    
+    #extract name, gender from household info from db.json
+    family_member = household_info.get("household_info", [])
+    #calculate family weekly calorie
+    family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
+    print("family weekly calorie:", family_weekly_calorie)
+    
+    #get total estimated calories from AI output
+    recommendations = ai_recommendations.get("recommendations", [])
+    total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
+    print("AI estimated calories:", total_estimated_calories)
+        
+    # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
+    if total_estimated_calories > family_weekly_calorie:
+        exceed_calorie = total_estimated_calories >= family_weekly_calorie    
+        print("Exceeded calories values by", exceed_calorie, "kcal")
+        return True
+    else:
+        return False
 
 """ # calculation for shelf life of item
 # def shelf_life(item_name, json_path="sample_database/stock.json"):
