@@ -23,6 +23,8 @@ def check_data(record, table):
             return True
         except ValueError:
             return False
+    def check_string(value):
+        return isinstance(value, str)
     def check_unit(value):
         valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
         return value in valid_units
@@ -36,7 +38,8 @@ def check_data(record, table):
     def check_gender(value):
         valid_genders = ['Male', 'Female', 'Other']
         return value in valid_genders
-    #TODO refactor function for new data structure, check if the data is valid for the given table
+    
+    
     data_length = len(record)
     if table == 'consumption_history' and data_length == 5:
         # Check if Date_Range is an integer
@@ -50,7 +53,7 @@ def check_data(record, table):
             return False, "Invalid Unit"
         return True, None
 
-    elif table == 'household_info' and data_length == 4:
+    elif table == 'household_info' and data_length == 5:
         # Check if Person_ID and Age is an integer
         if not check_integer(record["Person_ID"]):
             return False, "Person_ID must be an integer"
@@ -61,7 +64,7 @@ def check_data(record, table):
             return False, "Invalid Gender, must be either: ['Male', 'Female', 'Other']"
         return True, None
         
-    elif table == 'fridge' and data_length == 5:
+    elif table == 'fridge' and data_length == 6:
         # Check if Quantity can be converted to float
         if not check_float(record["Quantity"]):
             return False, "Quantity must be a number"
@@ -69,10 +72,12 @@ def check_data(record, table):
         if not check_unit(record["Unit"]):
             return False, "Invalid Unit."
         #check if Purchase_Date and Expiry_Date are valid dates
-        if not check_date(record["Purchase_Date"]):
+        if not check_date(record["Purchase_Date"]) and record["Purchase_Date"] != "":
             return False, "Invalid Purchase_Date format, must be YYYY-MM-DD"
         if not check_date(record["Expiry_Date"]):
             return False, "Invalid Expiry_Date format, must be YYYY-MM-DD"
+        if not check_string(record["Remarks"]):
+            return False, "Invalid Remarks format, must be a string"
         return True, None
         
     else:
@@ -165,8 +170,56 @@ def save_database(database, folder='database'):
     print(f"Database saved successfully to {filename}.")
 
 
+def get_all_quantity(database, item_name):
+    # Implementation for retrieving all quantities of a specific item from the fridge table
+    total_quantity = 0
+    for entry in database.get('fridge', []):
+        if entry.get('Item_Name').lower() == item_name.lower():
+            total_quantity += entry.get('Quantity')
+    for entry in database.get('consumption_history', []):
+        if entry.get('Item_Name').lower() == item_name.lower():
+            total_quantity += entry.get('Quantity')
+    return total_quantity
 
 
+def update_consumption_history(database, update_list):
+    for item in update_list:
+        check_result, error_message = check_data(item, 'consumption_history')
+        if not check_result:
+            print(f"Invalid data in consumption_history: {item}. Error: {error_message}")
+            continue  # Skip invalid entries
+        database.get('consumption_history', []).append(item)  # Append each item in the update list to the consumption_history table
+    return database
+
+
+def add_to_fridge(database, update_list):
+    for item in update_list:
+        check_result, error_message = check_data(item, 'fridge')
+        if not check_result:
+            print(f"Invalid data in fridge: {item}. Error: {error_message}")
+            continue  # Skip invalid entries
+        database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
+    return database
+
+
+def remove_from_fridge(database, update_list):  
+    for item in update_list:
+        amount_to_remove = item.get('Quantity', 0)
+        for entry in database.get('fridge', []).copy():  # Use copy() to avoid modifying the list while iterating
+            if entry.get('Item_Name').lower() == item.get('Item_Name').lower():
+                if entry.get('Quantity') >= amount_to_remove:
+                    entry['Quantity'] -= amount_to_remove
+                    amount_to_remove = 0
+                    if entry['Quantity'] == 0:
+                        database.get('fridge', []).remove(entry)
+                else:
+                    amount_to_remove -= entry.get('Quantity')
+                    database.get('fridge', []).remove(entry)
+                if amount_to_remove == 0:
+                    break
+            
+
+    return database 
 
 
 #--------------------------------------for testing----------------------------------------------
@@ -184,10 +237,14 @@ def load_kcal_database():
     print(cal_db)  # Print the entire kcal database dictionary for verification
     return cal_db
 
-'''
+
 database_exists()  # Ensure the database folder and file exist
 database = load_database("sample_database")  # Load the database into memory
+record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Date_Range": 5, "Remarks": "None"}]
+database = remove_from_fridge(database, record)
+#print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
+
 save_database(database, 'database')  # Save the database to the specified folder
-'''
-load_kcal_database()  # Load the kcal database for testing purposes
+
+#load_kcal_database()  # Load the kcal database for testing purposes
 
