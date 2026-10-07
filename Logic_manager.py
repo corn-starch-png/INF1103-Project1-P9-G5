@@ -100,14 +100,14 @@ def give_recommendation(user_input, ai_data):
         ai_data["recommended_quantity"]
     )
 
-    waste_risk = calculate_expiry_risk(
+    """ waste_risk = calculate_expiry_risk(
         user_input["planned_quantity"],
         ai_data["recommended_quantity"],
         "current_quanity",#to be added
         "dailyConsumptionRate", # to be calculated
         "shelfLife" #to be calculated
     )
-    
+     """
     return {
         "result": result,
         "advice": ai_data["reason"],
