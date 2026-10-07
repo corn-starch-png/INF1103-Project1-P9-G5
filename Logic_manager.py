@@ -2,8 +2,6 @@ import json
 import statistics
 import csv
 from datetime import datetime,date,timedelta
-#calling from AI manager?
-# recommendations = ai_recommendations.get("recommendations", [])
 from DB_manager import KCAL_TABLE
 
 
@@ -74,13 +72,12 @@ def calories_surplus():
     print("family weekly calorie:", family_weekly_calorie)
     
     #get total estimated calories from AI output
-    recommendations = ai_recommendations.get("recommendations", [])
-    total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
-    print("AI estimated calories:", total_estimated_calories)
-        
+    with open("sampleAioutput.json", "r") as ai_output:
+        ai_calories = json.load(ai_output)
+        total_estimated_calories = ai_calories.get("total_estiamted_calories", 0)
     # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
     if total_estimated_calories > family_weekly_calorie:
-        exceed_calorie = total_estimated_calories >= family_weekly_calorie    
+        exceed_calorie = total_estimated_calories > family_weekly_calorie    
         print("Exceeded calories values by", exceed_calorie, "kcal")
         return True
     else:
