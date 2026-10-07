@@ -23,6 +23,8 @@ def check_data(record, table):
             return True
         except ValueError:
             return False
+    def check_string(value):
+        return isinstance(value, str)
     def check_unit(value):
         valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
         return value in valid_units
@@ -36,7 +38,8 @@ def check_data(record, table):
     def check_gender(value):
         valid_genders = ['Male', 'Female', 'Other']
         return value in valid_genders
-    #TODO refactor function for new data structure, check if the data is valid for the given table
+    
+    
     data_length = len(record)
     if table == 'consumption_history' and data_length == 5:
         # Check if Date_Range is an integer
@@ -61,7 +64,7 @@ def check_data(record, table):
             return False, "Invalid Gender, must be either: ['Male', 'Female', 'Other']"
         return True, None
         
-    elif table == 'fridge' and data_length == 5:
+    elif table == 'fridge' and data_length == 6:
         # Check if Quantity can be converted to float
         if not check_float(record["Quantity"]):
             return False, "Quantity must be a number"
@@ -73,6 +76,8 @@ def check_data(record, table):
             return False, "Invalid Purchase_Date format, must be YYYY-MM-DD"
         if not check_date(record["Expiry_Date"]):
             return False, "Invalid Expiry_Date format, must be YYYY-MM-DD"
+        if not check_string(record["Remarks"]):
+            return False, "Invalid Remarks format, must be a string"
         return True, None
         
     else:
