@@ -65,18 +65,24 @@ def calories_surplus(total_estimated_calories):
     
     #extract name, gender from household info from db.json
     family_member = household_data.get("household_info", [])
+    #check the family memebers in the household
+    for member in family_member:
+        print(print(f"Family members: {member.get('Name')} | Age {member.get('Age')} | Gender {member.get('Gender')}"))
     #calculate family weekly calorie
     family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
-    print("family weekly calorie:", family_weekly_calorie)
+    print("Total family weekly calorie:", family_weekly_calorie)
     
     # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
     if total_estimated_calories > family_weekly_calorie:
         exceed_calorie = total_estimated_calories - family_weekly_calorie    
-        print(f"Exceeded calories values by {exceed_calorie} kcal")
+        print("Calories surplus is:", True)
+        print(f"Exceeded calories values by {exceed_calorie}kcal")
         return True
     else:
+        print("Calories surplus is:", False)
         return False
-
+    
+# RISK OF EXPIRY LOGIC------------------------
 # calculating risk of expiry
 def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
     if estimated_consumption_rate > 0:
@@ -91,10 +97,12 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
         #if the days taken to consume an item is greater than days to expire
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
+            print("Risk of expiry is:", True)
             print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
             print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
             return True
         else:
+            print("Risk of expiry is:", False)
             return False 
     else:
         # estimated_consumption_rate <= 0:
@@ -103,7 +111,7 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
 def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
         # calling calorie_surplus and expiry risk functions
-        calorie_surplus = calories_surplus(
+        calories_surplus = calories_surplus(
             total_estimated_calories=total_estimated_calories
         )
         expiry_risk = risk_of_expiry(
@@ -114,9 +122,13 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
             unit=unit
         )
 
+        print("Checking if either is T/F:")
+        print(f"calorie_surplus is {calories_surplus}")
+        print(f"expiry_risk is {expiry_risk}")
+
         # if calorie_surplus and expiry_risk == False
-        if not calorie_surplus and not expiry_risk:
-            print("Calling underbuy function")
+        if calories_surplus is False and expiry_risk is False:
+            print("Calling underbuy function...")
             under_buy(
                 item_name=item_name,
                 planned_quantity=planned_quantity,
@@ -124,6 +136,9 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
                 next_purchase_date=next_purchase_date,
                 estimated_consumption_rate=estimated_consumption_rate
         )
+        else:
+            print("Not underbuy")
+            return None
       
 #second logic funciton 
 def give_recommendation(user_input, ai_data):
@@ -249,7 +264,20 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
 under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
 next_purchase_date = "2026-10-30", estimated_consumption_rate = 1.3)
 
+# If risk of expiry is True 
+risk_of_expiry(estimated_consumption_rate=0.8, planned_quantity=3, item_name="Milk", item_expiry_date="2026-10-30", unit="L")
 
+#if risk of expiry is False
+risk_of_expiry(estimated_consumption_rate=1.37, item_name="Milk", planned_quantity=3, unit="L", item_expiry_date="2026-10-23")
+
+#if calories surplus is False (total_estimated_calorie (AI) < total family weekly calories)
+calories_surplus(total_estimated_calories=15000)
+
+#if calories surplus is True (total_estimated_calories > total family weekly calories)
+calories_surplus(total_estimated_calories=60000)
+
+# if evaluating underbuy = T
+evaluate_underbuy(estimated_consumption_rate=1.37, item_name="Milk", planned_quantity=3, unit="L", item_expiry_date="2026-11-04", total_estimated_calories=15000, next_purchase_date="2026-10-18")
 
 
 
