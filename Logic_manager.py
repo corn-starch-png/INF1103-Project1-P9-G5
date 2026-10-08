@@ -1,6 +1,8 @@
 import json 
 import statistics
-from datetime import datetime
+from datetime import datetime,date,timedelta
+from DB_manager import KCAL_TABLE
+
 
 def get_user_input(): #simulate I/O layer
     item = input("Item: ")
@@ -35,32 +37,307 @@ def check_over_under(planned_quantity, recommended_quantity):
     else:
         return "good"
 
-# calculation for shelf life of item
-def shelf_life(item_name, json_path="sample_database/stock.json"):
-    # Expiry date - Purchase Date
-    with open(json_path, mode="r", encoding="utf-8") as file:
-        data = json.load(file)
+#CALORIE SURPLUS LOGIC --------------------   
+# eg. if user age is 20, will fall under 19 years old calorie intake
+def get_age_from_KCAL(age: int):
+    if age >= 60:
+        return 60
+    if age > 30:
+        return 30
+    if age >= 19:
+        return 19
+    return age
+
+# get each calorie from each family member
+def calculate_family_weekly_kcal(family_member, KCAL_TABLE):
+    daily_total = 0
+    for person in family_member:
+        age = get_age_from_KCAL(person["Age"])
+        gender = person["Gender"]
+        daily_total += KCAL_TABLE[age][gender] #male + female calorie
+    return daily_total * 7    
+
+# calculating calories surplus
+def calories_surplus(total_estimated_calories):   
+    # get age and gender from db so can match calories from kcal.csv
+    with open("./sample_database/db.json", "r") as file:
+        household_data = json.load(file)
+    
+    #extract name, gender from household info from db.json
+    family_member = household_data.get("household_info", [])
+    #check the family memebers in the household
+    for member in family_member:
+        print(print(f"Family members: {member.get('Name')} | Age {member.get('Age')} | Gender {member.get('Gender')}"))
+    #calculate family weekly calorie
+    family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
+    print("Total family weekly calorie:", family_weekly_calorie)
+    
+    # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
+    if total_estimated_calories > family_weekly_calorie:
+        exceed_calorie = total_estimated_calories - family_weekly_calorie    
+        print("Calories surplus is:", True)
+        print(f"Exceeded calories values by {exceed_calorie}kcal")
+        return True
+    else:
+        print("Calories surplus is:", False)
+        return False
+    
+# RISK OF EXPIRY LOGIC------------------------
+# calculating risk of expiry
+def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
+    if estimated_consumption_rate > 0:
         
-        for item in data.get("stock", []):
-            if item["Item_Name"].strip().lower() == item_name.strip().lower():
-                purchaseDate = datetime.strptime(item["Purchase_Date"].strip(), "%Y-%m-%d")
-                expiryDate = datetime.strptime(item["Expiry_Date"].strip(), "%Y-%m-%d")
+        today = date.today()
+        # calculation of daily consumption rate per day
+        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+        
+        # days taken to finish consuming the item
+        estimated_days_to_consume = round(planned_quantity / daily_consumption_rate)
+                    
+        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        #if the days taken to consume an item is greater than days to expire
+        if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
+            print("Risk of expiry is:", True)
+            print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
+            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
+            return True
+        else:
+            print("Risk of expiry is:", False)
+            return False 
+    else:
+        # estimated_consumption_rate <= 0:
+        print("Consumption rate cannot be 0")    
+        
+# evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
+def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
+        # calling calorie_surplus and expiry risk functions
+        calories_surplus = calories_surplus(
+            total_estimated_calories=total_estimated_calories
+        )
+        expiry_risk = risk_of_expiry(
+            estimated_consumption_rate=estimated_consumption_rate,
+            planned_quantity=planned_quantity,
+            item_expiry_date=item_expiry_date,
+            item_name=item_name,
+            unit=unit
+        )
+
+        print("Checking if either is T/F:")
+        print(f"calorie_surplus is {calories_surplus}")
+        print(f"expiry_risk is {expiry_risk}")
+
+        # if calorie_surplus and expiry_risk == False
+        if calories_surplus is False and expiry_risk is False:
+            print("Calling underbuy function...")
+            under_buy(
+                item_name=item_name,
+                planned_quantity=planned_quantity,
+                item_expiry_date=item_expiry_date,
+                next_purchase_date=next_purchase_date,
+                estimated_consumption_rate=estimated_consumption_rate
+        )
+        else:
+            print("Not underbuy")
+            return None
+      
+#second logic funciton 
+def give_recommendation(user_input, ai_data):
+
+    result = check_over_under(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"]
+    )
+
+    """ waste_risk = calculate_expiry_risk(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"],
+        "current_quanity",#to be added
+        "dailyConsumptionRate", # to be calculated
+        "shelfLife" #to be calculated
+    )
+     """
+    return {
+        "result": result,
+        "advice": ai_data["reason"],
+        "waste_risk": None, #To be added 
+        "confidence_score": None #to be added 
+    }
+
+#first confidence score function, some funky math going on here
+def calculate_historical_data_completeness(item_name, consumption_history, fridge):
+    purchase_count = 0 #count how many times item was bought
+
+    for row in consumption_history:
+        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None": #each seperate time user goes to NTUC to buy, CS increases
+            purchase_count += 1
+
+    for row in fridge:
+            if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None": #each seperate time user goes to NTUC to buy, CS increases
+                purchase_count += 1
+
+    k = 8 #arbitary value i smoked out to control how fast completeness is given
+    # K is inverse to the rate CS grows 
+
+    completeness_score = purchase_count / (purchase_count + k) #keeping score <=1.0
+    return completeness_score
+
+
+#second confidence score function taking into account S/D
+def calculate_data_standard_deviation(item_name,consumption_history,fridge): #calculate for each item 
+    
+    quantities = [] #list to feed into stats funciton later
+
+    for row in consumption_history: #iterate through list, searchingin Item_Name column to find the find item user enterd "item_name"
+        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None" : #find item, omit if remarks is ticked
+            quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
+
+    for row in fridge:
+        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None":
+                quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
+
+    sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
+
+    if len(quantities) < 2: #can't calculate s/d with one value
+        return 0.0 
+   
+    mean = statistics.mean(quantities)  
+
+    if mean == 0: #so our program dont commit suicide by dividing with zero
+        return 1.0
+
+    cv = sd / mean #calculating relative standard deviation 
+
+    standard_deviation = 1 / (1 + cv) #keeping score <=1.0
+
+    return standard_deviation
+
+def calculate_confidence_score(item_name):
+
+    # pull out the 2 list i need to calculate confidence_score 
+    fridge_file = open("./sample_database/db.json" , "r")
+    database = json.load(fridge_file)
+    consumption_history = database["consumption_history"]
+    fridge = database["fridge"]
+
+    standard_deviation = calculate_data_standard_deviation(item_name=item_name, consumption_history = consumption_history, fridge = fridge)
+    consistency_score = calculate_historical_data_completeness(item_name = item_name ,consumption_history = consumption_history, fridge = fridge)
+    confidence_score = standard_deviation * consistency_score #will add more scores if needed
+    return round(confidence_score, 3) *100 #round off to 3 d.p in case of irrational number
+
+
+#under_buy will pull from basket/grocery_list
+def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate):
+    today = date.today()
+    # processing dates and calculating new variable with them
+    if estimated_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
+
+        
+        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+        estimated_day_to_consume = round(planned_quantity / daily_consumption_rate)
+    
+        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        day_item_is_eaten = today + timedelta(days = estimated_day_to_consume)
+
+        #calculating Nth amount needed to not run out of food
+        next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
+        days_to_next_purchase = next_purchase_date - today 
+        days_to_next_purchase = days_to_next_purchase.days #extra n from datetime.timedelta(days=n)
+        quantity_needed = daily_consumption_rate * days_to_next_purchase
+        amount_to_topup = round (quantity_needed - planned_quantity, 2)
+
+        if day_item_is_eaten < item_expiry_date:
+            print(f"You will finish consuming {item_name} in {estimated_day_to_consume} days.",
+                  f"You should buy {amount_to_topup} more to last till your next grocery run.",
+                 f"AI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
+
+        else:
+            return None
+
+    elif estimated_consumption_rate <=0:
+        print("Consumption rate is 0, not enough to calculate underbuy!")
+
+
+# ---------------V V V  execution code  V V V ---------------  
+
+# "item": "Milk",  "planned_quantity": 3, "unit": "L", "recommended_quantity": 0.4, "consumption_rate": 1.37, "estimated_calories": 240,
+
+under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
+next_purchase_date = "2026-10-30", estimated_consumption_rate = 1.3)
+
+# If risk of expiry is True 
+risk_of_expiry(estimated_consumption_rate=0.8, planned_quantity=3, item_name="Milk", item_expiry_date="2026-10-30", unit="L")
+
+#if risk of expiry is False
+risk_of_expiry(estimated_consumption_rate=1.37, item_name="Milk", planned_quantity=3, unit="L", item_expiry_date="2026-10-23")
+
+#if calories surplus is False (total_estimated_calorie (AI) < total family weekly calories)
+calories_surplus(total_estimated_calories=15000)
+
+#if calories surplus is True (total_estimated_calories > total family weekly calories)
+calories_surplus(total_estimated_calories=60000)
+
+# if evaluating underbuy = T
+evaluate_underbuy(estimated_consumption_rate=1.37, item_name="Milk", planned_quantity=3, unit="L", item_expiry_date="2026-11-04", total_estimated_calories=15000, next_purchase_date="2026-10-18")
+
+
+
+
+# ---------------V V V  Deprecated code  V V V ---------------  
+
+#getting user input (for testing purpose, I/O layer exists!)
+# while True:
+#     user_input = get_user_input()
+
+#     ai_data = None
+
+#     for recommendation in data["recommendations"]:
+#         if (    #checking if Ai recommendation exist for user input (in case AI omits)
+#             recommendation["item"].lower() == user_input["item"].lower()
+#             and 
+#             recommendation ["unit"].lower() == user_input["unit"].lower()
+#         ):
+#             ai_data = recommendation
+#             break
+
+#     if ai_data is None:
+#         print("No AI recommendation found for this item")
+#     else:
+#         result = give_recommendation(user_input, ai_data)
+
+#         print("\n--- Recommendation ---")
+#         print(f"Result: {result['result']}")
+#         print(f"Advice: {result['advice']}")
+#         print(f"Waste risk: {result['waste_risk']}")
+#         print(f"Confidence score: {result['confidence_score']}")
+
+""" # calculation for shelf life of item
+# def shelf_life(item_name, json_path="sample_database/stock.json"):
+    # Expiry date - Purchase Date
+    with open(csv_path, mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        
+        for row in reader:
+            # Strip whitespace around column keys and values
+            clean_row = {k.strip(): v.strip() for k, v in row.items()}
+            
+            if clean_row["Item_Name"].lower() == item_name.strip().lower():
+                purchaseDate = datetime.strptime(clean_row["Purchase_Date"], "%Y-%m-%d")
+                expiryDate = datetime.strptime(clean_row["Expiry_Date"], "%Y-%m-%d")
                 
                 # Total shelf life (from purchase to expiry)
                 total_shelf_life = (expiryDate - purchaseDate).days
                 return total_shelf_life
-                
-    # if item not found         
+    #if item not found         
     return None      
-
+                
 
 # calculating expiry risk to determine if food waste is high/medium/low
 def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, shelf_life, json_path="sample_database/stock.json"):
     # checking status of planned quantity and recommended quantity
     status = check_over_under(planned_quantity, recommended_quantity)
     if status == "over":
-        # to prevent division errors while handling zero consumption rate
-        if "Ai output consumption rate" <= 0:
+        #to prevent division errors while handling zero consumption rate
+        if dailyConsumptionRate <= 0:
             return "High Food Waste"
         
         # retrieve quantity of item from db
@@ -85,105 +362,5 @@ def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, she
         
     else:
         # if check_over_under is "under" and "good"
-        return "Low Food Waste"
-
-#second logic funciton 
-def give_recommendation(user_input, ai_data):
-
-    result = check_over_under(
-        user_input["planned_quantity"],
-        ai_data["recommended_quantity"]
-    )
-
-    waste_risk = calculate_expiry_risk(
-        user_input["planned_quantity"],
-        ai_data["recommended_quantity"],
-        "current_quanity",#to be added
-        "Ai output consumption rate", # to be calculated
-        "shelfLife" #to be calculated
-    )
+        return "Low Food Waste" """
     
-    return {
-        "result": result,
-        "advice": ai_data["reason"],
-        "waste_risk": None, #To be added 
-        "confidence_score": None #to be added 
-    }
-
-#first confidence score function, some funky math going on here
-def calculate_historical_data_completeness(data, item_name):
-    purchase_count = 0 #int value
-
-    for row in data: 
-        if row["Item_Name"].lower() == item_name.lower(): #each seperate time user goes to NTUC to buy, CS increases
-            purchase_count += 1
-
-    k = 8 #arbitary value i smoked out to control how fast completeness is given
-    # K is inverse to the rate CS grows 
-
-    completeness_score = purchase_count / (purchase_count + k) #keeping score <=1.0
-    return completeness_score
-
-
-#second confidence score function taking into account S/D
-def calculate_historical_data_consistency(data,item_name):
-    quantities = [] #list to feed into stats funciton later
-    for row in data: #iterate through CSV file, searchingin Item_name column to find the find item user enterd "item_name"
-        if row["Item_name"].lower() == item_name.lower():
-            quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
-
-    sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
-
-    if len(quantities) < 2: #can't calculate s/d with one value
-        return 0.0 
-   
-    mean = statistics.mean(quantities)  
-
-    if mean == 0: #so our program dont commit suicide by living with zero
-        return 1.0
-
-    cv = sd / mean #calculating relative standard deviation 
-
-    consistency_score = 1 / (1 + cv) #keeping score <=1.0
-
-    return consistency_score
-
-def calculate_confidence_score(completeness_score,consistency_score):
-    confidence_score = completeness_score * consistency_score #will add more scores if needed
-    return round(confidence_score, 3) #round off to 3 d.p in case of irrational number
-
-
-# ---------------V V V  execution code  V V V ---------------  
-
-
-#load dummy AI data (subjected to changes)
-with open("sampleAioutput.json","r") as file: #open .json with "read" mode as variable file
-    data = json.load(file) #json.load converts json to python
-
-
-#getting user input (for testing purpose, I/O layer exists!)
-while True:
-    user_input = get_user_input()
-
-    ai_data = None
-
-    for recommendation in data["recommendations"]:
-        if (    #checking if Ai recommendation exist for user input (in case AI omits)
-            recommendation["item"].lower() == user_input["item"].lower()
-            and 
-            recommendation ["unit"].lower() == user_input["unit"].lower()
-        ):
-            ai_data = recommendation
-            break
-
-    if ai_data is None:
-        print("No AI recommendation found for this item")
-    else:
-        result = give_recommendation(user_input, ai_data)
-
-        print("\n--- Recommendation ---")
-        print(f"Result: {result['result']}")
-        print(f"Advice: {result['advice']}")
-        print(f"Waste risk: {result['waste_risk']}")
-        print(f"Confidence score: {result['confidence_score']}")
-
