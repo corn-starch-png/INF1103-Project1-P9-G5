@@ -154,7 +154,7 @@ def create_profile():
  
  
 # For new users: Collect the food items they already have at home, with expiry dates.
-# Returns a list in the database's fridge format (Purchase_Date is left blank).
+# Returns a list in the database's fridge format (Purchase_Date is left blank, Remarks optional).
 def enter_home_items():
     while True:
         has_items = input("\nDo you have any food items at home you want to add? (yes/no): ").strip().lower()
@@ -170,13 +170,17 @@ def enter_home_items():
     while True:
         item = enter_item()
         expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
+        item_remarks = input("Any remarks about this item? e.g. opened, for a party (leave blank if none): ").strip()
+        if item_remarks == "":
+            item_remarks = "None"
  
         remaining_items.append({
             "Item_Name": item["name"],
             "Quantity": item["quantity"],
             "Unit": item["unit"],
             "Purchase_Date": "",
-            "Expiry_Date": expiry_date
+            "Expiry_Date": expiry_date,
+            "Remarks": item_remarks
         })
         print(f"Added {item['quantity']} {item['unit']} of {item['name']} (expires {expiry_date}) to your home items.")
         if not ask_add_another():
@@ -187,7 +191,8 @@ def enter_home_items():
  
 # For returning users: Ask how much of each item they consumed since last visit.
 # Batches of the same item (e.g. several Milk entries) are combined into one question.
-# Returns a list of {"Item_Name", "Consumed", "Unit"} for the database to remove.
+# Days since last use and remarks are asked once and applied to every item.
+# Returns a list in the database's consumption_history format
 def update_consumption(previous_inventory):
     consumed_items = []
     if not previous_inventory:
@@ -201,8 +206,17 @@ def update_consumption(previous_inventory):
             totals[key]["Quantity"] += item["Quantity"]
         else:
             totals[key] = {"Item_Name": item["Item_Name"], "Quantity": item["Quantity"], "Unit": item["Unit"]}
-
+ 
     print("\nUpdate Consumption.")
+ 
+    # Asked once for the whole consumption list
+    while True:
+        text = input("How many days has it been since you last used the app? ").strip()
+        if text.isdigit() and 1 <= int(text) <= 365:
+            date_range = int(text)
+            break
+        print("Please enter a whole number between 1 and 365.")
+ 
     for key in totals:
         name = totals[key]["Item_Name"]
         total = round(totals[key]["Quantity"], 2)
@@ -216,12 +230,20 @@ def update_consumption(previous_inventory):
             else:
                 consumed = float(text)
                 break
-
+ 
         consumed_items.append({
+            "Date_Range": date_range,
             "Item_Name": name,
-            "Consumed": consumed,
+            "Quantity": consumed,
             "Unit": unit
         })
+ 
+    # Asked once, then added to every item
+    remarks = input("Any remarks about your consumption since last time? (leave blank if none): ").strip()
+    if remarks == "":
+        remarks = "None"
+    for record in consumed_items:
+        record["Remarks"] = remarks
  
     return consumed_items
  
@@ -288,7 +310,7 @@ def show_welcome_back(household_info):
 # =====================================================================
  
 if __name__ == "__main__":
-    household_info = []      # change to [{"Person_ID": 1, "Name": "Test", "Age": 20, "Gender": "Male", "Dietary_Restriction": "None"}] to test a returning user
+    household_info = []     # change to [{"Person_ID": 1, "Name": "Test", "Age": 20, "Gender": "Male", "Dietary_Restriction": "None"}] to test a returning user
     previous_inventory = []  # e.g. [{"Item_Name": "Milk", "Quantity": 2, "Unit": "carton", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05"}]
     remaining_items = []
     consumed_items = []
