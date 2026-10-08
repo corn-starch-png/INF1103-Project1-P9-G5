@@ -67,7 +67,7 @@ def calories_surplus(total_estimated_calories):
     family_member = household_data.get("household_info", [])
     #check the family memebers in the household
     for member in family_member:
-        print(print(f"Family members: {member.get('Name')} | Age {member.get('Age')} | Gender {member.get('Gender')}"))
+        print(f"Family members: {member.get('Name')} | Age {member.get('Age')} | Gender {member.get('Gender')}")
     #calculate family weekly calorie
     family_weekly_calorie = calculate_family_weekly_kcal(family_member, KCAL_TABLE)
     print("Total family weekly calorie:", family_weekly_calorie)
