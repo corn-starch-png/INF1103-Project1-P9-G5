@@ -111,7 +111,7 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
 def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
         # calling calorie_surplus and expiry risk functions
-        calories_surplus = calories_surplus(
+        calorie_surplus = calories_surplus(
             total_estimated_calories=total_estimated_calories
         )
         expiry_risk = risk_of_expiry(
@@ -123,11 +123,11 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
         )
 
         print("Checking if either is T/F:")
-        print(f"calorie_surplus is {calories_surplus}")
+        print(f"calorie_surplus is {calorie_surplus}")
         print(f"expiry_risk is {expiry_risk}")
 
         # if calorie_surplus and expiry_risk == False
-        if calories_surplus is False and expiry_risk is False:
+        if calorie_surplus is False and expiry_risk is False:
             print("Calling underbuy function...")
             under_buy(
                 item_name=item_name,
