@@ -80,7 +80,6 @@ def calories_surplus(total_estimated_calories):
 # calculating risk of expiry
 def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
     if estimated_consumption_rate > 0:
-        print("Consumption rate must be greater than 0.")
         
         today = date.today()
         # calculation of daily consumption rate per day
