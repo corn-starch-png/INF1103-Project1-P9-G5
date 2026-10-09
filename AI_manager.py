@@ -77,7 +77,7 @@ def get_recommendation_schema():
     return {
         "type": "object",
         "properties": {
-            "recommendations": {
+            "Recommendations_List": {
                 "type": "array",
                 "items": {
                     "type": "object",
