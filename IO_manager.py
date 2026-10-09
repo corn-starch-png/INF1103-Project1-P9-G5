@@ -10,11 +10,7 @@ def enter_item(existing_items=None):
     if existing_items is None:
         existing_items = []
 
-    while True:
-        item_name = input("Item name: ").strip()
-        if item_name != "":
-            break
-        print("Item name can't be empty.")
+    item_name = enter_text("Item name: ")
 
     # Check if this item was entered before, and lock its unit
     locked_unit = ""
@@ -41,6 +37,18 @@ def enter_item(existing_items=None):
     return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
  
+# Double quote checks, reasks user to prevent JSON errors
+def enter_text(question, allow_blank=False):
+    while True:
+        text = input(question).strip()
+        if '"' in text:
+            print('Please don\'t use double quotes (") in your answer.')
+        elif text == "" and not allow_blank:
+            print("This can't be empty.")
+        else:
+            return text
+
+
 # Ask for a quantity until the user enters a number more than 0.
 def enter_quantity(question):
     while True:
@@ -84,11 +92,7 @@ def enter_date(question):
 # Collect a new user's profile and their family members' details.
 # Returns a list in the database's household_info format (the user is Person_ID 1).
 def create_profile():
-    while True:
-        name = input("Please enter your name: ").strip()
-        if name != "":
-            break
-        print("Name can't be empty.")
+    name = enter_text("Please enter your name: ")
  
     while True:
         age = input("Please enter your age: ").strip()
@@ -103,7 +107,7 @@ def create_profile():
             break
         print("Please enter male or female.")
  
-    dietary_restrictions = input("Please enter your dietary restrictions (leave blank if none): ").strip()
+    dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", True)
     if dietary_restrictions == "":
         dietary_restrictions = "None"
  
@@ -124,11 +128,7 @@ def create_profile():
     }
  
     for i in range(family - 1):
-        while True:
-            member_name = input(f"Please enter the name of family member {i + 1}: ").strip()
-            if member_name != "":
-                break
-            print("Name can't be empty.")
+        member_name = enter_text(f"Please enter the name of family member {i + 1}: ")
  
         while True:
             member_age = input(f"Please enter the age of {member_name}: ").strip()
@@ -143,7 +143,7 @@ def create_profile():
                 break
             print("Please enter male or female.")
  
-        member_diet = input(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ").strip()
+        member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", True)
         if member_diet == "":
             member_diet = "None"
  
@@ -195,7 +195,7 @@ def enter_home_items():
     while True:
         item = enter_item(remaining_items)
         expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
-        item_remarks = input("Any remarks about this item? e.g. opened, for a party (leave blank if none): ").strip()
+        item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
         if item_remarks == "":
             item_remarks = "None"
 
@@ -278,7 +278,7 @@ def update_consumption(previous_inventory):
         })
  
     # Asked once, then added to every item
-    remarks = input("Any remarks about your consumption since last time? (leave blank if none): ").strip()
+    remarks = enter_text("Any remarks about your consumption since last time? (leave blank if none): ", True)
     if remarks == "":
         remarks = "None"
     for record in consumed_items:
@@ -319,7 +319,7 @@ def enter_grocery_list():
  
 # Ask for optional remarks about this week (e.g. events).
 def ask_remarks():
-    return input("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ").strip()
+    return enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
  
  
 # Ask how many days until the user's next planned shop.
@@ -491,4 +491,3 @@ if __name__ == "__main__":
     print("remarks =", remarks)
     print("days_until_next =", days_until_next)
     print("final_checkout =", final_checkout)
- 
