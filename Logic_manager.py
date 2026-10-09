@@ -67,7 +67,8 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
             print("Risk of expiry is:", True)
             print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
-            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
+            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
+                  "\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
             return True
         else:
             print("Risk of expiry is:", False)
@@ -77,7 +78,7 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         print("Consumption rate cannot be 0")    
         
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
-def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
+""" def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
         # calling calorie_surplus and expiry risk functions
         calorie_surplus = calories_surplus(
             total_estimated_calories=total_estimated_calories
@@ -107,7 +108,7 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
         else:
             print("Not underbuy")
             return None
-      
+       """
 
 #first confidence score function, some funky math going on here
 def calculate_historical_data_completeness(item_name, consumption_history, fridge):
