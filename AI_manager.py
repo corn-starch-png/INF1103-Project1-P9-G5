@@ -42,6 +42,22 @@ def date_convert(current_date, days_until_next):
         raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
 #endregion
 
+#region expiration date conversion
+def get_expiration_date(current_date, default_expiration_days):
+    try:
+        expiration_date = current_date + timedelta(days=default_expiration_days)
+        return expiration_date
+    except ValueError:
+        raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
+    
+def get_default_expiration_date(current_date, default_expiration_days):
+    try:
+        default_expiration_date = current_date + timedelta(days=default_expiration_days)
+        return default_expiration_date
+    except ValueError:
+        raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
+#endregion
+
 #For main.py to prepare data for AI processing
 #region data preparation
 def prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input,remarks, current_date=None, next_purchase_date=None):
@@ -66,52 +82,53 @@ def get_recommendation_schema():
                 "items": {
                     "type": "object",
                     "properties": {
-                        "item": {
+                        "Item_Name": {
                             "type": "string"
                         },
-                        "planned_quantity": {
+                        "Planned_Quantity": {
                             "type": "number",
                             "minimum": 0
                         },
-                        "unit": {
+                        "Unit": {
                             "type": "string"
                         },
-                        "recommended_quantity": {
+                        "Recommended_Quantity": {
                             "type": "number",
                             "minimum": 0
                         },
-                        "consumption_rate": {
+                        "Consumption_Rate": {
                             "type": "number",
                             "minimum": 0
                         },
-                        "estimated_calories": {
+                        "Estimated_Calories": {
                             "type": "number",
                             "minimum": 0
                         },
-                        "reason": {
-                            "type": "string"
-                        }
+                        "Estimated_Expiration_Days": {
+                            "type": ["integer", "null"],
+                            "minimum": 0
+                        },
                     },
                     "required": [
-                        "item",
-                        "planned_quantity",
-                        "unit",
-                        "recommended_quantity",
-                        "consumption_rate",
-                        "estimated_calories",
-                        "reason"
+                        "Item_Name",
+                        "Planned_Quantity",
+                        "Unit",
+                        "Recommended_Quantity",
+                        "Consumption_Rate",
+                        "Estimated_Calories",
+                        "Estimated_Expiration_Days",
                     ],
                     "additionalProperties": False
                 }
             },
-            "total_estimated_calories": {
+            "Total_Estimated_Calories": {
                 "type": "number",
                 "minimum": 0
             }
         },
         "required": [
-            "recommendations",
-            "total_estimated_calories"
+            "Recommendations_List",
+            "Total_Estimated_Calories"
         ],
         "additionalProperties": False
     }
@@ -121,13 +138,9 @@ def get_recommendation_schema():
 def build_ai_prompt(data):
     return f"""
 You are the food waste recommendation assistant for a household.
-
 Your task is to analyse the provided household information and determine the recommended quantity to buy for every item in the planned grocery list.
-
 Your goal is to meet the household's expected needs until the next planned purchase while avoiding unnecessary purchases that may contribute to food waste.
-
 Use only the information provided for household and purchase recommendations. Do not invent or assume household data, consumption, stock, future purchases, household changes, preferences, or nutritional requirements that are not provided.
-
 Typical nutritional knowledge may be used ONLY when estimating calories, as described below.
 
 HOUSEHOLD PROFILE:
@@ -151,7 +164,6 @@ CURRENT DATE:
 PLANNED NEXT PURCHASE DATE:
 {data["next_purchase_date"]}
 
-
 ASSESSMENT CRITERIA:
 For every item consider:
 1. Historical consumption
@@ -166,8 +178,7 @@ For every item consider:
 
 REMARKS HANDLING:
 - Before calculating the recommended_quantity, you should check the item's remarks.
-- If a remark describes a temporary or unusual change in the household's needs,
-When making the recommendation, give that information the top priority.
+- If a remark describes a temporary or unusual change in the household's needs, When making the recommendation, give that information the top priority.
 - The note is to be considered along with other information that includes current stock levels, planned quantity, family situation, and previous usage records.
 - If there are no notes made, derive the conclusion based on other pieces of information available.
 - Do not invent any situations or changes in the family which are not stated here.
@@ -176,11 +187,30 @@ RECOMMENDED QUANTITY:
 The amount that the household should buy is the recommended_quantity.
 
 The recommended quantity shall:
-- Consider current fridge stock before recommending additional purchases
-- Reflect historical consumption where sufficient data is available
-- Account for relevant remarks and temporary changes in needs
-- Avoid unnecessary excess that may contribute to food waste
-- Never be negative
+- Consider current fridge stock before recommending additional purchases.
+- Reflect historical consumption where sufficient data is available.
+- Account for relevant remarks and temporary changes in needs.
+- Avoid unnecessary excess that may contribute to food waste.
+- Never be negative.
+
+NEW ITEMS AND MISSING CONSUMPTION HISTORY:
+- Check whether each planned grocery item has any relevant
+  historical consumption records.
+- No consumption history does not mean zero consumption.
+- Do not interpret missing consumption records as evidence
+  that the household does not need the item.
+- If an item has no historical consumption records,
+  use its planned_quantity as the default recommended_quantity.
+- Only adjust this default if current stock information,
+  explicit remarks or other provided evidence supports
+  a different quantity.
+- Do not invent a consumption rate for an item with
+  no historical consumption records.
+- Do not recommend zero solely because an item is new.
+- If historical records explicitly show zero consumption,
+  distinguish this from missing consumption history.
+- For newly planned perishable items, do not invent a
+  smaller consumption-based quantity solely from shelf life.
 
 QUANTITY RULES:
 The only valid units are:
@@ -200,8 +230,7 @@ ESTIMATED CALORIES:
 For every item, estimate the total calories represented by the recommended_quantity.
 Using typical nutritional values to determine the recommended quantity.
 
-The calorie value is an estimate only and must not be presented
-as exact nutritional information.
+The calorie value is an estimate only and must not be presented as exact nutritional information.
 
 If exact nutrition information is not provided:
 - Use a reasonable typical calorie value for the food item
@@ -220,24 +249,12 @@ that item's recommended_quantity.
 Also calculate:
 - total_estimated_calories
 
-total_estimated_calories must be the sum of estimated_calories
-for all recommendation items.
+total_estimated_calories must be the sum of estimated_calories for all recommendation items.
 
 CALORIE UNIT:
 - All estimated calorie values must be expressed in kilocalories (kcal).
 - estimated_calories and total_estimated_calories must be numeric kcal values.
 - Do not return calories in cal, kJ, or any other unit.
-
-REASON:
-Provide an explanation in 1-2 sentences for each recommended quantity.
-
-The reason shall:
-- Reference relevant consumption history, current fridge stock,
-planned quantity, household information or remarks
-- Explain the main factor affecting the recommended quantity
-- Mention uncertainty where available information is limited
-- Not contain information that was not provided
-- Not present estimated calorie information as exact
 
 PURCHASE PERIOD:
 - Use CURRENT DATE and PLANNED NEXT PURCHASE DATE to determine
@@ -247,12 +264,38 @@ PURCHASE PERIOD:
 - Do not assume another grocery purchase will occur before the
   planned next purchase date.
 
-WEEKLY CONSUMPTION RATE:
-For all items that are supposed to be purchased,
-compute the consumption rate.
+ESTIMATED EXPIRATION DAYS:
+For each item from the planned grocery list, estimate the number of days
+until the newly purchased food is expected to expire.
+estimated_expiration_days refers to the number of days a newly purchased food item will remain edible from the day of purchase.
+The value returned is a non-negative integer and not a date.
 
-Consumption rate is the estimated amount that
-is consumed within a period of 7 days.
+When estimating the number of days until expiration:
+1. Think about the type of food.
+2. Think about the typical shelf life of the food.
+3. Think about any specific storage instructions, packaging,
+freshness information, or other relevant notes.
+4. Use general food storage and shelf-life knowledge
+when estimating the number of days until expiration.
+5. Do not make up specific information about a food’s
+manufacturer-specified expiration information, pack aging, storage instructions, or other specific details.
+
+6. Do not assume that existing items in the fridge have the
+same shelf life as newly purchased items.
+7. Remember to treat the estimated_expiration_days as an
+estimate and not an official manufacturer expiration or use-by date.
+If recommended_quantity is 0, return estimated_expiration_days as null.
+Return estimated_expiration_days as null if the data required to estimate expiry datys is not available or cannot be estimated a reasonable days.
+Otherwise, if you believe you have enough information to estimate expiration, return the number of days as an integer. There should be no units or other text. You should never use more decimal places than are necessary to represent an integer.
+
+When determining the suggested quantity:
+Consider whether it is reasonable to assume that the amount of food recommended will be consumed before it goes bad.
+When making a recommendation, consider past consumption, current inventory, the time of purchase, and any pertinent notes, but do not recommend more than you feel can be safely consumed before it expires.
+
+WEEKLY CONSUMPTION RATE:
+For all items that are supposed to be purchased, compute the consumption rate.
+
+Consumption rate is the estimated amount that is consumed within a period of 7 days.
 
 A Consumption History entry comprises of:
 - Date Range: number of days in the record
@@ -278,7 +321,7 @@ The resulting consumption rate:
 OUTPUT RULES:
 - Retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
 - Do not modify or recalculate planned_quantity
-- Calculate recommended_quantity, consumption_rate, estimated_calories and reason for each item.
+- Calculate recommended_quantity, consumption_rate, estimated_calories and estimated_expiration_date for each item.
 For each item on the planned grocery list, make exactly one recommendation.
 - Make sure not to include any items that are not on the grocery list.
 - Do not take any items off the grocery list that was planned.
@@ -401,19 +444,6 @@ def update_ai_status(message):
     print(f"[AI STATUS] {message}")
 #endregion
 
-#region AI Text clean up
-def clean_ai_text(text):
-    if not isinstance(text, str):
-        return text
-
-    return (
-        text
-        .replace("\u202f", " ")
-        .replace("\u00a0", " ")
-        .replace("\u2011", "-")
-    )
-#endregion
-
 #region Process AI output
 def process_ai_response(ai_response):
     try:
@@ -431,24 +461,45 @@ def process_ai_response(ai_response):
     for item in recommendations:
         if not isinstance(item, dict):
             return None, (f"Invalid recommendation structure. \nExpected dict, received {type(item).__name__}.")
-        item["reason"] = clean_ai_text(item.get("reason", ""))
-        estimated_calories = item.get("estimated_calories")
-        if not isinstance(estimated_calories, (int, float)):
-            return None, (f"estimated_calories for {item.get('item', 'Unknown')} must be numeric.")
+        item_name = item.get("Item_Name", "Unknown")
+        recommended_quantity = item.get("Recommended_Quantity")
+        if type(recommended_quantity) not in (int, float):
+            return None, (f"Recommended_Quantity for {item_name} must be numeric.")
+        if recommended_quantity < 0:
+            return None, (f"Recommended_Quantity for {item_name} cannot be negative.")
+        # Validate estimated expiration days
+        estimated_expiration_days = item.get("Estimated_Expiration_Days")
+        if estimated_expiration_days is not None:
+            if type(estimated_expiration_days) is not int:
+                return None, (f"Estimated_Expiration_Days for {item_name} must be an integer.")
+            if estimated_expiration_days < 0:
+                return None, (f"Estimated_Expiration_Days for {item_name} cannot be negative.")
+        if recommended_quantity == 0:
+            if estimated_expiration_days is not None:
+                return None, (f"Estimated_Expiration_Days for {item_name} must be null when Recommended_Quantity is 0.")
+        # Validate estimated calories
+        estimated_calories = item.get("Estimated_Calories")
+        if type(estimated_calories) not in (int, float):
+            return None, (f"Estimated_Calories for {item_name} must be numeric.")
         if estimated_calories < 0:
-            return None, (f"estimated_calories for {item.get('item', 'Unknown')} cannot be negative.")
-
+            return None, (f"Estimated_Calories for {item_name} cannot be negative.")
     # Validate total estimated calories
     total_calories = data.get("total_estimated_calories")
-    if not isinstance(total_calories, (int, float)):
+    if type(total_calories) not in (int, float):
         return None, ("total_estimated_calories must be numeric.")
     if total_calories < 0:
         return None, ("total_estimated_calories cannot be negative.")
-
     # Validate total against item calorie sum
-    calculated_total = sum(item["estimated_calories"] for item in recommendations)
+    calculated_total = sum(item["Estimated_Calories"] for item in recommendations)
     if abs(calculated_total - total_calories) > 0.01:
-        return None, ("total_estimated_calories does not match the sum of estimated_calories.")
+        return None, ("total_estimated_calories does not match the sum of Estimated_Calories.")
+    # Add Estimated_Expiry_Date after successful validation
+    for item in recommendations:
+        estimated_expiration_days = item.get("Estimated_Expiration_Days")
+        if estimated_expiration_days is not None:
+            item["Estimated_Expiry_Date"] = get_expiration_date(date.today(), estimated_expiration_days).isoformat()
+        else:
+            item["Estimated_Expiry_Date"] = get_default_expiration_date(date.today(), 365).isoformat()
     return data, None
 #endregion
 
