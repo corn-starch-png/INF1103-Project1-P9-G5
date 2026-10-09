@@ -30,7 +30,10 @@ def check_data(record, table):
         return isinstance(value, str)
     def check_unit(value):
         valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
-        return value.lower() in valid_units.lower()
+        for i in valid_units:
+            if value.lower() == i.lower():
+                return True
+        return False
     def check_date(value):
         # Check if the date is in the format YYYY-MM-DD
         try:
