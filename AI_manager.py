@@ -96,7 +96,7 @@ def get_recommendation_schema():
                             "type": "number",
                             "minimum": 0
                         },
-                        "Consumption_Rate": {
+                        "Estimated_Consumption_Rate": {
                             "type": "number",
                             "minimum": 0
                         },
@@ -114,7 +114,7 @@ def get_recommendation_schema():
                         "Planned_Quantity",
                         "Unit",
                         "Recommended_Quantity",
-                        "Consumption_Rate",
+                        "Estimated_Consumption_Rate",
                         "Estimated_Calories",
                         "Estimated_Expiration_Days",
                     ],
@@ -321,7 +321,7 @@ The resulting consumption rate:
 OUTPUT RULES:
 - Retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
 - Do not modify or recalculate planned_quantity
-- Calculate recommended_quantity, consumption_rate, estimated_calories and estimated_expiration_date for each item.
+- Calculate recommended_quantity, Estimated_Consumption_Rate, estimated_calories and estimated_expiration_date for each item.
 For each item on the planned grocery list, make exactly one recommendation.
 - Make sure not to include any items that are not on the grocery list.
 - Do not take any items off the grocery list that was planned.
@@ -454,9 +454,9 @@ def process_ai_response(ai_response):
     if not isinstance(data, dict):
         return None, (f"Invalid AI response structure. \nExpected dict, received {type(data).__name__}.")
     # Validate recommendations list
-    recommendations = data.get("recommendations")
+    recommendations = data.get("Recommendations_List")
     if not isinstance(recommendations, list):
-        return None, ("AI response does not contain a valid 'recommendations' list.")
+        return None, ("AI response does not contain a valid 'Recommendations_List' list.")
     # Validate each recommendation object
     for item in recommendations:
         if not isinstance(item, dict):
@@ -474,9 +474,6 @@ def process_ai_response(ai_response):
                 return None, (f"Estimated_Expiration_Days for {item_name} must be an integer.")
             if estimated_expiration_days < 0:
                 return None, (f"Estimated_Expiration_Days for {item_name} cannot be negative.")
-        if recommended_quantity == 0:
-            if estimated_expiration_days is not None:
-                return None, (f"Estimated_Expiration_Days for {item_name} must be null when Recommended_Quantity is 0.")
         # Validate estimated calories
         estimated_calories = item.get("Estimated_Calories")
         if type(estimated_calories) not in (int, float):
@@ -484,15 +481,15 @@ def process_ai_response(ai_response):
         if estimated_calories < 0:
             return None, (f"Estimated_Calories for {item_name} cannot be negative.")
     # Validate total estimated calories
-    total_calories = data.get("total_estimated_calories")
+    total_calories = data.get("Total_Estimated_Calories")
     if type(total_calories) not in (int, float):
-        return None, ("total_estimated_calories must be numeric.")
+        return None, ("Total_Estimated_Calories must be numeric.")
     if total_calories < 0:
         return None, ("total_estimated_calories cannot be negative.")
     # Validate total against item calorie sum
     calculated_total = sum(item["Estimated_Calories"] for item in recommendations)
     if abs(calculated_total - total_calories) > 0.01:
-        return None, ("total_estimated_calories does not match the sum of Estimated_Calories.")
+        return None, ("Total_Estimated_Calories does not match the sum of Estimated_Calories.")
     # Add Estimated_Expiry_Date after successful validation
     for item in recommendations:
         estimated_expiration_days = item.get("Estimated_Expiration_Days")
