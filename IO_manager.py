@@ -1,33 +1,66 @@
+from datetime import date
+
+
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
  
 # Ask for one item's name, quantity and unit, validating bad input.
-def enter_item():
-    while True:
-        item_name = input("Item name: ").strip()
-        if item_name != "":
+# If the item already exists in existing_items, its unit is reused.
+def enter_item(existing_items=None):
+    if existing_items is None:
+        existing_items = []
+
+    item_name = enter_text("Item name: ")
+
+    # Check if this item was entered before, and lock its unit
+    locked_unit = ""
+    for existing in existing_items:
+        if existing["Item_Name"].lower() == item_name.lower():
+            locked_unit = existing["Unit"]
+            print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
             break
-        print("Item name can't be empty.")
+
+    if locked_unit != "":
+        quantity = enter_quantity(f"Quantity ({locked_unit}): ")
+    else:
+        quantity = enter_quantity("Quantity: ")
+
+    if locked_unit != "":
+        unit = locked_unit
+    else:
+        while True:
+            unit = input(f"Unit ({', '.join(valid_units)}): ").strip().lower()
+            if unit in valid_units:
+                break
+            print("Please enter a valid unit.")
+
+    return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
+ 
+# Double quote checks, reasks user to prevent JSON errors
+def enter_text(question, allow_blank=False):
     while True:
-        text = input("Quantity: ").strip()
+        text = input(question).strip()
+        if '"' in text:
+            print('Please don\'t use double quotes (") in your answer.')
+        elif text == "" and not allow_blank:
+            print("This can't be empty.")
+        else:
+            return text
+
+
+# Ask for a quantity until the user enters a number more than 0.
+def enter_quantity(question):
+    while True:
+        text = input(question).strip()
         if not text.replace(".", "", 1).isdigit():
             print("Please enter a valid number.")
         elif float(text) <= 0:
             print("Quantity must be more than 0.")
         else:
-            quantity = float(text)
-            break
- 
-    while True:
-        unit = input(f"Unit ({', '.join(valid_units)}): ").strip().lower()
-        if unit in valid_units:
-            break
-        print("Please enter a valid unit.")
- 
-    return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
- 
- 
+            return float(text)
+
+
 # Ask whether the user wants to add another item.
 def ask_add_another():
     while True:
@@ -59,11 +92,7 @@ def enter_date(question):
 # Collect a new user's profile and their family members' details.
 # Returns a list in the database's household_info format (the user is Person_ID 1).
 def create_profile():
-    while True:
-        name = input("Please enter your name: ").strip()
-        if name != "":
-            break
-        print("Name can't be empty.")
+    name = enter_text("Please enter your name: ")
  
     while True:
         age = input("Please enter your age: ").strip()
@@ -78,7 +107,7 @@ def create_profile():
             break
         print("Please enter male or female.")
  
-    dietary_restrictions = input("Please enter your dietary restrictions (leave blank if none): ").strip()
+    dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", True)
     if dietary_restrictions == "":
         dietary_restrictions = "None"
  
@@ -99,11 +128,7 @@ def create_profile():
     }
  
     for i in range(family - 1):
-        while True:
-            member_name = input(f"Please enter the name of family member {i + 1}: ").strip()
-            if member_name != "":
-                break
-            print("Name can't be empty.")
+        member_name = enter_text(f"Please enter the name of family member {i + 1}: ")
  
         while True:
             member_age = input(f"Please enter the age of {member_name}: ").strip()
@@ -118,7 +143,7 @@ def create_profile():
                 break
             print("Please enter male or female.")
  
-        member_diet = input(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ").strip()
+        member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", True)
         if member_diet == "":
             member_diet = "None"
  
@@ -168,17 +193,35 @@ def enter_home_items():
  
     print("\nEnter the items you currently have at home.")
     while True:
-        item = enter_item()
+        item = enter_item(remaining_items)
         expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
-        item_remarks = input("Any remarks about this item? e.g. opened, for a party (leave blank if none): ").strip()
+        item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
         if item_remarks == "":
             item_remarks = "None"
- 
+
         item["Purchase_Date"] = ""
         item["Expiry_Date"] = expiry_date
         item["Remarks"] = item_remarks
-        remaining_items.append(item)
-        print(f"Added {format_item(item)} to your home items.")
+
+        # If the same item with the same expiry date was already entered, add to it
+        found = False
+        for existing in remaining_items:
+            if (existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]
+                    and existing["Expiry_Date"] == item["Expiry_Date"]):
+                existing["Quantity"] += item["Quantity"]
+                # Keep both remarks if they are different
+                if item["Remarks"] != "None" and item["Remarks"] != existing["Remarks"]:
+                    if existing["Remarks"] == "None":
+                        existing["Remarks"] = item["Remarks"]
+                    else:
+                        existing["Remarks"] = existing["Remarks"] + ", " + item["Remarks"]
+                found = True
+                print(f"{existing['Item_Name']} is already in your home items. Total is now {format_item(existing)}.")
+                break
+
+        if not found:
+            remaining_items.append(item)
+            print(f"Added {format_item(item)} to your home items.")
         if not ask_add_another():
             break
  
@@ -235,7 +278,7 @@ def update_consumption(previous_inventory):
         })
  
     # Asked once, then added to every item
-    remarks = input("Any remarks about your consumption since last time? (leave blank if none): ").strip()
+    remarks = enter_text("Any remarks about your consumption since last time? (leave blank if none): ", True)
     if remarks == "":
         remarks = "None"
     for record in consumed_items:
@@ -251,7 +294,7 @@ def enter_grocery_list():
     print("\nEnter the groceries you are planning to buy.")
  
     while True:
-        item = enter_item()
+        item = enter_item(grocery_list)
  
         # If the same item with the same unit was already entered, add to it
         found = False
@@ -270,12 +313,13 @@ def enter_grocery_list():
             break
  
     show_items("Your grocery list", grocery_list)
+    print("grocery_list =", grocery_list)  # Print the grocery list for verification
     return grocery_list
  
  
 # Ask for optional remarks about this week (e.g. events).
 def ask_remarks():
-    return input("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ").strip()
+    return enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
  
  
 # Ask how many days until the user's next planned shop.
@@ -285,8 +329,71 @@ def ask_days_until_next():
         if text.isdigit() and 1 <= int(text) <= 365:
             return int(text)
         print("Please enter a whole number between 1 and 365.")
+
+
+def shopping_cart_conclusion(grocery_list,remarks):
+    while True:
+        decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
+        if decision == "yes":
+            print("\nYour shopping cart has been concluded.")
+            for i in range(len(grocery_list)):
+                grocery_list[i]["Purchase_Date"] =  date.today().isoformat()
+                grocery_list[i]["Expiry_Date"] = ""
+                grocery_list[i]["Remarks"] = remarks
+            return grocery_list
+        elif decision == "no":
+            print("\nProceed with editing your shopping cart.")
+            updated_list = []
+            for i in range(len(grocery_list)):
+                print(f"  {i + 1}. {format_item(grocery_list[i])}")
+                action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
+                if action == "yes":
+                    print(f"{format_item(grocery_list[i])} has been removed from your shopping cart.")
+                    continue
+                elif action == "no":
+                    grocery_list[i]["Quantity"] = enter_quantity(f"Enter the new quantity for {format_item(grocery_list[i])}: ")
+                    updated_list.append(grocery_list[i])
+                else:
+                    print("Invalid input. Please enter 'yes' or 'no'.")
+                    updated_list.append(grocery_list[i])
+            grocery_list = updated_list
+            show_items("Updated shopping cart", grocery_list)
+            addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
+            if addtion == "yes":
+                while True:
+                    item = enter_item(grocery_list)
+
+                    # If the same item is already in the cart, add to it
+                    found = False
+                    for existing in grocery_list:
+                        if existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]:
+                            existing["Quantity"] += item["Quantity"]
+                            found = True
+                            print(f"{existing['Item_Name']} is already in your cart. Total is now {format_item(existing)}.")
+                            break
+
+                    if not found:
+                        grocery_list.append(item)
+                        print(f"Added {format_item(item)} to your shopping cart.")
+                    if not ask_add_another():
+                        break
+            elif addtion == "no":  
+                print("\nYour shopping cart has been concluded.")
+                for i in range(len(grocery_list)):
+                    grocery_list[i]["Purchase_Date"] =  date.today().isoformat()    
+                    grocery_list[i]["Expiry_Date"] = ""
+                    grocery_list[i]["Remarks"] = remarks
+                return grocery_list
+            else:
+                print("Invalid input. Please enter 'yes' or 'no'.")
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
+        
+
+
+
  
- 
+
 # Formatting 
 
 def format_item(item):
@@ -339,7 +446,14 @@ def show_welcome():
 # Print the welcome-back message for a returning user (Person_ID 1 is the user).
 def show_welcome_back(household_info):
     print(f"Welcome back, {household_info[0]['Name']}!")
- 
+
+
+def send_message(message):
+    print(f"{message}")
+
+def send_log(message):
+    print(f"[LOG] {message}")
+
  
 # =====================================================================
 # Testing
@@ -367,7 +481,7 @@ if __name__ == "__main__":
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
- 
+    final_checkout = shopping_cart_conclusion(grocery_list, remarks)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
@@ -376,4 +490,4 @@ if __name__ == "__main__":
     print("grocery_list =", grocery_list)
     print("remarks =", remarks)
     print("days_until_next =", days_until_next)
- 
+    print("final_checkout =", final_checkout)
