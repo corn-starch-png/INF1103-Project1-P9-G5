@@ -29,7 +29,7 @@ def check_data(record, table):
     def check_string(value):
         return isinstance(value, str)
     def check_unit(value):
-        valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
+        valid_units = ['kg', 'g', 'L', 'ml', 'pcs']
         return value in valid_units
     def check_date(value):
         # Check if the date is in the format YYYY-MM-DD
