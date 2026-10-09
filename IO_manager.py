@@ -1,3 +1,6 @@
+from datetime import date
+
+
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
  
@@ -173,7 +176,7 @@ def enter_home_items():
         item_remarks = input("Any remarks about this item? e.g. opened, for a party (leave blank if none): ").strip()
         if item_remarks == "":
             item_remarks = "None"
- 
+
         item["Purchase_Date"] = ""
         item["Expiry_Date"] = expiry_date
         item["Remarks"] = item_remarks
@@ -288,25 +291,33 @@ def ask_days_until_next():
         print("Please enter a whole number between 1 and 365.")
 
 
-def shopping_cart_conclusion(grocery_list):
+def shopping_cart_conclusion(grocery_list,remarks):
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
         if decision == "yes":
             print("\nYour shopping cart has been concluded.")
+            for i in range(len(grocery_list)):
+                grocery_list[i]["Purchase_Date"] =  date.today().isoformat()
+                grocery_list[i]["Expiry_Date"] = ""
+                grocery_list[i]["Remarks"] = remarks
             return grocery_list
         elif decision == "no":
             print("\nProceed with editing your shopping cart.")
+            updated_list = []
             for i in range(len(grocery_list)):
                 print(f"  {i + 1}. {format_item(grocery_list[i])}")
                 action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
                 if action == "yes":
-                    grocery_list.pop(i)
                     print(f"{format_item(grocery_list[i])} has been removed from your shopping cart.")
                     continue
                 elif action == "no":
                     grocery_list[i]["Quantity"] = float(input(f"Enter the new quantity for {format_item(grocery_list[i])}: "))
+                    updated_list.append(grocery_list[i])
                 else:
                     print("Invalid input. Please enter 'yes' or 'no'.")
+                    updated_list.append(grocery_list[i])
+            grocery_list = updated_list
+            show_items("Updated shopping cart", grocery_list)
             addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
             if addtion == "yes":
                 while True:
@@ -317,6 +328,10 @@ def shopping_cart_conclusion(grocery_list):
                         break
             elif addtion == "no":  
                 print("\nYour shopping cart has been concluded.")
+                for i in range(len(grocery_list)):
+                    grocery_list[i]["Purchase_Date"] =  date.today().isoformat()    
+                    grocery_list[i]["Expiry_Date"] = ""
+                    grocery_list[i]["Remarks"] = remarks
                 return grocery_list
             else:
                 print("Invalid input. Please enter 'yes' or 'no'.")
@@ -415,7 +430,7 @@ if __name__ == "__main__":
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
- 
+    final_checkout = shopping_cart_conclusion(grocery_list, remarks)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
@@ -424,4 +439,5 @@ if __name__ == "__main__":
     print("grocery_list =", grocery_list)
     print("remarks =", remarks)
     print("days_until_next =", days_until_next)
+    print("final_checkout =", final_checkout)
  
