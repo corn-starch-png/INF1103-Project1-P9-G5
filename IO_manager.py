@@ -331,14 +331,14 @@ def ask_days_until_next():
         print("Please enter a whole number between 1 and 365.")
 
 
-def shopping_cart_conclusion(grocery_list,remarks):
+def shopping_cart_conclusion(grocery_list,remarks, expiry_dates):
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
         if decision == "yes":
             print("\nYour shopping cart has been concluded.")
             for i in range(len(grocery_list)):
                 grocery_list[i]["Purchase_Date"] =  date.today().isoformat()
-                grocery_list[i]["Expiry_Date"] = ""
+                grocery_list[i]["Expiry_Date"] = expiry_dates[i]
                 grocery_list[i]["Remarks"] = remarks
             return grocery_list
         elif decision == "no":
