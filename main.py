@@ -45,11 +45,12 @@ print("days_until_next =", days_until_next)
 
 #region AI Recommendations
 ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge, grocery_list,remarks,days_until_next)
-if error:
-    print(f"Error: {error}")
-    #return
-recommendations = ai_recommendations.get("recommendations", [])
-total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
+if error or ai_recommendations is None:
+    raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
+
+recommendations = ai_recommendations.get("Recommendations_List", [])
+total_estimated_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
+
 print(f"AI Recommendations: {json.dumps(recommendations, indent=2)}")
 print(f"Total Estimated Calories: {total_estimated_calories}")
 #endregion """
@@ -59,12 +60,13 @@ print(f"Total Estimated Calories: {total_estimated_calories}")
 
 calorie_extra = calories_surplus(database, total_estimated_calories)
 for item in recommendations:
-    est_consum_rate = item["consumption_rate"]
-    planned_amt = item["planned_quantity"]
-    item_name = item["item"]
-    expiry_date = item["estimated_expiration_date"]
-    unit = item["unit"]
-    next_purchase_date = "2026-10-10"
+    est_consum_rate = item["Estimated_Consumption_Rate"]
+    planned_amt = item["Planned_Quantity"]
+    item_name = item["Item_Name"]
+    expiry_date = item["Estimated_Expiry_Date"]
+    unit = item["Unit"]
+    next_purchase_date = str(date.today() + timedelta(days=days_until_next))
+    #next_purchase_date = "2026-10-10"
     
     roe = risk_of_expiry(est_consum_rate, planned_amt, expiry_date, item_name, unit)
     if roe is False and calorie_extra is False:
