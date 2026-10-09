@@ -4,38 +4,6 @@ from datetime import datetime,date,timedelta
 from DB_manager import KCAL_TABLE
 
 
-def get_user_input(): #simulate I/O layer
-    item = input("Item: ")
-    unit = input("Unit: ")
-
-    while True:
-        try:
-            planned_quantity = round(float(input("Planned quantity: ")), 2) #round input off to 2d.p
-            if planned_quantity < 0:
-                print("Quantity cannot be negative.")
-                continue
-            else:
-                break
-        except ValueError:
-            print("Please enter a valid number.")
-
-    return { # return a dictionary = passing data between functions easy
-        "item": item,
-        "unit": unit,
-        "planned_quantity": planned_quantity
-    }    
-
-#check_over_under, first logic function 
-def check_over_under(planned_quantity, recommended_quantity):
-    
-    if planned_quantity > recommended_quantity:
-        return "over"
-   
-    elif planned_quantity < recommended_quantity:
-        return "under"
-   
-    else:
-        return "good"
 
 #CALORIE SURPLUS LOGIC --------------------   
 # eg. if user age is 20, will fall under 19 years old calorie intake
@@ -99,7 +67,8 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
             print("Risk of expiry is:", True)
             print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
-            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
+            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
+                  "\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
             return True
         else:
             print("Risk of expiry is:", False)
@@ -109,7 +78,7 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         print("Consumption rate cannot be 0")    
         
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
-def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
+""" def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
         # calling calorie_surplus and expiry risk functions
         calorie_surplus = calories_surplus(
             total_estimated_calories=total_estimated_calories
@@ -139,29 +108,7 @@ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purcha
         else:
             print("Not underbuy")
             return None
-      
-#second logic funciton 
-def give_recommendation(user_input, ai_data):
-
-    result = check_over_under(
-        user_input["planned_quantity"],
-        ai_data["recommended_quantity"]
-    )
-
-    """ waste_risk = calculate_expiry_risk(
-        user_input["planned_quantity"],
-        ai_data["recommended_quantity"],
-        "current_quanity",#to be added
-        "dailyConsumptionRate", # to be calculated
-        "shelfLife" #to be calculated
-    )
-     """
-    return {
-        "result": result,
-        "advice": ai_data["reason"],
-        "waste_risk": None, #To be added 
-        "confidence_score": None #to be added 
-    }
+       """
 
 #first confidence score function, some funky math going on here
 def calculate_historical_data_completeness(item_name, consumption_history, fridge):
@@ -262,9 +209,9 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
 # "item": "Milk",  "planned_quantity": 3, "unit": "L", "recommended_quantity": 0.4, "consumption_rate": 1.37, "estimated_calories": 240,
 
 under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
-next_purchase_date = "2026-10-30", estimated_consumption_rate = 1.3)
+next_purchase_date = "2026-10-30", estimated_consumption_rate = 5)
 
-# If risk of expiry is True 
+""" # If risk of expiry is True 
 risk_of_expiry(estimated_consumption_rate=0.8, planned_quantity=3, item_name="Milk", item_expiry_date="2026-10-30", unit="L")
 
 #if risk of expiry is False
@@ -278,7 +225,7 @@ calories_surplus(total_estimated_calories=60000)
 
 # if evaluating underbuy = T
 evaluate_underbuy(estimated_consumption_rate=1.37, item_name="Milk", planned_quantity=3, unit="L", item_expiry_date="2026-11-04", total_estimated_calories=15000, next_purchase_date="2026-10-18")
-
+ """
 
 
 
@@ -364,3 +311,59 @@ def calculate_expiry_risk(item_name, planned_quantity, recommended_quantity, she
         # if check_over_under is "under" and "good"
         return "Low Food Waste" """
     
+
+""" def get_user_input(): #simulate I/O layer
+    item = input("Item: ")
+    unit = input("Unit: ")
+
+    while True:
+        try:
+            planned_quantity = round(float(input("Planned quantity: ")), 2) #round input off to 2d.p
+            if planned_quantity < 0:
+                print("Quantity cannot be negative.")
+                continue
+            else:
+                break
+        except ValueError:
+            print("Please enter a valid number.")
+
+    return { # return a dictionary = passing data between functions easy
+        "item": item,
+        "unit": unit,
+        "planned_quantity": planned_quantity
+    }    
+
+#check_over_under, first logic function 
+def check_over_under(planned_quantity, recommended_quantity):
+    
+    if planned_quantity > recommended_quantity:
+        return "over"
+   
+    elif planned_quantity < recommended_quantity:
+        return "under"
+   
+    else:
+        return "good" """
+        
+"""         #second logic funciton 
+def give_recommendation(user_input, ai_data):
+
+    result = check_over_under(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"]
+    )
+
+    waste_risk = calculate_expiry_risk(
+        user_input["planned_quantity"],
+        ai_data["recommended_quantity"],
+        "current_quanity",#to be added
+        "dailyConsumptionRate", # to be calculated
+        "shelfLife" #to be calculated
+    )
+     
+    return {
+        "result": result,
+        "advice": ai_data["reason"],
+        "waste_risk": None, #To be added 
+        "confidence_score": None #to be added 
+    } """

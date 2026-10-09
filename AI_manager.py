@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 import json
 import os
 import time
@@ -33,274 +33,24 @@ def get_ai_model():
     return ai_model
 #endregion
 
-#TODO: proper data fetching from IO Manager
-#[DEV] region data fetching
-def get_household_info():
-    return {"consumption_history": [
-        {"Person_ID": 1, "Name": "John Doe", "Age": 45, "Gender": "Male", "Dietary_Restriction": "None"}, 
-        {"Person_ID": 2, "Name": "Jane Smith", "Age": 42, "Gender": "Female", "Dietary_Restriction": "Vegetarian"}, 
-        {"Person_ID": 3, "Name": "Bob Johnson", "Age": 16, "Gender": "Male", "Dietary_Restriction": "None"}
-    ]
-    }
-
-def get_consumption_history():
-    return {"consumption_history": [
-            {
-                "Date_Range": 5,
-                "Item_Name": "Milk",
-                "Quantity": 1.5,
-                "Unit": "L",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Milk",
-                "Quantity": 1.8,
-                "Unit": "L",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Milk",
-                "Quantity": 1.6,
-                "Unit": "L",
-                "Remarks": "None"
-            },
-
-            {
-                "Date_Range": 5,
-                "Item_Name": "Eggs",
-                "Quantity": 10,
-                "Unit": "count",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Eggs",
-                "Quantity": 12,
-                "Unit": "count",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Eggs",
-                "Quantity": 11,
-                "Unit": "count",
-                "Remarks": "None"
-            },
-
-            {
-                "Date_Range": 5,
-                "Item_Name": "Chicken",
-                "Quantity": 1.2,
-                "Unit": "kg",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Chicken",
-                "Quantity": 1.4,
-                "Unit": "kg",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Chicken",
-                "Quantity": 5,
-                "Unit": "kg",
-                "Remarks": "20pax Gathering"
-            },
-
-            {
-                "Date_Range": 5,
-                "Item_Name": "Fanta",
-                "Quantity": 1,
-                "Unit": "L",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Fanta",
-                "Quantity": 1.5,
-                "Unit": "L",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Fanta",
-                "Quantity": 8,
-                "Unit": "L",
-                "Remarks": "Birthday party"
-            },
-
-            {
-                "Date_Range": 5,
-                "Item_Name": "Apple",
-                "Quantity": 12,
-                "Unit": "count",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Apple",
-                "Quantity": 14,
-                "Unit": "count",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Apple",
-                "Quantity": 6,
-                "Unit": "count",
-                "Remarks": "Parents away for part of the period"
-            },
-            {
-                "Date_Range": 5,
-                "Item_Name": "Rice",
-                "Quantity": 0.8,
-                "Unit": "kg",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 10,
-                "Item_Name": "Rice",
-                "Quantity": 1.0,
-                "Unit": "kg",
-                "Remarks": "None"
-            },
-            {
-                "Date_Range": 15,
-                "Item_Name": "Rice",
-                "Quantity": 0.9,
-                "Unit": "kg",
-                "Remarks": "None"
-            }
-        ]
-    }
-
-def get_grocery_input():
-    return [
-        {
-            "item": "Milk",
-            "current_stock": 1,
-            "planned_quantity": 3,
-            "unit": "L",
-            "remarks": ""
-        },
-        {
-            "item": "Eggs",
-            "current_stock": 8,
-            "planned_quantity": 12,
-            "unit": "count",
-            "remarks": ""
-        },
-        {
-            "item": "Chicken",
-            "current_stock": 0,
-            "planned_quantity": 0.5,
-            "unit": "kg",
-            "remarks": ""
-        },
-        {
-            "item": "Fanta",
-            "current_stock": 0,
-            "planned_quantity": 30,
-            "unit": "L",
-            "remarks": "House party with 100 guests on monday"
-        },
-        {
-            "item": "Apple",
-            "current_stock": 0,
-            "planned_quantity": 13,
-            "unit": "count",
-            "remarks": "Parents left for holiday on wednesday"
-        },
-        {
-            "item": "Rice",
-            "current_stock": 4,
-            "planned_quantity": 2,
-            "unit": "kg",
-            "remarks": ""
-        }
-    ]
-
-def get_fridge_stock():
-    return {"fridge_stock": [
-    {
-        "Item_Name": "Rice",
-        "Quantity": 5,
-        "Unit": "kg",
-        "Purchase_Date": "2026-09-01",
-        "Expiry_Date": "2027-09-01"
-    },
-    {
-        "Item_Name": "Milk",
-        "Quantity": 6,
-        "Unit": "carton",
-        "Purchase_Date": "2026-09-20",
-        "Expiry_Date": "2026-10-04"
-    },
-    {
-        "Item_Name": "Milk",
-        "Quantity": 2,
-        "Unit": "carton",
-        "Purchase_Date": "2026-09-20",
-        "Expiry_Date": "2026-10-04"
-    },
-    {
-        "Item_Name": "Milk",
-        "Quantity": 1,
-        "Unit": "carton",
-        "Purchase_Date": "2026-09-20",
-        "Expiry_Date": "2026-10-04"
-    },
-    {
-        "Item_Name": "Milk",
-        "Quantity": 10,
-        "Unit": "carton",
-        "Purchase_Date": "2026-09-20",
-        "Expiry_Date": "2026-10-04"
-    },
-    {
-        "Item_Name": "Chicken",
-        "Quantity": 1,
-        "Unit": "kg",
-        "Purchase_Date": "2026-09-23",
-        "Expiry_Date": "2026-09-26"
-    },
-    {
-        "Item_Name": "Chicken",
-        "Quantity": 2,
-        "Unit": "kg",
-        "Purchase_Date": "2026-09-25",
-        "Expiry_Date": "2026-09-26"
-    },
-    {
-        "Item_Name": "Chicken",
-        "Quantity": 1.5,
-        "Unit": "kg",
-        "Purchase_Date": "2026-09-27",
-        "Expiry_Date": "2026-09-29"
-    },
-    {
-        "Item_Name": "Chicken",
-        "Quantity": 1,
-        "Unit": "kg",
-        "Purchase_Date": "2026-09-28",
-        "Expiry_Date": "2026-09-30"
-    }
-    ]
-    }
+#region Date Conversion
+def date_convert(current_date, days_until_next):
+    try:
+        next_purchase_date = current_date + timedelta(days=days_until_next)
+        return next_purchase_date
+    except ValueError:
+        raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
 #endregion
 
 #For main.py to prepare data for AI processing
 #region data preparation
-def prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input, current_date=None, next_purchase_date=None):
+def prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input,remarks, current_date=None, next_purchase_date=None):
     return {
         "household_info": household_info,
         "consumption_history": consumption_history,
         "fridge_stock": fridge_stock,
         "planned_grocery_list": grocery_list_input,
+        "remarks": remarks,
         "current_date": current_date,
         "next_purchase_date": next_purchase_date
     }
@@ -372,11 +122,13 @@ def build_ai_prompt(data):
     return f"""
 You are the food waste recommendation assistant for a household.
 
-On the provided household information, perform an analysis and assign the amount of each item that is recommended to be bought in the grocery list planned.
+Your task is to analyse the provided household information and determine the recommended quantity to buy for every item in the planned grocery list.
 
-You are required to use only the information provided below.
+Your goal is to meet the household's expected needs until the next planned purchase while avoiding unnecessary purchases that may contribute to food waste.
 
-Do not make any assumptions about household data, consumption data, stock data, future data, or nutritional data, if the information is not provided.
+Use only the information provided for household and purchase recommendations. Do not invent or assume household data, consumption, stock, future purchases, household changes, preferences, or nutritional requirements that are not provided.
+
+Typical nutritional knowledge may be used ONLY when estimating calories, as described below.
 
 HOUSEHOLD PROFILE:
 {data["household_info"]}
@@ -389,6 +141,9 @@ CURRENT FRIDGE STOCK:
 
 PLANNED PURCHASES:
 {data["planned_grocery_list"]}
+
+REMARKS:
+{data["remarks"]}
 
 CURRENT DATE:
 {data["current_date"]}
@@ -409,7 +164,7 @@ For every item consider:
 8. Quantity and quality of historical data available
 9. Remarks provided for the item
 
-REMARKS:
+REMARKS HANDLING:
 - Before calculating the recommended_quantity, you should check the item's remarks.
 - If a remark describes a temporary or unusual change in the household's needs,
 When making the recommendation, give that information the top priority.
@@ -421,42 +176,40 @@ RECOMMENDED QUANTITY:
 The amount that the household should buy is the recommended_quantity.
 
 The recommended quantity shall:
-- consider current fridge stock before recommending additional purchases
-- reflect historical consumption where sufficient data is available
-- account for relevant remarks and temporary changes in needs
-- avoid unnecessary excess that may contribute to food waste
-- never be negative
+- Consider current fridge stock before recommending additional purchases
+- Reflect historical consumption where sufficient data is available
+- Account for relevant remarks and temporary changes in needs
+- Avoid unnecessary excess that may contribute to food waste
+- Never be negative
 
 QUANTITY RULES:
 The only valid units are:
-- "count"
-- "kg"
-- "L"
+- "kg","l","g,"ml","pcs",
 
-If the unit is "count":
-- recommended_quantity must be a whole number
-- do not recommend fractional quantities
+If the unit is "pcs":
+- Recommended_quantity must be a whole number
+- Do not recommend fractional quantities
 
-If the unit is "kg" or "L":
-- decimal quantities are allowed when appropriate
-- avoid unnecessary precision
+If the unit is "kg", "g", "l" or "ml":
+- Decimal quantities are allowed when appropriate
+- Avoid unnecessary precision
 
 The unit that is recommended quantity should be the same as the one used for the planned purchase.
 
 ESTIMATED CALORIES:
-For every item, estimate the total calories represented by the
+For every item, estimate the total calories represented by the recommended_quantity.
 Using typical nutritional values to determine the recommended quantity.
 
 The calorie value is an estimate only and must not be presented
 as exact nutritional information.
 
 If exact nutrition information is not provided:
-- use a reasonable typical calorie value for the food item
-- base the estimate on the recommended_quantity and its unit
-- use common nutritional assumptions appropriate to the item
-- avoid unnecessary precision
-- do not claim that the estimate represents a specific brand or product
-- do not invent exact nutrition-label values
+- Use a reasonable typical calorie value for the food item
+- Base the estimate on the recommended_quantity and its unit
+- Use common nutritional assumptions appropriate to the item
+- Avoid unnecessary precision
+- Do not claim that the estimate represents a specific brand or product
+- Do not invent exact nutrition-label values
 
 For every recommendation provide:
 - estimated_calories
@@ -479,12 +232,12 @@ REASON:
 Provide an explanation in 1-2 sentences for each recommended quantity.
 
 The reason shall:
-- reference relevant consumption history, current fridge stock,
+- Reference relevant consumption history, current fridge stock,
 planned quantity, household information or remarks
-- explain the main factor affecting the recommended quantity
-- mention uncertainty where available information is limited
-- not contain information that was not provided
-- not present estimated calorie information as exact
+- Explain the main factor affecting the recommended quantity
+- Mention uncertainty where available information is limited
+- Not contain information that was not provided
+- Not present estimated calorie information as exact
 
 PURCHASE PERIOD:
 - Use CURRENT DATE and PLANNED NEXT PURCHASE DATE to determine
@@ -507,17 +260,13 @@ A Consumption History entry comprises of:
 - Unit: unit of measurement
 
 When normalising consumption for a historical record:
-
 weekly_rate = (Quantity / Date_Range) * 7
 
 Where there are several historical records for a product:
 - Calculate the weekly_rate for each relevant record
 - Look out for remarks of any unusual or special consumption
-- Do not use an unusual event as the normal consumption
-  pattern of the household, unless the unusual circumstances
-  apply to the upcoming purchase cycle
-- Find the appropriate consumption_rate from the normalised
-  historical data provided
+- Do not use an unusual event as the normal consumption pattern of the household, unless the unusual circumstances apply to the upcoming purchase cycle
+- Find the appropriate consumption_rate from the normalised historical data provided
 
 The resulting consumption rate:
 - Must reflect the consumption rate per 7 days
@@ -527,12 +276,12 @@ The resulting consumption rate:
 - Should not be unnecessarily precise
 
 OUTPUT RULES:
-- retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
-- do not modify or recalculate planned_quantity
-- only calculate recommended_quantity, estimated_calories and reason for each item
+- Retain the item, the planned quantity and the unit exactly as they are given in the planned purchases.
+- Do not modify or recalculate planned_quantity
+- Calculate recommended_quantity, consumption_rate, estimated_calories and reason for each item.
 For each item on the planned grocery list, make exactly one recommendation.
 - Make sure not to include any items that are not on the grocery list.
-- do not take any items off the grocery list that was planned.
+- Do not take any items off the grocery list that was planned.
 The total estimated calories must equal the sum of all the estimated calories values.
 """
 #endregion
@@ -705,10 +454,10 @@ def process_ai_response(ai_response):
 
 #region Functions to be implemented for main.py to call AI_manager.py
 # To use functions to get specific data from the AI output, you can implement the following functions in main.py:
-# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
+# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next)
 # recommendations = ai_recommendations.get("recommendations", [])
 # total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
-def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date):
+def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next):
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
 
@@ -721,7 +470,9 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     
     update_ai_status("Preparing AI input...")
     # Prepare data for AI processing
-    data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
+    current_date = date.today()
+    next_purchase_date = date_convert(current_date,days_until_next)
+    data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date)
 
     update_ai_status("Building AI prompt...")
     #build the prompt for AI processing
@@ -745,28 +496,4 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
         return None, error
 
     return ai_output, None
-#endregion
-
-#region [DEV ONLY] main ai process calling
-def ai_main():
-    household_info = get_household_info()
-    consumption_history = get_consumption_history()
-    fridge_stock = get_fridge_stock()
-    purchase_stock = get_grocery_input()
-    current_date = date.today().isoformat()
-    next_purchase_date = "2026-10-13"
-    ai_recommendations, error  = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, current_date, next_purchase_date)
-    if error:
-        print(f"Error: {error}")
-        return
-    recommendations = ai_recommendations.get("recommendations", [])
-    total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
-
-    print(f"AI Recommendations: {json.dumps(recommendations, indent=2)}")
-    print(f"Total Estimated Calories: {total_estimated_calories}")
-#endregion
-
-#region [DEV ONLY] main ai process calling
-#if __name__ == "__main__":
-#    ai_main()
 #endregion
