@@ -270,6 +270,7 @@ def enter_grocery_list():
             break
  
     show_items("Your grocery list", grocery_list)
+    print("grocery_list =", grocery_list)  # Print the grocery list for verification
     return grocery_list
  
  
@@ -285,8 +286,48 @@ def ask_days_until_next():
         if text.isdigit() and 1 <= int(text) <= 365:
             return int(text)
         print("Please enter a whole number between 1 and 365.")
+
+
+def shopping_cart_conclusion(grocery_list):
+    while True:
+        decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
+        if decision == "yes":
+            print("\nYour shopping cart has been concluded.")
+            return grocery_list
+        elif decision == "no":
+            print("\nProceed with editing your shopping cart.")
+            for i in range(len(grocery_list)):
+                print(f"  {i + 1}. {format_item(grocery_list[i])}")
+                action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
+                if action == "yes":
+                    grocery_list.pop(i)
+                    print(f"{format_item(grocery_list[i])} has been removed from your shopping cart.")
+                    continue
+                elif action == "no":
+                    grocery_list[i]["Quantity"] = float(input(f"Enter the new quantity for {format_item(grocery_list[i])}: "))
+                else:
+                    print("Invalid input. Please enter 'yes' or 'no'.")
+            addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
+            if addtion == "yes":
+                while True:
+                    item = enter_item()
+                    grocery_list.append(item)
+                    print(f"Added {format_item(item)} to your shopping cart.")
+                    if not ask_add_another():
+                        break
+            elif addtion == "no":  
+                print("\nYour shopping cart has been concluded.")
+                return grocery_list
+            else:
+                print("Invalid input. Please enter 'yes' or 'no'.")
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
+        
+
+
+
  
- 
+
 # Formatting 
 
 def format_item(item):
@@ -339,7 +380,14 @@ def show_welcome():
 # Print the welcome-back message for a returning user (Person_ID 1 is the user).
 def show_welcome_back(household_info):
     print(f"Welcome back, {household_info[0]['Name']}!")
- 
+
+
+def send_message(message):
+    print(f"{message}")
+
+def send_log(message):
+    print(f"[LOG] {message}")
+
  
 # =====================================================================
 # Testing
