@@ -1,5 +1,4 @@
-from datetime import date
-#from db_manager import load_database (to combine with db_manger)
+from datetime import date, timedelta
 import json
 import os
 import time
@@ -32,6 +31,15 @@ def get_ai_model():
         raise ValueError("AI_MODEL not found in environment file")
 
     return ai_model
+#endregion
+
+#region Date Conversion
+def date_convert(current_date, days_until_next):
+    try:
+        next_purchase_date = current_date + timedelta(days=days_until_next)
+        return next_purchase_date
+    except ValueError:
+        raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
 #endregion
 
 #For main.py to prepare data for AI processing
@@ -446,10 +454,10 @@ def process_ai_response(ai_response):
 
 #region Functions to be implemented for main.py to call AI_manager.py
 # To use functions to get specific data from the AI output, you can implement the following functions in main.py:
-# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date)
+# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next)
 # recommendations = ai_recommendations.get("recommendations", [])
 # total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
-def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date):
+def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next):
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
 
@@ -462,6 +470,8 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     
     update_ai_status("Preparing AI input...")
     # Prepare data for AI processing
+    current_date = date.today()
+    next_purchase_date = date_convert(current_date,days_until_next)
     data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date)
 
     update_ai_status("Building AI prompt...")

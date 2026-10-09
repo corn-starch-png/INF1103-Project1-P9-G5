@@ -1,6 +1,5 @@
 from datetime import date, timedelta
 import json
-
 from DB_manager import database_exists, load_database, save_database, KCAL_TABLE
 from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next
 from AI_manager import get_ai_recommendations
@@ -32,7 +31,6 @@ grocery_list = enter_grocery_list()
 remarks = ask_remarks()
 days_until_next = ask_days_until_next()
 
-
 print("\n--- Test results ---")
 print("household_info =", household_info)
 print("remaining_items =", remaining_items)
@@ -42,9 +40,7 @@ print("remarks =", remarks)
 print("days_until_next =", days_until_next)
 
 #region AI Recommendations
-current_date = date.today()
-next_purchase_date = current_date + timedelta(days=days_until_next)
-ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge, grocery_list,remarks,current_date, next_purchase_date)
+ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge, grocery_list,remarks,days_until_next)
 if error:
     print(f"Error: {error}")
     #return
