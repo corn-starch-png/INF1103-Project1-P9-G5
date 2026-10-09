@@ -26,13 +26,10 @@ def calculate_family_weekly_kcal(family_member, KCAL_TABLE):
     return daily_total * 7    
 
 # calculating calories surplus
-def calories_surplus(total_estimated_calories):   
-    # get age and gender from db so can match calories from kcal.csv
-    with open("./sample_database/db.json", "r") as file:
-        household_data = json.load(file)
+def calories_surplus(database, total_estimated_calories):   
     
     #extract name, gender from household info from db.json
-    family_member = household_data.get("household_info", [])
+    family_member = database.get("household_info", [])
     #check the family memebers in the household
     for member in family_member:
         print(f"Family members: {member.get('Name')} | Age {member.get('Age')} | Gender {member.get('Gender')}")
@@ -68,14 +65,15 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
             print("Risk of expiry is:", True)
             print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
             print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
-                  "\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
+                  f"\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
             return True
         else:
             print("Risk of expiry is:", False)
             return False 
     else:
         # estimated_consumption_rate <= 0:
-        print("Consumption rate cannot be 0")    
+        print("cannot calculate")
+        return False 
         
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
 """ def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
@@ -121,6 +119,10 @@ def calculate_historical_data_completeness(item_name, consumption_history, fridg
     for row in fridge:
             if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None": #each seperate time user goes to NTUC to buy, CS increases
                 purchase_count += 1
+                
+    if purchase_count == 0: #for items with no records
+        completeness_score = 0
+        return completeness_score
 
     k = 8 #arbitary value i smoked out to control how fast completeness is given
     # K is inverse to the rate CS grows 
@@ -142,6 +144,10 @@ def calculate_data_standard_deviation(item_name,consumption_history,fridge): #ca
         if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None":
                 quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
 
+    if quantities == []: #for items with no records
+        standard_deviation = 0
+        return standard_deviation
+    print (quantities)
     sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
 
     if len(quantities) < 2: #can't calculate s/d with one value
@@ -160,7 +166,7 @@ def calculate_data_standard_deviation(item_name,consumption_history,fridge): #ca
 
 def calculate_confidence_score(item_name):
 
-    # pull out the 2 list i need to calculate confidence_score 
+    #pull out the 2 list i need to calculate confidence_score 
     fridge_file = open("./sample_database/db.json" , "r")
     database = json.load(fridge_file)
     consumption_history = database["consumption_history"]
@@ -192,11 +198,13 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
         quantity_needed = daily_consumption_rate * days_to_next_purchase
         amount_to_topup = round (quantity_needed - planned_quantity, 2)
 
-        if day_item_is_eaten < item_expiry_date:
+        if day_item_is_eaten < item_expiry_date and amount_to_topup >0:
             print(f"You will finish consuming {item_name} in {estimated_day_to_consume} days.",
-                  f"You should buy {amount_to_topup} more to last till your next grocery run.",
-                 f"AI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
+                  f"You should buy {amount_to_topup} more to last till your next grocery run.")
+                 #f"AI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
 
+        elif amount_to_topup <=0:
+            print("Grocery list looks good, no items at risk of expiry or underbuying")
         else:
             return None
 
@@ -208,8 +216,8 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
 
 # "item": "Milk",  "planned_quantity": 3, "unit": "L", "recommended_quantity": 0.4, "consumption_rate": 1.37, "estimated_calories": 240,
 
-under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
-next_purchase_date = "2026-10-30", estimated_consumption_rate = 5)
+#under_buy(item_name = "Milk", planned_quantity = 4, item_expiry_date = "2026-11-04",
+#next_purchase_date = "2026-10-30", estimated_consumption_rate = 5)
 
 """ # If risk of expiry is True 
 risk_of_expiry(estimated_consumption_rate=0.8, planned_quantity=3, item_name="Milk", item_expiry_date="2026-10-30", unit="L")
