@@ -389,16 +389,23 @@ def edit_fridge(fridge):
             print(f"{format_item(removed)} has been removed from your fridge.")
 
 
-def shopping_cart_conclusion(grocery_list,remarks, fridge_items=None):
+def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=None):
     if fridge_items is None:
         fridge_items = []
+
+    # Attach each item's expiry date now, so it stays with the right item if items are removed or added
+    for i in range(len(grocery_list)):
+        if i < len(expiry_dates):
+            grocery_list[i]["Expiry_Date"] = expiry_dates[i]
+        else:
+            grocery_list[i]["Expiry_Date"] = ""
+
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
         if decision == "yes":
             print("\nYour shopping cart has been concluded.")
             for i in range(len(grocery_list)):
                 grocery_list[i]["Purchase_Date"] =  date.today().isoformat()
-                grocery_list[i]["Expiry_Date"] = ""
                 grocery_list[i]["Remarks"] = remarks
             return grocery_list
         elif decision == "no":
@@ -434,6 +441,7 @@ def shopping_cart_conclusion(grocery_list,remarks, fridge_items=None):
                             break
 
                     if not found:
+                        item["Expiry_Date"] = ""
                         grocery_list.append(item)
                         print(f"Added {format_item(item)} to your shopping cart.")
                     if not ask_add_another():
@@ -442,7 +450,6 @@ def shopping_cart_conclusion(grocery_list,remarks, fridge_items=None):
                 print("\nYour shopping cart has been concluded.")
                 for i in range(len(grocery_list)):
                     grocery_list[i]["Purchase_Date"] =  date.today().isoformat()    
-                    grocery_list[i]["Expiry_Date"] = ""
                     grocery_list[i]["Remarks"] = remarks
                 return grocery_list
             else:
@@ -548,7 +555,7 @@ if __name__ == "__main__":
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
-    final_checkout = shopping_cart_conclusion(grocery_list, remarks, previous_inventory + remaining_items)
+    final_checkout = shopping_cart_conclusion(grocery_list, remarks, [], previous_inventory + remaining_items)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
