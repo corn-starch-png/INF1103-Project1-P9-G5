@@ -331,6 +331,52 @@ def ask_days_until_next():
         print("Please enter a whole number between 1 and 365.")
 
 
+# Show the returning user's menu and return their choice ("1" or "2").
+def ask_menu_choice():
+    while True:
+        print("\nWhat would you like to do?")
+        print("  1. Update consumption and plan groceries")
+        print("  2. Edit expiry dates or delete items from your fridge")
+        choice = input("Enter 1 or 2: ").strip()
+        if choice in ["1", "2"]:
+            return choice
+        print("Please enter 1 or 2.")
+
+
+# Let the user edit expiry dates or delete items from their fridge until they are done.
+# Returns the updated fridge list.
+def edit_fridge(fridge):
+    while True:
+        show_items("Items in your fridge", fridge)
+        if not fridge:
+            return fridge
+
+        print("\nWhat would you like to do with your fridge?")
+        print("  1. Edit an expiry date")
+        print("  2. Delete an item")
+        print("  3. Done")
+        action = input("Enter 1, 2 or 3: ").strip()
+        if action == "3":
+            return fridge
+        elif action not in ["1", "2"]:
+            print("Please enter 1, 2 or 3.")
+            continue
+
+        while True:
+            text = input(f"Enter the item number (1-{len(fridge)}): ").strip()
+            if text.isdigit() and 1 <= int(text) <= len(fridge):
+                number = int(text) - 1
+                break
+            print(f"Please enter a number between 1 and {len(fridge)}.")
+
+        if action == "1":
+            fridge[number]["Expiry_Date"] = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ")
+            print(f"Updated: {format_item(fridge[number])}")
+        else:
+            removed = fridge.pop(number)
+            print(f"{format_item(removed)} has been removed from your fridge.")
+
+
 def shopping_cart_conclusion(grocery_list,remarks):
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
@@ -474,8 +520,14 @@ if __name__ == "__main__":
         show_items("Items at home", remaining_items)
     else:
         show_welcome_back(household_info)
-        consumed_items = update_consumption(previous_inventory)
-        show_consumption(consumed_items)
+        while True:
+            choice = ask_menu_choice()
+            if choice == "1":
+                consumed_items = update_consumption(previous_inventory)
+                show_consumption(consumed_items)
+                break
+            else:
+                previous_inventory = edit_fridge(previous_inventory)
  
     grocery_list = enter_grocery_list()
  
@@ -485,6 +537,7 @@ if __name__ == "__main__":
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
+    print("previous_inventory =", previous_inventory)
     print("remaining_items =", remaining_items)
     print("consumed_items =", consumed_items)
     print("grocery_list =", grocery_list)
