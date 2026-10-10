@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 import json
 from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history, KCAL_TABLE
-from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion
+from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge
 from AI_manager import get_ai_recommendations
 from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
 database_exists()  # Ensure the database folder and file exist
@@ -28,12 +28,19 @@ if household_info == []:
     database = add_to_fridge(database, remaining_items)
 else:
     show_welcome_back(household_info)
-    consumed_items = update_consumption(fridge)
-    database = remove_from_fridge(database, consumed_items)
-    database = update_consumption_history(database, consumed_items)
-    show_consumption(consumed_items)
+    while True:
+        choice = ask_menu_choice()
+        if choice == "1":
+            consumed_items = update_consumption(fridge)
+            database = remove_from_fridge(database, consumed_items)
+            database = update_consumption_history(database, consumed_items)
+            show_consumption(consumed_items)
+            break
+        else:
+            fridge = edit_fridge(fridge)
+            database["fridge"] = fridge
 
-grocery_list = enter_grocery_list()
+grocery_list = enter_grocery_list(fridge + remaining_items)
 
 remarks = ask_remarks()
 days_until_next = ask_days_until_next()
@@ -87,6 +94,6 @@ for item in recommendations:
     print(item_name, confidence_score)
 print("expiry dates:")
 print(expiry_dates)
-final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates)
+final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates, fridge + remaining_items)
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder
