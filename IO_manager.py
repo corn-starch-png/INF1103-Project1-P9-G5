@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
@@ -41,8 +41,8 @@ def enter_item(existing_items=None):
 def enter_text(question, allow_blank=False):
     while True:
         text = input(question).strip()
-        if '"' in text:
-            print('Please don\'t use double quotes (") in your answer.')
+        if '"' in text or "\\" in text:
+            print('Please don\'t use double quotes (") or backslashes (\\) in your answer.')
         elif text == "" and not allow_blank:
             print("This can't be empty.")
         else:
@@ -53,7 +53,7 @@ def enter_text(question, allow_blank=False):
 def enter_quantity(question):
     while True:
         text = input(question).strip()
-        if not text.replace(".", "", 1).isdigit():
+        if not text.replace(".", "", 1).isdecimal():
             print("Please enter a valid number.")
         elif float(text) <= 0:
             print("Quantity must be more than 0.")
@@ -76,7 +76,7 @@ def enter_date(question):
         text = input(question).strip()
         parts = text.split("-")
         valid = (len(parts) == 3 and len(parts[0]) == 4 and len(parts[1]) == 2 and len(parts[2]) == 2
-                 and parts[0].isdigit() and parts[1].isdigit() and parts[2].isdigit())
+                 and parts[0].isdecimal() and parts[1].isdecimal() and parts[2].isdecimal())
         if valid:
             year = int(parts[0])
             month = int(parts[1])
@@ -84,9 +84,16 @@ def enter_date(question):
             is_leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
             days_in_month = [31, 29 if is_leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
             valid = 1 <= month <= 12 and 1 <= day <= days_in_month[month - 1]
-        if valid:
+        if not valid:
+            print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
+        elif date(year, month, day) < date.today() - timedelta(days=365):
+            print("That date is more than a year ago. Please enter a more recent date.")
+        elif date(year, month, day) > date.today() + timedelta(days=3 * 365):
+            print("That date is more than 3 years ahead. Please check the year and try again.")
+        else:
+            if date(year, month, day) < date.today():
+                print("That date has already passed! This item is marked as expired.")
             return text
-        print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
  
  
 # Collect a new user's profile and their family members' details.
@@ -96,10 +103,10 @@ def create_profile():
  
     while True:
         age = input("Please enter your age: ").strip()
-        if age.isdigit() and int(age) <= 120:
+        if age.isdecimal() and 10 <= int(age) <= 120:
             age = int(age)
             break
-        print("Please enter a valid age (whole number between 0 and 120).")
+        print("Please enter a valid age (whole number between 10 and 120).")
  
     while True:
         gender = input(f"Please enter your gender ({', '.join(valid_genders)}): ").strip().lower()
@@ -113,7 +120,7 @@ def create_profile():
  
     while True:
         family = input("Please enter your family size including yourself: ").strip()
-        if family.isdigit() and 1 <= int(family) <= 20:
+        if family.isdecimal() and 1 <= int(family) <= 20:
             family = int(family)
             break
         print("Please enter a whole number between 1 and 20.")
@@ -132,7 +139,7 @@ def create_profile():
  
         while True:
             member_age = input(f"Please enter the age of {member_name}: ").strip()
-            if member_age.isdigit() and int(member_age) <= 120:
+            if member_age.isdecimal() and int(member_age) <= 120:
                 member_age = int(member_age)
                 break
             print("Please enter a valid age (whole number between 0 and 120).")
@@ -251,7 +258,7 @@ def update_consumption(previous_inventory):
     # Asked once for the whole consumption list
     while True:
         text = input("How many days has it been since you last used the app? ").strip()
-        if text.isdigit() and 1 <= int(text) <= 365:
+        if text.isdecimal() and 1 <= int(text) <= 365:
             date_range = int(text)
             break
         print("Please enter a whole number between 1 and 365.")
@@ -262,7 +269,7 @@ def update_consumption(previous_inventory):
         unit = totals[key]["Unit"]
         while True:
             text = input(f"How much {name} did you consume? (you have {total} {unit}): ").strip()
-            if not text.replace(".", "", 1).isdigit():
+            if not text.replace(".", "", 1).isdecimal():
                 print("Please enter a valid number.")
             elif float(text) > total:
                 print(f"That's more than you have ({total} {unit}). Please try again.")
@@ -289,12 +296,14 @@ def update_consumption(previous_inventory):
  
 # Collect the groceries the user plans to buy, until they say they are done.
 # Returns a list of {"Item_Name", "Quantity", "Unit"}.
-def enter_grocery_list():
+def enter_grocery_list(fridge_items=None):
+    if fridge_items is None:
+        fridge_items = []
     grocery_list = []
     print("\nEnter the groceries you are planning to buy.")
  
     while True:
-        item = enter_item(grocery_list)
+        item = enter_item(grocery_list + fridge_items)
  
         # If the same item with the same unit was already entered, add to it
         found = False
@@ -319,14 +328,17 @@ def enter_grocery_list():
  
 # Ask for optional remarks about this week (e.g. events).
 def ask_remarks():
-    return enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
+    remarks = enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
+    if remarks == "":
+        remarks = "None"
+    return remarks
  
  
 # Ask how many days until the user's next planned shop.
 def ask_days_until_next():
     while True:
         text = input("\nIn how many days do you plan to shop next? (e.g. 7): ").strip()
-        if text.isdigit() and 1 <= int(text) <= 365:
+        if text.isdecimal() and 1 <= int(text) <= 365:
             return int(text)
         print("Please enter a whole number between 1 and 365.")
 
@@ -364,7 +376,7 @@ def edit_fridge(fridge):
 
         while True:
             text = input(f"Enter the item number (1-{len(fridge)}): ").strip()
-            if text.isdigit() and 1 <= int(text) <= len(fridge):
+            if text.isdecimal() and 1 <= int(text) <= len(fridge):
                 number = int(text) - 1
                 break
             print(f"Please enter a number between 1 and {len(fridge)}.")
@@ -377,7 +389,9 @@ def edit_fridge(fridge):
             print(f"{format_item(removed)} has been removed from your fridge.")
 
 
-def shopping_cart_conclusion(grocery_list,remarks):
+def shopping_cart_conclusion(grocery_list,remarks, fridge_items=None):
+    if fridge_items is None:
+        fridge_items = []
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
         if decision == "yes":
@@ -392,22 +406,23 @@ def shopping_cart_conclusion(grocery_list,remarks):
             updated_list = []
             for i in range(len(grocery_list)):
                 print(f"  {i + 1}. {format_item(grocery_list[i])}")
-                action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
+                while True:
+                    action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
+                    if action in ["yes", "no"]:
+                        break
+                    print("Invalid input. Please enter 'yes' or 'no'.")
                 if action == "yes":
                     print(f"{format_item(grocery_list[i])} has been removed from your shopping cart.")
                     continue
-                elif action == "no":
-                    grocery_list[i]["Quantity"] = enter_quantity(f"Enter the new quantity for {format_item(grocery_list[i])}: ")
-                    updated_list.append(grocery_list[i])
                 else:
-                    print("Invalid input. Please enter 'yes' or 'no'.")
+                    grocery_list[i]["Quantity"] = enter_quantity(f"Enter the new quantity for {format_item(grocery_list[i])}: ")
                     updated_list.append(grocery_list[i])
             grocery_list = updated_list
             show_items("Updated shopping cart", grocery_list)
             addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
             if addtion == "yes":
                 while True:
-                    item = enter_item(grocery_list)
+                    item = enter_item(grocery_list + fridge_items)
 
                     # If the same item is already in the cart, add to it
                     found = False
@@ -529,11 +544,11 @@ if __name__ == "__main__":
             else:
                 previous_inventory = edit_fridge(previous_inventory)
  
-    grocery_list = enter_grocery_list()
+    grocery_list = enter_grocery_list(previous_inventory + remaining_items)
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
-    final_checkout = shopping_cart_conclusion(grocery_list, remarks)
+    final_checkout = shopping_cart_conclusion(grocery_list, remarks, previous_inventory + remaining_items)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
