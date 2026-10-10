@@ -297,9 +297,3 @@ save_database(database, 'database')  # Save the database to the specified folder
 
 #load_kcal_database()  # Load the kcal database for testing purposes
 '''
-
-database_exists()  # Ensure the database folder and file exist
-database = load_database('sample_database')  # Load the database into memory
-household_info = database.get('household_info', [])
-database["household_info"] = []
-print(household_info)

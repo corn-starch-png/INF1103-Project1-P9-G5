@@ -9,12 +9,12 @@ database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
 #print(database)  # Print the loaded database for verification
 
-household_info = database.get('household_info', [])
-consumption_history = database.get('consumption_history', [])
-fridge = database.get('fridge', [])
+household_info = database['household_info']
+history = database['consumption_history']
+fridge = database['fridge']
 
 
-remaining_items = []
+existing_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
@@ -22,10 +22,10 @@ show_welcome()
 if household_info == []:
     household_info = create_profile()
     show_profile(household_info)
-    remaining_items = enter_home_items()
-    show_items("Items at home", remaining_items)
+    existing_items = enter_home_items()
+    show_items("Items at home", existing_items)
     database = update_household_info(database, household_info)
-    database = add_to_fridge(database, remaining_items)
+    database = add_to_fridge(database, existing_items)
 else:
     show_welcome_back(household_info)
     while True:
@@ -40,15 +40,14 @@ else:
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
 
-grocery_list = enter_grocery_list(fridge + remaining_items)
-
+grocery_list = enter_grocery_list(fridge + existing_items)
 remarks = ask_remarks()
-days_until_next = ask_days_until_next()
+days_until_next_visit = ask_days_until_next()
 
 '''
 print("\n--- Test results ---")
 print("household_info =", household_info)
-print("remaining_items =", remaining_items)
+print("existing_items =", existing_items)
 print("consumed_items =", consumed_items)
 print("grocery_list =", grocery_list)
 print("remarks =", remarks)
@@ -56,7 +55,7 @@ print("days_until_next =", days_until_next)
 '''
 
 #region AI Recommendations
-ai_recommendations, error = get_ai_recommendations(database.get('household_info', []), database.get('consumption_history', []), database.get('fridge', []), grocery_list,remarks,days_until_next)
+ai_recommendations, error = get_ai_recommendations(household_info, history, fridge, grocery_list,remarks,days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 
@@ -70,22 +69,24 @@ print(f"Total Estimated Calories: {total_estimated_calories}")
 
 #logic for database 
 
-calorie_extra = calories_surplus(database, total_estimated_calories)
+extra_calories = calories_surplus(database, total_estimated_calories)
 expiry_dates=[] #for saving to db later
+
 for item in recommendations:
-    est_consum_rate = item["Estimated_Consumption_Rate"]
-    planned_amt = item["Planned_Quantity"]
     item_name = item["Item_Name"]
+    est_consume_rate = item["Estimated_Consumption_Rate"]
+    planned_amt = item["Planned_Quantity"]
     expiry_date = item["Estimated_Expiry_Date"]
     unit = item["Unit"]
-    next_purchase_date = str(date.today() + timedelta(days=days_until_next))
+    next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
     #needed for saving to database
     expiry_dates.append(expiry_date)
-    roe = risk_of_expiry(est_consum_rate, planned_amt, expiry_date, item_name, unit)
-    if roe is False and calorie_extra is False:
+
+    roe = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
+    if roe is False and extra_calories is False:
         under_string = under_buy(item_name=item_name, planned_quantity= planned_amt,
                       item_expiry_date= expiry_date, 
-                      estimated_consumption_rate= est_consum_rate,
+                      estimated_consumption_rate= est_consume_rate,
                       next_purchase_date=next_purchase_date)
         print(f"Underbuy {under_string}")
 
@@ -94,6 +95,6 @@ for item in recommendations:
     print(item_name, confidence_score)
 print("expiry dates:")
 print(expiry_dates)
-final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates, fridge + remaining_items)
+final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates, fridge + existing_items)
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder
