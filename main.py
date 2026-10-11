@@ -71,7 +71,25 @@ print(f"Total Estimated Calories: {total_estimated_calories}")
 
 extra_calories = calories_surplus(database, total_estimated_calories)
 expiry_dates=[] #for saving to db later
-
+'''
+#TODO check that recommandations output contains same data as grocery_list
+if len(recommendations) == len(grocery_list):
+    for i in range(0,len(recommendations)):
+        ai_item_name = recommendations[i]["Item_Name"]
+        user_item_name = grocery_list[i]["Item_Name"]
+        ai_ori_quantity = recommendations[i]["Planned_Quantity"]
+        user_quantity = grocery_list[i]["Quantity"]
+        ai_units = recommendations[i]["Units"]
+        user_units = grocery_list[i]["Units"]
+        if ai_item_name == user_item_name and ai_ori_quantity == user_quantity and ai_units == user_units:
+            continue
+        else:
+            pass
+            #return False 
+    #return True
+else:
+    pass
+'''
 for item in recommendations:
     item_name = item["Item_Name"]
     est_consume_rate = item["Estimated_Consumption_Rate"]
@@ -82,8 +100,8 @@ for item in recommendations:
     #needed for saving to database
     expiry_dates.append(expiry_date)
 
-    roe = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
-    if roe is False and extra_calories is False:
+    expire_before_consume = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
+    if expire_before_consume is False and extra_calories is False:
         under_string = under_buy(item_name=item_name, planned_quantity= planned_amt,
                       item_expiry_date= expiry_date, 
                       estimated_consumption_rate= est_consume_rate,
