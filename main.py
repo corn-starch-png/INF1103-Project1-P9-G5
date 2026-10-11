@@ -4,7 +4,9 @@ try:
     from datetime import date, timedelta
     import json
     from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history
-    from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message
+    from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
+                            update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
+                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message,output_recommendations)
     from AI_manager import get_ai_recommendations
     from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
 except ImportError:
@@ -25,7 +27,6 @@ existing_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
-'''
 show_welcome()
 if household_info == []:
     household_info = create_profile()
@@ -59,12 +60,6 @@ send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
 send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
-'''
-existing_items = []
-consumed_items = [{'Date_Range': 3, 'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'milk', 'Quantity': 0.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'chicken', 'Quantity': 0.0, 'Unit': 'kg', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs', 'Remarks': 'None'}]
-grocery_list = [{'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l'}, {'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs'}]
-remarks = "None"
-days_until_next_visit = 3
 
 
 #region AI Recommendations
@@ -85,9 +80,9 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 
 #logic for database 
 
-#TODO check that recommandations output contains same data as grocery_list
-#check_ai_output(recommendations, grocery_list) # ensure that AI did not hallucinate/modify original data
-extra_calories = calories_surplus(database, total_planned_calories)
+extra_calories, calories_message = calories_surplus(database, total_planned_calories)
+risk_of_expiry_messages = []
+underbuy_messages = []
 
 for item in recommendations:
     item_name = item["Item_Name"]
@@ -97,17 +92,25 @@ for item in recommendations:
     unit = item["Unit"]
     next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
 
-    expire_before_consume = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
+    expire_before_consume, expiry_message = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit) #TODO risk of expiry not taking into account fridge values
+    if expiry_message is not None:
+        risk_of_expiry_messages.append(expiry_message) 
+
     if expire_before_consume is False and extra_calories is False:
-        under_string = under_buy(item_name=item_name, planned_quantity= planned_amt,
+        need_to_buy_more, underbuy_message = under_buy(item_name=item_name, planned_quantity= planned_amt,
                       item_expiry_date= expiry_date, 
                       estimated_consumption_rate= est_consume_rate,
-                      next_purchase_date=next_purchase_date)
-        print(f"Underbuy {under_string}")
+                      next_purchase_date=next_purchase_date) #TODO under_buy not taking into account fridge values
+        
+        if underbuy_message is not None:
+                underbuy_messages.append(underbuy_message) 
 
 
-    confidence_score = calculate_confidence_score(item_name, database)
-    print(item_name, confidence_score)
+    historial_score = calculate_confidence_score(item_name, database)
+    item["historial_score"] = historial_score
+output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
+
+
 
 
 final_checkout = shopping_cart_conclusion(recommendations, remarks)
