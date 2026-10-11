@@ -1,5 +1,5 @@
-from datetime import date, timedelta, datetime
-import os
+from datetime import date, timedelta
+
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
@@ -20,19 +20,35 @@ def enter_item(existing_items=None):
             print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
             break
 
-    if locked_unit != "":
-        quantity = enter_quantity(f"Quantity ({locked_unit}): ")
-    else:
-        quantity = enter_quantity("Quantity: ")
+    # Ask for quantity and unit together
+    while True:
+        if locked_unit != "":
+            text = input(f"Quantity in {locked_unit} (e.g. 3): ").strip().lower()
+        else:
+            text = input(f"Quantity and unit (e.g. 6kg, 500 g, 3 pcs) - units: {', '.join(valid_units)}: ").strip().lower()
 
-    if locked_unit != "":
-        unit = locked_unit
-    else:
-        while True:
-            unit = input(f"Unit ({', '.join(valid_units)}): ").strip().lower()
-            if unit in valid_units:
-                break
-            print("Please enter a valid unit.")
+        # Split where the number ends and the unit begins
+        split_at = 0
+        while split_at < len(text) and (text[split_at].isdecimal() or text[split_at] == "."):
+            split_at += 1
+        number_part = text[:split_at]
+        unit = text[split_at:].strip()
+
+        if not number_part.replace(".", "", 1).isdecimal():
+            print("Please start with a valid number, e.g. 6kg.")
+        elif float(number_part) <= 0:
+            print("Quantity must be more than 0.")
+        elif unit == "" and locked_unit == "":
+            print(f"Please include a unit ({', '.join(valid_units)}), e.g. 6kg.")
+        elif unit != "" and unit not in valid_units:
+            print(f"'{unit}' is not a valid unit. Please use one of: {', '.join(valid_units)}.")
+        elif locked_unit != "" and unit != "" and unit != locked_unit:
+            print(f"{item_name} must be entered in {locked_unit}.")
+        else:
+            quantity = float(number_part)
+            if unit == "":
+                unit = locked_unit
+            break
 
     return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
@@ -322,7 +338,7 @@ def enter_grocery_list(fridge_items=None):
             break
  
     show_items("Your grocery list", grocery_list)
-    send_log(f"[IO MANAGER] grocery_list = {grocery_list}")  # Print the grocery list for verification
+    print("grocery_list =", grocery_list)  # Print the grocery list for verification
     return grocery_list
  
  
@@ -394,20 +410,11 @@ def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=No
         fridge_items = []
 
     # Attach each item's expiry date now, so it stays with the right item if items are removed or added
-    # Default expiry date for items with unknown expiry
-    default_expiry_date = (date.today() + timedelta(days=365)).isoformat()
-    # Attach expiry dates to grocery items
     for i in range(len(grocery_list)):
-        if i < len(expiry_dates) and expiry_dates[i]:
+        if i < len(expiry_dates):
             grocery_list[i]["Expiry_Date"] = expiry_dates[i]
         else:
-            grocery_list[i]["Expiry_Date"] = default_expiry_date
-    # Below code cause Error: Invalid Expiry_Date format, must be YYYY-MM-DD when Expiry is null
-    # for i in range(len(grocery_list)):
-    #     if i < len(expiry_dates):
-    #         grocery_list[i]["Expiry_Date"] = expiry_dates[i]
-    #     else:
-    #         grocery_list[i]["Expiry_Date"] = ""
+            grocery_list[i]["Expiry_Date"] = ""
 
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
@@ -450,8 +457,7 @@ def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=No
                             break
 
                     if not found:
-                        item["Expiry_Date"] = default_expiry_date
-                        #item["Expiry_Date"] = ""
+                        item["Expiry_Date"] = ""
                         grocery_list.append(item)
                         print(f"Added {format_item(item)} to your shopping cart.")
                     if not ask_add_another():
@@ -529,15 +535,8 @@ def show_welcome_back(household_info):
 def send_message(message):
     print(f"{message}")
 
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 def send_log(message):
-    filename=f"{current_datetime}.log"
-    if not os.path.exists(filename):
-        with open(filename, 'w') as f:
-            f.write(message)
-    else:
-        with open(filename, 'a') as f:
-            f.write(f"\n{message}")
+    print(f"[LOG] {message}")
 
  
 # =====================================================================
