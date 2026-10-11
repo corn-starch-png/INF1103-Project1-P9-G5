@@ -56,7 +56,7 @@ def enter_item(existing_items=None):
 # Double quote checks, reasks user to prevent JSON errors
 def enter_text(question, allow_blank=False):
     while True:
-        text = input(question).strip().lower()
+        text = input(question).strip()
         if '"' in text or "\\" in text:
             print('Please don\'t use double quotes (") or backslashes (\\) in your answer.')
         elif text == "" and not allow_blank:
@@ -408,6 +408,9 @@ def edit_fridge(fridge):
 #displays item, current quantity and recommened quantity for conclusion IO 
 def display_cart(item_list):
     #assuming input is always the recommendations list
+    if not item_list:
+        print("  (your shopping cart is empty)")
+        return
     name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
 
     # Print header
@@ -457,20 +460,20 @@ def shopping_cart_conclusion(item_list, remarks):
                 item_index = input("\nEnter item to edit/delete(1,2...) or enter 'exit' to save: ").strip().lower()
                 if item_index == "exit":
                     return convert_cart_to_db_list(item_list, remarks)
-                elif item_index.isdigit():
+                elif item_index.isdecimal():
                     if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
                         item_index = int(item_index) - 1
                         while True:
-                            print(f"Selected {item_list[item_index]["Item_Name"]}, Current Quantity: {item_list[item_index]["Planned_Quantity"]}")
+                            print(f"Selected {item_list[item_index]['Item_Name']}, Current Quantity: {item_list[item_index]['Planned_Quantity']}")
                             edited_quantity = input("Enter new amount (enter 0 to delete item):").strip()
-                            if edited_quantity.isdigit():
-                                if int(edited_quantity) == 0:
+                            if edited_quantity.replace(".", "", 1).isdecimal():
+                                if float(edited_quantity) == 0:
                                     del item_list[item_index]
                                 else:
                                     item_list[item_index]["Planned_Quantity"] = float(edited_quantity)
                                 break
                             else:
-                                print("Invalid input. Enter a postive integer")
+                                print("Invalid input. Enter a positive number")
                         display_cart(item_list)
                     else:
                         print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
@@ -604,7 +607,12 @@ if __name__ == "__main__":
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
-    final_checkout = shopping_cart_conclusion(grocery_list, remarks, [], previous_inventory + remaining_items)
+    recommendations = []
+    for item in grocery_list:
+        recommendations.append({"Item_Name": item["Item_Name"], "Planned_Quantity": item["Quantity"],
+                                "Recommended_Quantity": item["Quantity"], "Unit": item["Unit"],
+                                "Estimated_Expiry_Date": ""})
+    final_checkout = shopping_cart_conclusion(recommendations, remarks)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
