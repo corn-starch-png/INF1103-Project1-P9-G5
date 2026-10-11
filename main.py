@@ -25,6 +25,7 @@ existing_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
+'''
 show_welcome()
 if household_info == []:
     household_info = create_profile()
@@ -57,7 +58,14 @@ send_log(f"[MAIN] existing_items = {existing_items}")
 send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
-send_log(f"[MAIN] days_until_next = {days_until_next_visit}")
+send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
+'''
+existing_items = []
+consumed_items = [{'Date_Range': 3, 'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'milk', 'Quantity': 0.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'chicken', 'Quantity': 0.0, 'Unit': 'kg', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs', 'Remarks': 'None'}]
+grocery_list = [{'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l'}, {'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs'}]
+remarks = "None"
+days_until_next_visit = 3
+
 
 #region AI Recommendations
 send_message("Getting AI recommendations... This can take a while")
