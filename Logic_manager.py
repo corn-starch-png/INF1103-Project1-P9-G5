@@ -51,11 +51,12 @@ def calories_surplus(database, total_estimated_calories):
 # calculating risk of expiry
 def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
     if estimated_consumption_rate > 0:
-        
         today = date.today()
         # calculation of daily consumption rate per day
-        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
-        
+        # Retain calculation precision to prevent very small positive rates from rounding to zero
+        daily_consumption_rate = estimated_consumption_rate / 7
+        # daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+
         # days taken to finish consuming the item
         estimated_days_to_consume = round(planned_quantity / daily_consumption_rate)
                     
@@ -64,8 +65,9 @@ def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_dat
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
             print("Risk of expiry is:", True)
             print("Based on Estimated consumption rate and Expiry date, you will not able to finish:")
-            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
-                  f"\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
+            print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)")
+            #print(f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
+            #      f"\nAI confidence score on data available for {item_name} : {calculate_confidence_score(item_name=item_name)}%")
             return True
         else:
             print("Risk of expiry is:", False)
@@ -144,14 +146,12 @@ def calculate_data_standard_deviation(item_name,consumption_history,fridge): #ca
         if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None":
                 quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
 
-    if quantities == []: #for items with no records
-        standard_deviation = 0
-        return standard_deviation
+    # Ensure at least 2 data points exist before calculating standard deviation to prevent StatisticsError
+    # can't calculate s/d with one value
+    if len(quantities) < 2:
+        return 0.0
     print (quantities)
     sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
-
-    if len(quantities) < 2: #can't calculate s/d with one value
-        return 0.0 
    
     mean = statistics.mean(quantities)  
 
@@ -164,11 +164,9 @@ def calculate_data_standard_deviation(item_name,consumption_history,fridge): #ca
 
     return standard_deviation
 
-def calculate_confidence_score(item_name):
-
+def calculate_confidence_score(item_name, database):
+    # Retrieve consumption history and fridge stock from the existing database
     #pull out the 2 list i need to calculate confidence_score 
-    fridge_file = open("./sample_database/db.json" , "r")
-    database = json.load(fridge_file)
     consumption_history = database["consumption_history"]
     fridge = database["fridge"]
 

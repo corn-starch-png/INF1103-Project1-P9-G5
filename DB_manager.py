@@ -4,8 +4,8 @@ import json
 DB_FILENAME = 'db.json'
 FILE_STRUCTURE = {
     'consumption_history': 'Date_Range,Item_Name,Quantity,Unit,Remarks',
-    'household_info': 'Person_ID,Age,Gender,Dietary_Restriction',
-    'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date'
+    'household_info': 'Person_ID,Name,Age,Gender,Dietary_Restriction',
+    'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date,Remarks'
 }
 KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 
@@ -29,11 +29,10 @@ def check_data(record, table):
     def check_string(value):
         return isinstance(value, str)
     def check_unit(value):
-        valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
-        for i in valid_units:
-            if value.lower() == i.lower():
-                return True
-        return False
+        valid_units = ['kg', 'g', 'L', 'ml', 'pcs']
+        if not isinstance(value, str):
+            return False
+        return value.strip().lower() in [unit.lower() for unit in valid_units]
     def check_date(value):
         # Check if the date is in the format YYYY-MM-DD
         try:
@@ -42,7 +41,7 @@ def check_data(record, table):
         except ValueError:
             return False
     def check_gender(value):
-        valid_genders = ['Male', 'Female', 'Other']
+        valid_genders = ['Male', 'Female']
         return value in valid_genders
     
     
@@ -67,7 +66,7 @@ def check_data(record, table):
             return False, "Age must be an integer"
         # check if Gender is valid
         if not check_gender(record["Gender"]):
-            return False, "Invalid Gender, must be either: ['Male', 'Female', 'Other']"
+            return False, "Invalid Gender, must be either: ['Male', 'Female']"
         return True, None
         
     elif table == 'fridge' and data_length == 6:
@@ -100,7 +99,8 @@ def check_database(database):
             errors.append(f"Missing table '{table}' in the database.")
             database[table] = []  # Initialize missing tables with an empty list
             continue
-        for entry in database[table]:
+        # Iterate over a copy to prevent skipping entries when removing invalid records
+        for entry in database[table][:]:
             if not isinstance(entry, dict):
                 errors.append(f"Invalid entry in table '{table}': {entry}. Expected a dictionary.")
                 database[table].remove(entry)  # Remove invalid entries
@@ -297,9 +297,3 @@ save_database(database, 'database')  # Save the database to the specified folder
 
 #load_kcal_database()  # Load the kcal database for testing purposes
 '''
-
-database_exists()  # Ensure the database folder and file exist
-database = load_database('sample_database')  # Load the database into memory
-household_info = database.get('household_info', [])
-database["household_info"] = []
-print(household_info)
