@@ -10,6 +10,8 @@ try:
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
+
+
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
 send_log(f"[MAIN] check database is loaded: {database}")
@@ -23,6 +25,7 @@ existing_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
+'''
 show_welcome()
 if household_info == []:
     household_info = create_profile()
@@ -55,7 +58,14 @@ send_log(f"[MAIN] existing_items = {existing_items}")
 send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
-send_log(f"[MAIN] days_until_next = {days_until_next_visit}")
+send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
+'''
+existing_items = []
+consumed_items = [{'Date_Range': 3, 'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'milk', 'Quantity': 0.0, 'Unit': 'l', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'chicken', 'Quantity': 0.0, 'Unit': 'kg', 'Remarks': 'None'}, {'Date_Range': 3, 'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs', 'Remarks': 'None'}]
+grocery_list = [{'Item_Name': 'coke', 'Quantity': 1.0, 'Unit': 'l'}, {'Item_Name': 'eggs', 'Quantity': 6.0, 'Unit': 'pcs'}]
+remarks = "None"
+days_until_next_visit = 3
+
 
 #region AI Recommendations
 send_message("Getting AI recommendations... This can take a while")
@@ -74,27 +84,11 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 
 
 #logic for database 
-extra_calories = calories_surplus(database, total_planned_calories)
-expiry_dates=[] #for saving to db later
-'''
+
 #TODO check that recommandations output contains same data as grocery_list
-if len(recommendations) == len(grocery_list):
-    for i in range(0,len(recommendations)):
-        ai_item_name = recommendations[i]["Item_Name"]
-        user_item_name = grocery_list[i]["Item_Name"]
-        ai_ori_quantity = recommendations[i]["Planned_Quantity"]
-        user_quantity = grocery_list[i]["Quantity"]
-        ai_units = recommendations[i]["Units"]
-        user_units = grocery_list[i]["Units"]
-        if ai_item_name == user_item_name and ai_ori_quantity == user_quantity and ai_units == user_units:
-            continue
-        else:
-            pass
-            #return False 
-    #return True
-else:
-    pass
-'''
+#check_ai_output(recommendations, grocery_list) # ensure that AI did not hallucinate/modify original data
+extra_calories = calories_surplus(database, total_planned_calories)
+
 for item in recommendations:
     item_name = item["Item_Name"]
     est_consume_rate = item["Estimated_Consumption_Rate"]
@@ -102,8 +96,6 @@ for item in recommendations:
     expiry_date = item["Estimated_Expiry_Date"]
     unit = item["Unit"]
     next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
-    #needed for saving to database
-    expiry_dates.append(expiry_date)
 
     expire_before_consume = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
     if expire_before_consume is False and extra_calories is False:
@@ -116,8 +108,8 @@ for item in recommendations:
 
     confidence_score = calculate_confidence_score(item_name, database)
     print(item_name, confidence_score)
-print("expiry dates:")
-print(expiry_dates)
-final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates, fridge + existing_items)
+
+
+final_checkout = shopping_cart_conclusion(recommendations, remarks)
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder

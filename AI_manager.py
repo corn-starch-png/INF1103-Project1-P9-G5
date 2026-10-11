@@ -504,6 +504,26 @@ def process_ai_response(ai_response):
     return data, None
 #endregion
 
+#region check AI response order matches original grocery_list
+def check_ai_output(recommendations, grocery_list):
+    if len(recommendations) == len(grocery_list):
+        for i in range(0,len(recommendations)):
+            ai_item_name = recommendations[i]["Item_Name"]
+            user_item_name = grocery_list[i]["Item_Name"]
+            ai_ori_quantity = recommendations[i]["Planned_Quantity"]
+            user_quantity = grocery_list[i]["Quantity"]
+            ai_units = recommendations[i]["Unit"]
+            user_units = grocery_list[i]["Unit"]
+            if ai_item_name == user_item_name and ai_ori_quantity == user_quantity and ai_units == user_units:
+                continue
+            else:
+                return False 
+        return True
+    else:
+        return False 
+#endregion
+
+
 #region Functions to be implemented for main.py to call AI_manager.py
 # To use functions to get specific data from the AI output, you can implement the following functions in main.py:
 # ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next)
@@ -542,7 +562,9 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     update_ai_status("Validating AI output...")
     # Process and validate the AI response
     ai_output, error = process_ai_response(ai_response)
-    if error:
+    if error == None:
+        output_valid = check_ai_output(ai_output.get("Recommendations_List"), purchase_stock) #check that AI did not malform original data and order of items
+    if error or output_valid == False:
         update_ai_status("AI output validation failed.")
         send_log(error)
         return None, error
