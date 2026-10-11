@@ -506,21 +506,23 @@ def process_ai_response(ai_response):
 
 #region check AI response order matches original grocery_list
 def check_ai_output(recommendations, grocery_list):
-    if len(recommendations) == len(grocery_list):
-        for i in range(0,len(recommendations)):
-            ai_item_name = recommendations[i]["Item_Name"]
-            user_item_name = grocery_list[i]["Item_Name"]
-            ai_ori_quantity = recommendations[i]["Planned_Quantity"]
-            user_quantity = grocery_list[i]["Quantity"]
-            ai_units = recommendations[i]["Unit"]
-            user_units = grocery_list[i]["Unit"]
-            if ai_item_name == user_item_name and ai_ori_quantity == user_quantity and ai_units == user_units:
-                continue
-            else:
-                return False 
-        return True
-    else:
-        return False 
+    if not isinstance(recommendations, list) or not isinstance(grocery_list, list):
+        return False
+    if len(recommendations) != len(grocery_list):
+        return False
+    for ai_item, original in zip(recommendations, grocery_list):
+        if not isinstance(ai_item, dict) or not isinstance(original, dict):
+            return False
+        for ai_field, original_field in (
+            ("Item_Name", "Item_Name"),
+            ("Planned_Quantity", "Quantity"),
+            ("Unit", "Unit"),
+        ):
+            if ai_field not in ai_item or original_field not in original:
+                return False
+            if ai_item[ai_field] != original[original_field]:
+                return False
+    return True
 #endregion
 
 
@@ -562,12 +564,16 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     update_ai_status("Validating AI output...")
     # Process and validate the AI response
     ai_output, error = process_ai_response(ai_response)
-    if error == None:
-        output_valid = check_ai_output(ai_output.get("Recommendations_List"), purchase_stock) #check that AI did not malform original data and order of items
-    if error or output_valid == False:
+
+    if error:
         update_ai_status("AI output validation failed.")
         send_log(error)
         return None, error
 
+    if not check_ai_output( ai_output["Recommendations_List"], purchase_stock):
+        error = ("AI recommendations do not match the original grocery list: item names, quantities, units, or order.")
+        update_ai_status("AI output validation failed.")
+        send_log(error)
+        return None, error
     return ai_output, None
 #endregion

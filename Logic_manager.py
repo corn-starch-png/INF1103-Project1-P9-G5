@@ -11,7 +11,7 @@ from IO_manager import send_log, send_message
 def get_age_from_KCAL(age: int):
     if age >= 60:
         return 60
-    if age > 30:
+    if age >= 30:
         return 30
     if age >= 19:
         return 19
@@ -167,6 +167,8 @@ def calculate_confidence_score(item_name, database):
     confidence_score = standard_deviation * consistency_score #will add more scores if needed
     return round(confidence_score, 3) *100 #round off to 3 d.p in case of irrational number
 
+def should_evaluate_underbuy(calorie_surplus, expiry_risk):
+    return calorie_surplus is False and expiry_risk is False
 
 #under_buy will pull from basket/grocery_list
 def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate):
@@ -174,7 +176,9 @@ def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date,
     if estimated_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
         #TODO remove redundant code, lines below are repeating ROE code
         today = date.today()
-        daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
+        #prevents small positive consumption rates from being rounded down to zero before division.
+        daily_consumption_rate = estimated_consumption_rate / 7
+        #daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
         estimated_day_to_consume = round(planned_quantity / daily_consumption_rate)
     
         item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date

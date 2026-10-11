@@ -8,7 +8,7 @@ try:
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message,output_recommendations)
     from AI_manager import get_ai_recommendations
-    from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
+    from Logic_manager import (under_buy,calories_surplus,risk_of_expiry,calculate_confidence_score,should_evaluate_underbuy)
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
@@ -96,7 +96,7 @@ for item in recommendations:
     if expiry_message is not None:
         risk_of_expiry_messages.append(expiry_message) 
 
-    if expire_before_consume is False and extra_calories is False:
+    if should_evaluate_underbuy(extra_calories, expire_before_consume):
         need_to_buy_more, underbuy_message = under_buy(item_name=item_name, planned_quantity= planned_amt,
                       item_expiry_date= expiry_date, 
                       estimated_consumption_rate= est_consume_rate,
