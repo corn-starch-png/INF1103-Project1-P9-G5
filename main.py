@@ -1,10 +1,16 @@
 #-------START OF DEPENDENCY LINE----------#
-from datetime import date, timedelta
-import json
-from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history, KCAL_TABLE
-from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge
-from AI_manager import get_ai_recommendations
-from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
+import sys
+try:
+    from datetime import date, timedelta
+    import json
+    from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history
+    from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge
+    from AI_manager import get_ai_recommendations
+    from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
+except ImportError:
+    print("requried libraries do not exist")
+    sys.exit(1)
+
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
 #print(database)  # Print the loaded database for verification
