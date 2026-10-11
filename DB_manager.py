@@ -30,10 +30,9 @@ def check_data(record, table):
         return isinstance(value, str)
     def check_unit(value):
         valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
-        for i in valid_units:
-            if value.lower() == i.lower():
-                return True
-        return False
+        if not isinstance(value, str):
+            return False
+        return value.strip().lower() in [unit.lower() for unit in valid_units]
     def check_date(value):
         # Check if the date is in the format YYYY-MM-DD
         try:
@@ -42,7 +41,7 @@ def check_data(record, table):
         except ValueError:
             return False
     def check_gender(value):
-        valid_genders = ['Male', 'Female', 'Other']
+        valid_genders = ['Male', 'Female']
         return value in valid_genders
     
     
@@ -67,7 +66,7 @@ def check_data(record, table):
             return False, "Age must be an integer"
         # check if Gender is valid
         if not check_gender(record["Gender"]):
-            return False, "Invalid Gender, must be either: ['Male', 'Female', 'Other']"
+            return False, "Invalid Gender, must be either: ['Male', 'Female']"
         return True, None
         
     elif table == 'fridge' and data_length == 6:
@@ -100,7 +99,8 @@ def check_database(database):
             errors.append(f"Missing table '{table}' in the database.")
             database[table] = []  # Initialize missing tables with an empty list
             continue
-        for entry in database[table]:
+        # Iterate over a copy to prevent skipping entries when removing invalid records
+        for entry in database[table][:]:
             if not isinstance(entry, dict):
                 errors.append(f"Invalid entry in table '{table}': {entry}. Expected a dictionary.")
                 database[table].remove(entry)  # Remove invalid entries

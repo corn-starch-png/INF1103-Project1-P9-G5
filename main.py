@@ -109,7 +109,7 @@ for item in recommendations:
         print(f"Underbuy {under_string}")
 
 
-    confidence_score = calculate_confidence_score(item_name=item_name)
+    confidence_score = calculate_confidence_score(item_name, database)
     print(item_name, confidence_score)
 print("expiry dates:")
 print(expiry_dates)
