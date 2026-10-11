@@ -40,7 +40,7 @@ def enter_item(existing_items=None):
 # Double quote checks, reasks user to prevent JSON errors
 def enter_text(question, allow_blank=False):
     while True:
-        text = input(question).strip()
+        text = input(question).strip().lower()
         if '"' in text or "\\" in text:
             print('Please don\'t use double quotes (") or backslashes (\\) in your answer.')
         elif text == "" and not allow_blank:
@@ -389,88 +389,111 @@ def edit_fridge(fridge):
             print(f"{format_item(removed)} has been removed from your fridge.")
 
 
-def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=None):
-    if fridge_items is None:
-        fridge_items = []
+#displays item, current quantity and recommened quantity for conclusion IO 
+def display_cart(item_list):
+    #assuming input is always the recommendations list
+    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
 
-    # Attach each item's expiry date now, so it stays with the right item if items are removed or added
-    # Default expiry date for items with unknown expiry
-    default_expiry_date = (date.today() + timedelta(days=365)).isoformat()
-    # Attach expiry dates to grocery items
-    for i in range(len(grocery_list)):
-        if i < len(expiry_dates) and expiry_dates[i]:
-            grocery_list[i]["Expiry_Date"] = expiry_dates[i]
-        else:
-            grocery_list[i]["Expiry_Date"] = default_expiry_date
-    # Below code cause Error: Invalid Expiry_Date format, must be YYYY-MM-DD when Expiry is null
-    # for i in range(len(grocery_list)):
-    #     if i < len(expiry_dates):
-    #         grocery_list[i]["Expiry_Date"] = expiry_dates[i]
-    #     else:
-    #         grocery_list[i]["Expiry_Date"] = ""
+    # Print header
+    print(
+        f"{'No.':<5}| "
+        f"{'Item name':<{name_width}}| "
+        f"{'Current Quantity':<20}| "
+        f"{'Recommended Quantity':<22}|"
+    )
 
+    # Print rows
+    for i in range(0,len(item_list)):
+        print(
+            f"{i+1:<5}| "
+            f"{item_list[i]['Item_Name']:<{name_width}}| "
+            f"{item_list[i]['Planned_Quantity']:<20}| "
+            f"{item_list[i]['Recommended_Quantity']:<22}|"
+        )
+
+
+#converts recommendation list into format that can be saved in DB
+def convert_cart_to_db_list(recommendations_list, remarks):
+    final_list=[]
+    for i in range(len(recommendations_list)):
+        db_item = {}
+        db_item["Item_Name"] = recommendations_list[i]["Item_Name"]
+        db_item["Quantity"] = recommendations_list[i]["Planned_Quantity"]
+        db_item["Unit"] = recommendations_list[i]["Unit"]
+        db_item["Purchase_Date"] = date.today().isoformat()
+        db_item["Expiry_Date"] = recommendations_list[i]["Estimated_Expiry_Date"]
+        db_item["Remarks"] = remarks
+        final_list.append(db_item)
+    return final_list
+
+
+#handles IO for after AI and logic processes
+def shopping_cart_conclusion(item_list, remarks):
+    display_cart(item_list)
     while True:
-        decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
-        if decision == "yes":
+        decision = input("\nWould you like to change the quantity of items in your shopping cart? (yes/no): ").strip().lower()
+        if decision in ["no", "n"]:
             print("\nYour shopping cart has been concluded.")
-            for i in range(len(grocery_list)):
-                grocery_list[i]["Purchase_Date"] =  date.today().isoformat()
-                grocery_list[i]["Remarks"] = remarks
-            return grocery_list
-        elif decision == "no":
-            print("\nProceed with editing your shopping cart.")
-            updated_list = []
-            for i in range(len(grocery_list)):
-                print(f"  {i + 1}. {format_item(grocery_list[i])}")
-                while True:
-                    action = input(f"Do you want to remove this item from your shopping cart? (yes/no): ").strip().lower()
-                    if action in ["yes", "no"]:
-                        break
-                    print("Invalid input. Please enter 'yes' or 'no'.")
-                if action == "yes":
-                    print(f"{format_item(grocery_list[i])} has been removed from your shopping cart.")
-                    continue
+            return convert_cart_to_db_list(item_list, remarks)
+        
+        elif decision in ["yes", "y"]:
+            while True:
+                item_index = input("\nEnter item to edit/delete(1,2...) or enter 'exit' to save: ").strip().lower()
+                if item_index == "exit":
+                    return convert_cart_to_db_list(item_list, remarks)
+                elif item_index.isdigit():
+                    if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
+                        item_index = int(item_index) - 1
+                        while True:
+                            print(f"Selected {item_list[item_index]["Item_Name"]}, Current Quantity: {item_list[item_index]["Planned_Quantity"]}")
+                            edited_quantity = input("Enter new amount (enter 0 to delete item):").strip()
+                            if edited_quantity.isdigit():
+                                if int(edited_quantity) == 0:
+                                    del item_list[item_index]
+                                else:
+                                    item_list[item_index]["Planned_Quantity"] = float(edited_quantity)
+                                break
+                            else:
+                                print("Invalid input. Enter a postive integer")
+                        display_cart(item_list)
+                    else:
+                        print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
                 else:
-                    grocery_list[i]["Quantity"] = enter_quantity(f"Enter the new quantity for {format_item(grocery_list[i])}: ")
-                    updated_list.append(grocery_list[i])
-            grocery_list = updated_list
-            show_items("Updated shopping cart", grocery_list)
-            addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
-            if addtion == "yes":
-                while True:
-                    item = enter_item(grocery_list + fridge_items)
-
-                    # If the same item is already in the cart, add to it
-                    found = False
-                    for existing in grocery_list:
-                        if existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]:
-                            existing["Quantity"] += item["Quantity"]
-                            found = True
-                            print(f"{existing['Item_Name']} is already in your cart. Total is now {format_item(existing)}.")
-                            break
-
-                    if not found:
-                        item["Expiry_Date"] = default_expiry_date
-                        #item["Expiry_Date"] = ""
-                        grocery_list.append(item)
-                        print(f"Added {format_item(item)} to your shopping cart.")
-                    if not ask_add_another():
-                        break
-            elif addtion == "no":  
-                print("\nYour shopping cart has been concluded.")
-                for i in range(len(grocery_list)):
-                    grocery_list[i]["Purchase_Date"] =  date.today().isoformat()    
-                    grocery_list[i]["Remarks"] = remarks
-                return grocery_list
-            else:
-                print("Invalid input. Please enter 'yes' or 'no'.")
+                    print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
         else:
             print("Invalid input. Please enter 'yes' or 'no'.")
-        
+            #REMOVE ABILITY TO ADD NEW ITEMS TO CART AS EXPIRY DATE NEEDS TO BE PROVIDED BY AI
+            # addtion = input("\nDo you want to add any new items to your shopping cart? (yes/no): ").strip().lower()
+            # if addtion == "yes":
+            #     while True:
+            #         item = enter_item(item_list + fridge_items)
+
+            #         # If the same item is already in the cart, add to it
+            #         found = False
+            #         for existing in item_list:
+            #             if existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]:
+            #                 existing["Quantity"] += item["Quantity"]
+            #                 found = True
+            #                 print(f"{existing['Item_Name']} is already in your cart. Total is now {format_item(existing)}.")
+            #                 break
+
+            #         if not found:
+            #             item["Expiry_Date"] = default_expiry_date
+            #             #item["Expiry_Date"] = ""
+            #             item_list.append(item)
+            #             print(f"Added {format_item(item)} to your shopping cart.")
+            #         if not ask_add_another():
+            #             break
+            # elif addtion == "no":  
+            #     print("\nYour shopping cart has been concluded.")
+            #     for i in range(len(item_list)):
+            #         item_list[i]["Purchase_Date"] =  date.today().isoformat()    
+            #         item_list[i]["Remarks"] = remarks
+            #     return item_list
+            # else:
+            #     print("Invalid input. Please enter 'yes' or 'no'.")
 
 
-
- 
 
 # Formatting 
 
@@ -513,7 +536,7 @@ def show_consumption(consumed_items):
     print(f"  Over the last {consumed_items[0]['Date_Range']} day(s), remarks: {consumed_items[0]['Remarks']}")
     for i in range(len(consumed_items)):
         record = consumed_items[i]
-        print(f"  {i + 1}. {record['Quantity']:g} {record['Unit']} of {record['Item_Name']}")
+        print(f"  {i + 1}. {record['Quantity']:g}{record['Unit']} of {record['Item_Name']}")
  
  
 # Print the start-up welcome message.
