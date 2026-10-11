@@ -501,45 +501,7 @@ def shopping_cart_conclusion(item_list, remarks):
         else:
             print("Invalid input. Please enter 'yes' or 'no'.")
 
-test =[
-  {
-    "Item_Name": "coke",
-    "Planned_Quantity": 2.0,
-    "Unit": "l",
-    "Recommended_Quantity": 1.0,
-    "Estimated_Consumption_Rate": 2.33,
-    "Planned_Estimated_Calories": 840,
-    "Estimated_Calories": 420,
-    "Estimated_Expiration_Days": 180,
-    "Estimated_Expiry_Date": "2027-04-09",
-    "Expiry_Date_Is_Default": False
-  },
-  {
-    "Item_Name": "milk",
-    "Planned_Quantity": 2.0,
-    "Unit": "l",
-    "Recommended_Quantity": 1.0,
-    "Estimated_Consumption_Rate": 2.33,
-    "Planned_Estimated_Calories": 1240,
-    "Estimated_Calories": 620,
-    "Estimated_Expiration_Days": 7,
-    "Estimated_Expiry_Date": "2026-10-18",
-    "Expiry_Date_Is_Default": False
-  },
-  {
-    "Item_Name": "eggs",
-    "Planned_Quantity": 10.0,
-    "Unit": "pcs",
-    "Recommended_Quantity": 2,
-    "Estimated_Consumption_Rate": 14,
-    "Planned_Estimated_Calories": 700,
-    "Estimated_Calories": 140,
-    "Estimated_Expiration_Days": 21,
-    "Estimated_Expiry_Date": "2026-11-01",
-    "Expiry_Date_Is_Default": False
-  }
-]
-shopping_cart_conclusion(test, '')
+
 
 # Formatting 
 
