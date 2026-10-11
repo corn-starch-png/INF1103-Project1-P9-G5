@@ -6,6 +6,7 @@ import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
+from IO_manager import send_message, send_log
 
 #region API config
 load_dotenv()
@@ -442,7 +443,7 @@ def should_retry_ai_error(error):
 
 #region AI STATUS UPDATE
 def update_ai_status(message):
-    print(f"[AI STATUS] {message}")
+    send_log(f"[AI STATUS] {message}")
 #endregion
 
 #region Process AI output
@@ -515,7 +516,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     # Check if the connection to the AI API is successful
     if not connected: 
         update_ai_status("AI API connection failed.")
-        print(errMsg) 
+        send_log(errMsg) 
         return None, errMsg
     update_ai_status("AI API connection successful.")
     
@@ -535,7 +536,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
 
     if error: 
         update_ai_status("AI request failed.")
-        print(error) 
+        send_log(error) 
         return None, error
     
     update_ai_status("Validating AI output...")
@@ -543,7 +544,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     ai_output, error = process_ai_response(ai_response)
     if error:
         update_ai_status("AI output validation failed.")
-        print(error)
+        send_log(error)
         return None, error
 
     return ai_output, None

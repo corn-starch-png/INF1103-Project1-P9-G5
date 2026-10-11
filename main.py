@@ -4,16 +4,15 @@ try:
     from datetime import date, timedelta
     import json
     from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history
-    from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge
+    from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message
     from AI_manager import get_ai_recommendations
     from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
-
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
-#print(database)  # Print the loaded database for verification
+send_log(f"[MAIN] check database is loaded: {database}")
 
 household_info = database['household_info']
 history = database['consumption_history']
@@ -50,17 +49,16 @@ grocery_list = enter_grocery_list(fridge + existing_items)
 remarks = ask_remarks()
 days_until_next_visit = ask_days_until_next()
 
-'''
-print("\n--- Test results ---")
-print("household_info =", household_info)
-print("existing_items =", existing_items)
-print("consumed_items =", consumed_items)
-print("grocery_list =", grocery_list)
-print("remarks =", remarks)
-print("days_until_next =", days_until_next)
-'''
+send_log(f"[MAIN] \n--- IO results ---")
+send_log(f"[MAIN] household_info = {household_info}")
+send_log(f"[MAIN] existing_items = {existing_items}")
+send_log(f"[MAIN] consumed_items = {consumed_items}")
+send_log(f"[MAIN] grocery_list = {grocery_list}")
+send_log(f"[MAIN] remarks = {remarks}")
+send_log(f"[MAIN] days_until_next = {days_until_next_visit}")
 
 #region AI Recommendations
+send_message("Getting AI recommendations... This can take a while")
 ai_recommendations, error = get_ai_recommendations(household_info, history, fridge, grocery_list,remarks,days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
@@ -69,14 +67,13 @@ recommendations = ai_recommendations.get("Recommendations_List", [])
 total_planned_calories = ai_recommendations.get("Total_Planned_Estimated_Calories", 0)
 total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
 
-print(f"AI Recommendations: {json.dumps(recommendations, indent=2)}")
-print(f"Total Planned Estimated Calories: {total_planned_calories}")
-print(f"Total Recommended Calories: {total_recommended_calories}")
-#endregion """
+send_log(f"[MAIN] AI Recommendations: {json.dumps(recommendations, indent=2)}")
+send_log(f"[MAIN] Total Planned Estimated Calories: {total_planned_calories}")
+send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
+#endregion
 
 
 #logic for database 
-
 extra_calories = calories_surplus(database, total_planned_calories)
 expiry_dates=[] #for saving to db later
 '''
