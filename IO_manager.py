@@ -1,5 +1,5 @@
-from datetime import date, timedelta, datetime
-import os
+from datetime import date, timedelta
+
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
@@ -20,19 +20,35 @@ def enter_item(existing_items=None):
             print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
             break
 
-    if locked_unit != "":
-        quantity = enter_quantity(f"Quantity ({locked_unit}): ")
-    else:
-        quantity = enter_quantity("Quantity: ")
+    # Ask for quantity and unit together
+    while True:
+        if locked_unit != "":
+            text = input(f"Quantity in {locked_unit} (e.g. 3): ").strip().lower()
+        else:
+            text = input(f"Quantity and unit (e.g. 6kg, 500 g, 3 pcs) - units: {', '.join(valid_units)}: ").strip().lower()
 
-    if locked_unit != "":
-        unit = locked_unit
-    else:
-        while True:
-            unit = input(f"Unit ({', '.join(valid_units)}): ").strip().lower()
-            if unit in valid_units:
-                break
-            print("Please enter a valid unit.")
+        # Split where the number ends and the unit begins
+        split_at = 0
+        while split_at < len(text) and (text[split_at].isdecimal() or text[split_at] == "."):
+            split_at += 1
+        number_part = text[:split_at]
+        unit = text[split_at:].strip()
+
+        if not number_part.replace(".", "", 1).isdecimal():
+            print("Please start with a valid number, e.g. 6kg.")
+        elif float(number_part) <= 0:
+            print("Quantity must be more than 0.")
+        elif unit == "" and locked_unit == "":
+            print(f"Please include a unit ({', '.join(valid_units)}), e.g. 6kg.")
+        elif unit != "" and unit not in valid_units:
+            print(f"'{unit}' is not a valid unit. Please use one of: {', '.join(valid_units)}.")
+        elif locked_unit != "" and unit != "" and unit != locked_unit:
+            print(f"{item_name} must be entered in {locked_unit}.")
+        else:
+            quantity = float(number_part)
+            if unit == "":
+                unit = locked_unit
+            break
 
     return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
@@ -40,7 +56,7 @@ def enter_item(existing_items=None):
 # Double quote checks, reasks user to prevent JSON errors
 def enter_text(question, allow_blank=False):
     while True:
-        text = input(question).strip().lower()
+        text = input(question).strip()
         if '"' in text or "\\" in text:
             print('Please don\'t use double quotes (") or backslashes (\\) in your answer.')
         elif text == "" and not allow_blank:
@@ -322,7 +338,7 @@ def enter_grocery_list(fridge_items=None):
             break
  
     show_items("Your grocery list", grocery_list)
-    send_log(f"[IO MANAGER] grocery_list = {grocery_list}")  # Print the grocery list for verification
+    print("grocery_list =", grocery_list)  # Print the grocery list for verification
     return grocery_list
  
  
@@ -392,6 +408,9 @@ def edit_fridge(fridge):
 #displays item, current quantity and recommened quantity for conclusion IO 
 def display_cart(item_list):
     #assuming input is always the recommendations list
+    if not item_list:
+        print("  (your shopping cart is empty)")
+        return
     name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
 
     # Print header
@@ -441,20 +460,20 @@ def shopping_cart_conclusion(item_list, remarks):
                 item_index = input("\nEnter item to edit/delete(1,2...) or enter 'exit' to save: ").strip().lower()
                 if item_index == "exit":
                     return convert_cart_to_db_list(item_list, remarks)
-                elif item_index.isdigit():
+                elif item_index.isdecimal():
                     if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
                         item_index = int(item_index) - 1
                         while True:
-                            print(f"Selected {item_list[item_index]["Item_Name"]}, Current Quantity: {item_list[item_index]["Planned_Quantity"]}")
+                            print(f"Selected {item_list[item_index]['Item_Name']}, Current Quantity: {item_list[item_index]['Planned_Quantity']}")
                             edited_quantity = input("Enter new amount (enter 0 to delete item):").strip()
-                            if edited_quantity.isdigit():
-                                if int(edited_quantity) == 0:
+                            if edited_quantity.replace(".", "", 1).isdecimal():
+                                if float(edited_quantity) == 0:
                                     del item_list[item_index]
                                 else:
                                     item_list[item_index]["Planned_Quantity"] = float(edited_quantity)
                                 break
                             else:
-                                print("Invalid input. Enter a postive integer")
+                                print("Invalid input. Enter a positive number")
                         display_cart(item_list)
                     else:
                         print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
@@ -552,15 +571,8 @@ def show_welcome_back(household_info):
 def send_message(message):
     print(f"{message}")
 
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 def send_log(message):
-    filename=f"{current_datetime}.log"
-    if not os.path.exists(filename):
-        with open(filename, 'w') as f:
-            f.write(message)
-    else:
-        with open(filename, 'a') as f:
-            f.write(f"\n{message}")
+    print(f"[LOG] {message}")
 
  
 # =====================================================================
@@ -595,7 +607,12 @@ if __name__ == "__main__":
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
-    final_checkout = shopping_cart_conclusion(grocery_list, remarks, [], previous_inventory + remaining_items)
+    recommendations = []
+    for item in grocery_list:
+        recommendations.append({"Item_Name": item["Item_Name"], "Planned_Quantity": item["Quantity"],
+                                "Recommended_Quantity": item["Quantity"], "Unit": item["Unit"],
+                                "Estimated_Expiry_Date": ""})
+    final_checkout = shopping_cart_conclusion(recommendations, remarks)
  
     print("\n--- Test results ---")
     print("household_info =", household_info)
