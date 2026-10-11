@@ -1,5 +1,5 @@
-from datetime import date, timedelta
-
+from datetime import date, timedelta, datetime
+import os
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
@@ -338,7 +338,7 @@ def enter_grocery_list(fridge_items=None):
             break
  
     show_items("Your grocery list", grocery_list)
-    print("grocery_list =", grocery_list)  # Print the grocery list for verification
+    send_log(f"[IO MANAGER] grocery_list = {grocery_list}") #log grocery list for verification
     return grocery_list
  
  
@@ -588,8 +588,15 @@ def show_welcome_back(household_info):
 def send_message(message):
     print(f"{message}")
 
+current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 def send_log(message):
-    print(f"[LOG] {message}")
+    filename=f"{current_datetime}.log"
+    if not os.path.exists(filename):
+        with open(filename, 'w') as f:
+            f.write(message)
+    else:
+        with open(filename, 'a') as f:
+            f.write(f"\n{message}")
 
  
 # =====================================================================
