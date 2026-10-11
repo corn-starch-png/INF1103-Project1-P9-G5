@@ -29,7 +29,7 @@ def check_data(record, table):
     def check_string(value):
         return isinstance(value, str)
     def check_unit(value):
-        valid_units = ['kg', 'g', 'L', 'ml', 'pcs', 'carton']
+        valid_units = ['kg', 'g', 'L', 'ml', 'pcs']
         if not isinstance(value, str):
             return False
         return value.strip().lower() in [unit.lower() for unit in valid_units]
