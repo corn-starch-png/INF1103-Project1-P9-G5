@@ -60,16 +60,18 @@ if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 
 recommendations = ai_recommendations.get("Recommendations_List", [])
-total_estimated_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
+total_planned_calories = ai_recommendations.get("Total_Planned_Estimated_Calories", 0)
+total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
 
 print(f"AI Recommendations: {json.dumps(recommendations, indent=2)}")
-print(f"Total Estimated Calories: {total_estimated_calories}")
+print(f"Total Planned Estimated Calories: {total_planned_calories}")
+print(f"Total Recommended Calories: {total_recommended_calories}")
 #endregion """
 
 
 #logic for database 
 
-extra_calories = calories_surplus(database, total_estimated_calories)
+extra_calories = calories_surplus(database, total_planned_calories)
 expiry_dates=[] #for saving to db later
 '''
 #TODO check that recommandations output contains same data as grocery_list

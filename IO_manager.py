@@ -394,11 +394,20 @@ def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=No
         fridge_items = []
 
     # Attach each item's expiry date now, so it stays with the right item if items are removed or added
+    # Default expiry date for items with unknown expiry
+    default_expiry_date = (date.today() + timedelta(days=365)).isoformat()
+    # Attach expiry dates to grocery items
     for i in range(len(grocery_list)):
-        if i < len(expiry_dates):
+        if i < len(expiry_dates) and expiry_dates[i]:
             grocery_list[i]["Expiry_Date"] = expiry_dates[i]
         else:
-            grocery_list[i]["Expiry_Date"] = ""
+            grocery_list[i]["Expiry_Date"] = default_expiry_date
+    # Below code cause Error: Invalid Expiry_Date format, must be YYYY-MM-DD when Expiry is null
+    # for i in range(len(grocery_list)):
+    #     if i < len(expiry_dates):
+    #         grocery_list[i]["Expiry_Date"] = expiry_dates[i]
+    #     else:
+    #         grocery_list[i]["Expiry_Date"] = ""
 
     while True:
         decision = input("\nDo you want to conclude your shopping cart? (yes/no): ").strip().lower()
@@ -441,7 +450,8 @@ def shopping_cart_conclusion(grocery_list,remarks, expiry_dates, fridge_items=No
                             break
 
                     if not found:
-                        item["Expiry_Date"] = ""
+                        item["Expiry_Date"] = default_expiry_date
+                        #item["Expiry_Date"] = ""
                         grocery_list.append(item)
                         print(f"Added {format_item(item)} to your shopping cart.")
                     if not ask_add_another():
