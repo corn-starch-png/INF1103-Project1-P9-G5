@@ -61,7 +61,7 @@ def risk_of_expiry(item, total_amt_of_items):
         #if the days taken to consume an item is greater than days to expire
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
             send_log(f"[LOGIC] Risk of expiry is True for {item["Item_Name"]}")
-            return True, f"{item["Planned_Quantity"]} {item["Unit"]} of {item["Item_Name"]} expiring {item_expiry_date}. (you consume {item["Estimated_Consumption_Rate"]} {item["Unit"]} a week)"
+            return True, f"{item["Planned_Quantity"]} {item["Unit"]} of {item["Item_Name"]} --> estimated expiry: {item_expiry_date}. (avg consumption: {item["Estimated_Consumption_Rate"]} {item["Unit"]} a week)"
         else:
             send_log(f"[LOGIC] Risk of expiry is False for {item["Item_Name"]}")
             return False, None 
@@ -187,7 +187,7 @@ def under_buy(item, next_purchase_date, total_amt):
         amount_to_topup = round (quantity_needed - total_amt, 2)
 
         if amount_to_topup > 0:
-            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]}, Recommeneded to buy {quantity_needed} instead"
+            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]} {item["Unit"]}, Recommeneded to buy {quantity_needed} {item["Unit"]} instead"
 
         elif amount_to_topup <=0:
             send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")

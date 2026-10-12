@@ -48,6 +48,9 @@ else:
         else:
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
+            save_database(database, 'database')  # Save the database to the specified folder
+            sys.exit(1)
+
 
 days_until_next_visit = ask_days_until_next()
 grocery_list = enter_grocery_list(database)

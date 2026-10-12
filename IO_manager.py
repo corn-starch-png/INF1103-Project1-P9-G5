@@ -377,7 +377,7 @@ def ask_menu_choice():
 # Returns the updated fridge list.
 def edit_fridge(fridge):
     while True:
-        show_items("Items in your fridge", fridge)
+        display_fridge(fridge)
         if not fridge:
             return fridge
 
@@ -405,39 +405,6 @@ def edit_fridge(fridge):
         else:
             removed = fridge.pop(number)
             print(f"{format_item(removed)} has been removed from your fridge.")
-
-
-#displays item, current quantity and recommened quantity for conclusion IO 
-def display_cart(item_list):
-    #assuming input is always the recommendations list
-    if not item_list:
-        print("  (your shopping cart is empty)")
-        return
-    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
-
-    # Print header
-    print(f"\nGrocery Cart")
-    print(
-        f"{'No.':<4}| "
-        f"{'Item name':<{name_width}}| "
-        f"{'Current amt':<12}| "
-        f"{'Recommended amt':<16}| "
-        f"{'HS*':<6}| "
-    )
-
-    # Print rows
-    for i in range(0,len(item_list)):
-        cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
-        recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
-        historical_score_formatted = f"{round(item_list[i]['Historical_Score'], 1)}%"
-        print(
-            f"{i+1:<4}| "
-            f"{item_list[i]['Item_Name']:<{name_width}}| "
-            f"{cur_amt_formatted:<12}| "
-            f"{recommened_amt_formatted:<16}| "
-            f"{historical_score_formatted:<6}| "
-        )
-    print(f"* HS --> Historical score: calculation of historical data quantity and consistency")
 
 
 #displays recommendations made by business logic
@@ -492,7 +459,7 @@ def shopping_cart_conclusion(item_list, remarks):
                         item_index = int(item_index) - 1
                         while True:
                             print(f"Selected {item_list[item_index]['Item_Name']}, Current Quantity: {item_list[item_index]['Planned_Quantity']}")
-                            edited_quantity = input("Enter new amount (enter 0 to delete item):").strip()
+                            edited_quantity = input("Enter new amount (enter 0 to delete item): ").strip()
                             if edited_quantity.replace(".", "", 1).isdecimal():
                                 if float(edited_quantity) == 0:
                                     del item_list[item_index]
@@ -512,6 +479,70 @@ def shopping_cart_conclusion(item_list, remarks):
 
 
 # Formatting 
+
+#displays item, current quantity and recommened quantity for conclusion IO 
+def display_cart(item_list):
+    #assuming input is always the recommendations list
+    if not item_list:
+        print("  (your shopping cart is empty)")
+        return
+    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
+
+    # Print header
+    print(f"\nGrocery Cart")
+    print(
+        f"{'No.':<4}| "
+        f"{'Item name':<{name_width}}| "
+        f"{'Current amt':<12}| "
+        f"{'Recommended amt':<16}| "
+        f"{'HS*':<6}| "
+    )
+
+    # Print rows
+    for i in range(0,len(item_list)):
+        cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
+        recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
+        historical_score_formatted = f"{round(item_list[i]['Historical_Score'], 1)}%"
+        print(
+            f"{i+1:<4}| "
+            f"{item_list[i]['Item_Name']:<{name_width}}| "
+            f"{cur_amt_formatted:<12}| "
+            f"{recommened_amt_formatted:<16}| "
+            f"{historical_score_formatted:<6}| "
+        )
+    print(f"* HS --> Historical score: calculation of historical data quantity and consistency")
+
+
+def display_fridge(fridge_list):
+    if not fridge_list:
+        print("---(your fridge is empty)---")
+        return
+    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in fridge_list)) + 2 #align table according to how big item_name is
+    remarks_width = max(len("Remarks"), max(len(item["Remarks"]) for item in fridge_list)) + 2 #align table according to how big item_name is
+
+     # Print header
+    print(f"\n---Fridge---")
+    print(
+        f"{'No.':<4}| "
+        f"{'Item name':<{name_width}}| "
+        f"{'Current amt':<12}| "
+        f"{'Expiry date':<12}| "
+        f"{'Remarks':<{remarks_width}}| "
+    )
+
+    # Print rows
+    for i in range(0,len(fridge_list)):
+        cur_amt_formatted = f"{fridge_list[i]['Quantity']} {fridge_list[i]['Unit']}"
+        print(
+            f"{i+1:<4}| "
+            f"{fridge_list[i]['Item_Name']:<{name_width}}| "
+            f"{cur_amt_formatted:<12}| "
+            f"{fridge_list[i]['Expiry_Date']:<12}| "
+            f"{fridge_list[i]['Remarks']:<{remarks_width}}| "
+        )
+
+
+
 
 def format_item(item):
     text = f"{item['Quantity']:g} {item['Unit']} of {item['Item_Name']}"
