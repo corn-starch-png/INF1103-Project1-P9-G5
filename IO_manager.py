@@ -46,10 +46,13 @@ def enter_item(existing_items=None):
         elif locked_unit != "" and unit != "" and unit != locked_unit:
             print(f"{item_name} must be entered in {locked_unit}.")
         else:
-            quantity = float(number_part)
-            if unit == "":
-                unit = locked_unit
-            break
+            if unit == "pcs" and not number_part.isdigit():
+                print(f"items in pcs must be a whole number.")
+            else:
+                quantity = round(float(number_part), 4)
+                if unit == "":
+                    unit = locked_unit
+                break
 
     return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
@@ -532,6 +535,9 @@ def shopping_cart_conclusion(item_list, remarks):
                                 if float(edited_quantity) == 0:
                                     del item_list[item_index]
                                 else:
+                                    if item_list[item_index]['Unit'] == 'pcs' and not edited_quantity.isdigit():
+                                        print("quantity must be a whole number for unit pcs")
+                                        continue
                                     item_list[item_index]["Planned_Quantity"] = float(edited_quantity)
                                 break
                             else:
