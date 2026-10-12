@@ -22,7 +22,7 @@ history = database['consumption_history']
 fridge = database['fridge']
 
 
-existing_items = []
+existing_fridge_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
@@ -32,10 +32,10 @@ show_welcome()
 if household_info == []: 
     household_info = create_profile()
     show_profile(household_info)
-    existing_items = enter_home_items()
-    show_items("Items at home", existing_items)
+    existing_fridge_items = enter_home_items()
+    show_items("Items at home", existing_fridge_items)
     database = update_household_info(database, household_info)
-    database = add_to_fridge(database, existing_items)
+    database = add_to_fridge(database, existing_fridge_items)
 else:
     show_welcome_back(household_info)
     while True:
@@ -63,7 +63,7 @@ remarks = ask_remarks()
 
 send_log(f"[MAIN] \n--- IO results ---")
 send_log(f"[MAIN] household_info = {household_info}")
-send_log(f"[MAIN] existing_items = {existing_items}")
+send_log(f"[MAIN] existing_items = {existing_fridge_items}")
 send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
@@ -93,13 +93,8 @@ risk_of_expiry_messages = []
 underbuy_messages = []
 
 for item in recommendations:
-    item_name = item["Item_Name"]
-    est_consume_rate = item["Estimated_Consumption_Rate"]
-    planned_amt = item["Planned_Quantity"]
-    expiry_date = item["Estimated_Expiry_Date"]
-    unit = item["Unit"]
-    fridge_amt = get_all_fridge_quantity(database, item_name)
-    total_amt = fridge_amt + planned_amt #total amount of item in grocery list AND currently in fridge
+    fridge_amt = get_all_fridge_quantity(database, item["Item_Name"])
+    total_amt = fridge_amt + item["Planned_Quantity"] #total amount of item in grocery list AND currently in fridge
 
     expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 
     if expiry_message is not None:
@@ -112,7 +107,7 @@ for item in recommendations:
         if underbuy_message is not None:
             underbuy_messages.append(underbuy_message) 
 
-    item["Confidence_Score"] = calculate_confidence_score(item_name, database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
+    item["Confidence_Score"] = calculate_confidence_score(item["Item_Name"], database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
 #endregion
 
 

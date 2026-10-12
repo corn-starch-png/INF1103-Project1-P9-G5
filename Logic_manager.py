@@ -62,10 +62,10 @@ def calories_surplus(database, total_estimated_calories, days_until_next_visit):
     # if total calories (AI output)  > total calories that family needs (User in put) and returns true, else false
     if total_estimated_calories > family_calorie_until_next_visit: 
         send_log(f"[LOGIC] Calories surplus is: True")
-        return True, f"Exceeded recommended calories values by {exceed_calorie}kcal"
+        return True, f"Grocery cart exceeds recommended calories values for {days_until_next_visit} days by {exceed_calorie}kcal"
     else:
         send_log(f"[LOGIC] Calories surplus is: False")
-        return False, f"Short of {abs(exceed_calorie)}kcal to hit recommended calories"
+        return False, f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days"
 
 
     

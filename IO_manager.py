@@ -477,7 +477,7 @@ def shopping_cart_conclusion(item_list, remarks):
     def display_cart(item_list):
         #assuming input is always the recommendations list
         if not item_list:
-            print("  (your shopping cart is empty)")
+            print("  (your Grocery cart is empty)")
             return
         name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
 
@@ -512,9 +512,9 @@ def shopping_cart_conclusion(item_list, remarks):
 
     display_cart(item_list)
     while True:
-        decision = input("\nWould you like to change the quantity of items in your shopping cart? (yes/no): ").strip().lower()
+        decision = input("\nWould you like to change the quantity of items in your grocery cart? (yes/no): ").strip().lower()
         if decision in ["no", "n"]:
-            print("\nYour shopping cart has been concluded.")
+            print("\nYour grocery cart has been concluded.")
             return convert_cart_to_db_list(item_list, remarks)
         
         elif decision in ["yes", "y"]:
