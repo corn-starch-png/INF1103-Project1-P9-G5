@@ -173,12 +173,14 @@ def load_database(folder='database'):
                     
     if not errors:
         send_log(f"[DATABASE] Database loaded successfully.")
+        return True, database
     else:
         send_log(f"[DATABASE] ****************** Errors encountered during loading ******************")
         for error in errors:
-            send_log(f"[DATABASE] {error}")  # Print any errors encountered during loading
+            send_log(f"[DATABASE] {error}")  # log any errors encountered during loading
         send_log(f"[DATABASE] ***********************************************************************")
-    return database
+        False, database
+    
 
 
 #saves the database dictionary to a JSON file in the specified folder
