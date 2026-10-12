@@ -3,6 +3,7 @@ import os
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
+
  
 # Ask for one item's name, quantity and unit, validating bad input.
 # If the item already exists in existing_items, its unit is reused.
@@ -52,7 +53,7 @@ def enter_item(existing_items=None):
 
     return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
  
- 
+
 # Double quote checks, reasks user to prevent JSON errors
 def enter_text(question, allow_blank=False):
     while True:
@@ -111,7 +112,7 @@ def enter_date(question):
                 print("That date has already passed! This item is marked as expired.")
             return text
  
- 
+
 # Collect a new user's profile and their family members' details.
 # Returns a list in the database's household_info format (the user is Person_ID 1).
 def create_profile():
@@ -250,7 +251,7 @@ def enter_home_items():
  
     return remaining_items
  
- 
+
 # For returning users: Ask how much of each item they consumed since last visit.
 # Batches of the same item are combined into one question.
 # Days since last use and remarks are asked once and applied to every item.
@@ -376,6 +377,35 @@ def ask_menu_choice():
 # Let the user edit expiry dates or delete items from their fridge until they are done.
 # Returns the updated fridge list.
 def edit_fridge(fridge):
+    def display_fridge(fridge_list):
+        if not fridge_list:
+            print("---(your fridge is empty)---")
+            return
+        name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in fridge_list)) + 2 #align table according to how big item_name is
+        remarks_width = max(len("Remarks"), max(len(item["Remarks"]) for item in fridge_list)) + 2 #align table according to how big item_name is
+
+        # Print header
+        print(f"\n---Fridge---")
+        print(
+            f"{'No.':<4}| "
+            f"{'Item name':<{name_width}}| "
+            f"{'Current amt':<12}| "
+            f"{'Expiry date':<12}| "
+            f"{'Remarks':<{remarks_width}}| "
+        )
+
+        # Print rows
+        for i in range(0,len(fridge_list)):
+            cur_amt_formatted = f"{fridge_list[i]['Quantity']} {fridge_list[i]['Unit']}"
+            print(
+                f"{i+1:<4}| "
+                f"{fridge_list[i]['Item_Name']:<{name_width}}| "
+                f"{cur_amt_formatted:<12}| "
+                f"{fridge_list[i]['Expiry_Date']:<12}| "
+                f"{fridge_list[i]['Remarks']:<{remarks_width}}| "
+            )
+
+
     while True:
         display_fridge(fridge)
         if not fridge:
@@ -425,23 +455,60 @@ def output_recommendations(calories_message, risk_of_expiry_messages, underbuy_m
         print(f"\n--------------------------------------------------------------------------------")
 
 
-#converts recommendation list into format that can be saved in DB
-def convert_cart_to_db_list(recommendations_list, remarks):
-    final_list=[]
-    for i in range(len(recommendations_list)):
-        db_item = {}
-        db_item["Item_Name"] = recommendations_list[i]["Item_Name"]
-        db_item["Quantity"] = recommendations_list[i]["Planned_Quantity"]
-        db_item["Unit"] = recommendations_list[i]["Unit"]
-        db_item["Purchase_Date"] = date.today().isoformat()
-        db_item["Expiry_Date"] = recommendations_list[i]["Estimated_Expiry_Date"]
-        db_item["Remarks"] = remarks
-        final_list.append(db_item)
-    return final_list
-
-
 #handles IO for after AI and logic processes
 def shopping_cart_conclusion(item_list, remarks):
+    #converts recommendation list into format that can be saved in DB
+    def convert_cart_to_db_list(recommendations_list, remarks):
+        final_list=[]
+        for i in range(len(recommendations_list)):
+            db_item = {}
+            db_item["Item_Name"] = recommendations_list[i]["Item_Name"]
+            db_item["Quantity"] = recommendations_list[i]["Planned_Quantity"]
+            db_item["Unit"] = recommendations_list[i]["Unit"]
+            db_item["Purchase_Date"] = date.today().isoformat()
+            db_item["Expiry_Date"] = recommendations_list[i]["Estimated_Expiry_Date"]
+            db_item["Remarks"] = remarks
+            final_list.append(db_item)
+        return final_list
+
+
+    #displays item, current quantity and recommened quantity for conclusion IO 
+    def display_cart(item_list):
+        #assuming input is always the recommendations list
+        if not item_list:
+            print("  (your shopping cart is empty)")
+            return
+        name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
+
+        # Print header
+        print(f"\nGrocery Cart")
+        print(
+            f"{'No.':<4}| "
+            f"{'Item name':<{name_width}}| "
+            f"{'Current amt':<12}| "
+            f"{'Recommended amt':<16}| "
+            f"{'CS*':<6}| "
+        )
+
+        # Print rows
+        for i in range(0,len(item_list)):
+            cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
+            recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
+            if item_list[i]['Confidence_Score'] == 0:
+                confidence_score_formatted = f"NA"
+            else:
+                confidence_score_formatted = f"{round(item_list[i]['Confidence_Score'], 1)}%"
+            print(
+                f"{i+1:<4}| "
+                f"{item_list[i]['Item_Name']:<{name_width}}| "
+                f"{cur_amt_formatted:<12}| "
+                f"{recommened_amt_formatted:<16}| "
+                f"{confidence_score_formatted:<6}| "
+            )
+        print(f"* CS --> Confidence score: how accurate the AI estimation is")
+        print(f"if CS is NA there is not enough past data to provide score")
+
+
     display_cart(item_list)
     while True:
         decision = input("\nWould you like to change the quantity of items in your shopping cart? (yes/no): ").strip().lower()
@@ -478,76 +545,9 @@ def shopping_cart_conclusion(item_list, remarks):
 
 
 
-# Formatting 
-
-#displays item, current quantity and recommened quantity for conclusion IO 
-def display_cart(item_list):
-    #assuming input is always the recommendations list
-    if not item_list:
-        print("  (your shopping cart is empty)")
-        return
-    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
-
-    # Print header
-    print(f"\nGrocery Cart")
-    print(
-        f"{'No.':<4}| "
-        f"{'Item name':<{name_width}}| "
-        f"{'Current amt':<12}| "
-        f"{'Recommended amt':<16}| "
-        f"{'CS*':<6}| "
-    )
-
-    # Print rows
-    for i in range(0,len(item_list)):
-        cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
-        recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
-        if item_list[i]['Confidence_Score'] == 0:
-            confidence_score_formatted = f"NA"
-        else:
-            confidence_score_formatted = f"{round(item_list[i]['Confidence_Score'], 1)}%"
-        print(
-            f"{i+1:<4}| "
-            f"{item_list[i]['Item_Name']:<{name_width}}| "
-            f"{cur_amt_formatted:<12}| "
-            f"{recommened_amt_formatted:<16}| "
-            f"{confidence_score_formatted:<6}| "
-        )
-    print(f"* CS --> Confidence score: how accurate the AI estimation is")
-    print(f"if CS is NA there is not enough past data to provide score")
 
 
-def display_fridge(fridge_list):
-    if not fridge_list:
-        print("---(your fridge is empty)---")
-        return
-    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in fridge_list)) + 2 #align table according to how big item_name is
-    remarks_width = max(len("Remarks"), max(len(item["Remarks"]) for item in fridge_list)) + 2 #align table according to how big item_name is
-
-     # Print header
-    print(f"\n---Fridge---")
-    print(
-        f"{'No.':<4}| "
-        f"{'Item name':<{name_width}}| "
-        f"{'Current amt':<12}| "
-        f"{'Expiry date':<12}| "
-        f"{'Remarks':<{remarks_width}}| "
-    )
-
-    # Print rows
-    for i in range(0,len(fridge_list)):
-        cur_amt_formatted = f"{fridge_list[i]['Quantity']} {fridge_list[i]['Unit']}"
-        print(
-            f"{i+1:<4}| "
-            f"{fridge_list[i]['Item_Name']:<{name_width}}| "
-            f"{cur_amt_formatted:<12}| "
-            f"{fridge_list[i]['Expiry_Date']:<12}| "
-            f"{fridge_list[i]['Remarks']:<{remarks_width}}| "
-        )
-
-
-
-
+# Formatting----------- 
 def format_item(item):
     text = f"{item['Quantity']:g} {item['Unit']} of {item['Item_Name']}"
     details = []
@@ -603,6 +603,8 @@ def show_welcome_back(household_info):
 def send_message(message):
     print(f"{message}")
 
+#current_datetime used to generate log filename
+#only used by send_log function so its down here for easier reference
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 def send_log(message):
     filename=f"{current_datetime}.log"

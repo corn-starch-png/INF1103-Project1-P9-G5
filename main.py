@@ -1,5 +1,4 @@
 #-------START OF DEPENDENCY LINE----------#
-import sys
 try:
     from datetime import date, timedelta
     import json
@@ -11,8 +10,7 @@ try:
     from AI_manager import get_ai_recommendations
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError:
-    print("requried libraries do not exist")
-    sys.exit(1)
+    raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory")
 
 
 database_exists()  # Ensure the database folder and file exist
