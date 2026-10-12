@@ -298,7 +298,7 @@ def update_consumption(previous_inventory):
             elif float(text) > total:
                 print(f"That's more than you have ({total} {unit}). Please try again.")
             else:
-                consumed = float(text)
+                consumed = round(float(text), 4)
                 break
  
         consumed_items.append({
