@@ -9,7 +9,7 @@ try:
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, output_recommendations)
     from AI_manager import get_ai_recommendations
-    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_historical_score, should_evaluate_underbuy)
+    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
@@ -92,7 +92,8 @@ for item in recommendations:
     planned_amt = item["Planned_Quantity"]
     expiry_date = item["Estimated_Expiry_Date"]
     unit = item["Unit"]
-    total_amt = get_all_fridge_quantity(database, item_name) + planned_amt #total amount of item in grocery list AND currently in fridge
+    fridge_amt = get_all_fridge_quantity(database, item_name)
+    total_amt = fridge_amt + planned_amt #total amount of item in grocery list AND currently in fridge
 
     expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 
     if expiry_message is not None:
@@ -106,8 +107,8 @@ for item in recommendations:
                 underbuy_messages.append(underbuy_message) 
 
 
-    historical_score = calculate_historical_score(item_name, database)
-    item["Historical_Score"] = historical_score
+    confidence_score = calculate_confidence_score(item_name, database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
+    item["Confidence_Score"] = confidence_score
 
 output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
 

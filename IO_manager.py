@@ -495,22 +495,26 @@ def display_cart(item_list):
         f"{'Item name':<{name_width}}| "
         f"{'Current amt':<12}| "
         f"{'Recommended amt':<16}| "
-        f"{'HS*':<6}| "
+        f"{'CS*':<6}| "
     )
 
     # Print rows
     for i in range(0,len(item_list)):
         cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
         recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
-        historical_score_formatted = f"{round(item_list[i]['Historical_Score'], 1)}%"
+        if item_list[i]['Confidence_Score'] == 0:
+            confidence_score_formatted = f"NA"
+        else:
+            confidence_score_formatted = f"{round(item_list[i]['Confidence_Score'], 1)}%"
         print(
             f"{i+1:<4}| "
             f"{item_list[i]['Item_Name']:<{name_width}}| "
             f"{cur_amt_formatted:<12}| "
             f"{recommened_amt_formatted:<16}| "
-            f"{historical_score_formatted:<6}| "
+            f"{confidence_score_formatted:<6}| "
         )
-    print(f"* HS --> Historical score: calculation of historical data quantity and consistency")
+    print(f"* CS --> Confidence score: how accurate the AI estimation is")
+    print(f"if CS is NA there is not enough past data to provide score")
 
 
 def display_fridge(fridge_list):
