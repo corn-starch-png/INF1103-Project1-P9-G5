@@ -452,6 +452,7 @@ def process_ai_response(ai_response):
         data = json.loads(ai_response)
     except (json.JSONDecodeError, TypeError):
         return None, "AI returned invalid JSON response."
+    send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
     # Top-level response must be a dictionary
     if not isinstance(data, dict):
         return None, (f"Invalid AI response structure. \nExpected dict, received {type(data).__name__}.")
@@ -538,7 +539,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     # Check if the connection to the AI API is successful
     if not connected: 
         update_ai_status("AI API connection failed.")
-        send_log(errMsg) 
+        send_log(f"[AI] {errMsg}") 
         return None, errMsg
     update_ai_status("AI API connection successful.")
     
@@ -558,7 +559,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
 
     if error: 
         update_ai_status("AI request failed.")
-        send_log(error) 
+        send_log(f"[AI] {error}") 
         return None, error
     
     update_ai_status("Validating AI output...")
@@ -567,13 +568,13 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
 
     if error:
         update_ai_status("AI output validation failed.")
-        send_log(error)
+        send_log(f"[AI] {error}")
         return None, error
 
     if not check_ai_output( ai_output["Recommendations_List"], purchase_stock):
         error = ("AI recommendations do not match the original grocery list: item names, quantities, units, or order.")
         update_ai_status("AI output validation failed.")
-        send_log(error)
+        send_log(f"[AI] {error}")
         return None, error
     return ai_output, None
 #endregion

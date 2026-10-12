@@ -200,7 +200,7 @@ def load_database(folder='database'):
         for error in errors:
             send_log(f"[DATABASE] {error}")  # log any errors encountered during loading
         send_log(f"[DATABASE] ***********************************************************************")
-        False, database
+        return False, database
     
 
 
@@ -211,7 +211,7 @@ def save_database(database, folder='database'):
     # Implementation for saving the database
     filename = os.path.join(folder, DB_FILENAME)
     with open(filename, 'w') as f:
-        json.dump(database, f)
+        f.write(json.dumps(database, indent=2))
     send_log(f"[DATABASE] Database saved successfully to {filename}.")
 
 

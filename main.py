@@ -17,6 +17,7 @@ except ImportError as e :
 log_exists()
 database_exists()  # Ensure the database folder and file exist
 db_success, database = load_database('database')  # Load the database into memory
+send_log(f"[MAIN] database: {database}")
 if db_success == False:
     send_message(f"Database loading encountered issues, data may be missing")
 household_info = database['household_info']
@@ -83,7 +84,6 @@ recommendations = ai_recommendations.get("Recommendations_List", [])
 total_planned_calories = ai_recommendations.get("Total_Planned_Estimated_Calories", 0)
 total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
 
-send_log(f"[MAIN] AI Recommendations: {json.dumps(recommendations, indent=2)}")
 send_log(f"[MAIN] Total Planned Estimated Calories: {total_planned_calories}")
 send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 #endregion
