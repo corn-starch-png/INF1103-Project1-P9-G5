@@ -190,7 +190,7 @@ def calculate_confidence_score(item_name, database, recommended_amt, fridge_amt,
     #bonus score (MAX 5%)
     #bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
     def calculate_bonus(remarks):
-        if not remarks or remarks == "None":
+        if not remarks or remarks == "none":
             return 0.0
         remarks = remarks.lower()
 

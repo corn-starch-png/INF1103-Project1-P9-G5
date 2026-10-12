@@ -133,7 +133,7 @@ def create_profile():
  
     dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", True)
     if dietary_restrictions == "":
-        dietary_restrictions = "None"
+        dietary_restrictions = "none"
  
     while True:
         family = input("Please enter your family size including yourself: ").strip()
@@ -169,7 +169,7 @@ def create_profile():
  
         member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", True)
         if member_diet == "":
-            member_diet = "None"
+            member_diet = "none"
  
         user_check["family_members"][i + 1] = {
             "name": member_name,
@@ -221,7 +221,7 @@ def enter_home_items():
         expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
         item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
         if item_remarks == "":
-            item_remarks = "None"
+            item_remarks = "none"
 
         item["Purchase_Date"] = ""
         item["Expiry_Date"] = expiry_date
@@ -234,8 +234,8 @@ def enter_home_items():
                     and existing["Expiry_Date"] == item["Expiry_Date"]):
                 existing["Quantity"] += item["Quantity"]
                 # Keep both remarks if they are different
-                if item["Remarks"] != "None" and item["Remarks"] != existing["Remarks"]:
-                    if existing["Remarks"] == "None":
+                if item["Remarks"] != "none" and item["Remarks"] != existing["Remarks"]:
+                    if existing["Remarks"] == "none":
                         existing["Remarks"] = item["Remarks"]
                     else:
                         existing["Remarks"] = existing["Remarks"] + ", " + item["Remarks"]
@@ -303,8 +303,8 @@ def update_consumption(previous_inventory):
  
     # Asked once, then added to every item
     remarks = enter_text("Any remarks about your consumption since last time? (leave blank if none): ", True)
-    if remarks == "":
-        remarks = "None"
+    if remarks == "" or remarks.lower() == "none":
+        remarks = "none"
     for record in consumed_items:
         record["Remarks"] = remarks
  
@@ -348,8 +348,8 @@ def enter_grocery_list(database):
 # Ask for optional remarks about this week (e.g. events).
 def ask_remarks():
     remarks = enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
-    if remarks == "":
-        remarks = "None"
+    if remarks == "" or remarks.lower() == "none":
+        remarks = "none"
     return remarks
  
  
@@ -397,7 +397,7 @@ def edit_fridge(fridge):
 
         # Print rows
         for i in range(0,len(fridge_list)):
-            cur_amt_formatted = f"{fridge_list[i]['Quantity']} {fridge_list[i]['Unit']}"
+            cur_amt_formatted = f"{round(fridge_list[i]['Quantity'], 2)} {fridge_list[i]['Unit']}"
             print(
                 f"{i+1:<4}| "
                 f"{fridge_list[i]['Item_Name']:<{name_width}}| "
@@ -493,7 +493,7 @@ def shopping_cart_conclusion(item_list, remarks):
 
         # Print rows
         for i in range(0,len(item_list)):
-            cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
+            cur_amt_formatted = f"{round(item_list[i]['Planned_Quantity'], 2)} {item_list[i]['Unit']}"
             recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
             if item_list[i]['Confidence_Score'] == 0:
                 confidence_score_formatted = f"NA"
@@ -554,7 +554,7 @@ def format_item(item):
     details = []
     if item.get("Expiry_Date", "") != "":
         details.append(f"expires {item['Expiry_Date']}")
-    if item.get("Remarks", "None") != "None":
+    if item.get("Remarks", "none") != "none":
         details.append(item["Remarks"])
     if details:
         text += f" ({', '.join(details)})"
