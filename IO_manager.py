@@ -312,14 +312,16 @@ def update_consumption(previous_inventory):
  
 # Collect the groceries the user plans to buy, until they say they are done.
 # Returns a list of {"Item_Name", "Quantity", "Unit"}.
-def enter_grocery_list(fridge_items=None):
+def enter_grocery_list(database):
+    fridge_items = database["fridge"]
+    consumed_items = database["consumption_history"]
     if fridge_items is None:
         fridge_items = []
     grocery_list = []
     print("\nEnter the groceries you are planning to buy.")
  
     while True:
-        item = enter_item(grocery_list + fridge_items)
+        item = enter_item(grocery_list + fridge_items + consumed_items)
  
         # If the same item with the same unit was already entered, add to it
         found = False

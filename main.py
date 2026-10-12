@@ -49,9 +49,9 @@ else:
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
 
-grocery_list = enter_grocery_list(fridge + existing_items)
-remarks = ask_remarks()
 days_until_next_visit = ask_days_until_next()
+grocery_list = enter_grocery_list(database)
+remarks = ask_remarks()
 
 send_log(f"[MAIN] \n--- IO results ---")
 send_log(f"[MAIN] household_info = {household_info}")
