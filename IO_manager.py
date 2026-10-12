@@ -10,8 +10,12 @@ valid_genders = ["male", "female"]
 def enter_item(existing_items=None):
     if existing_items is None:
         existing_items = []
-
-    item_name = enter_text("Item name: ")
+    while True:
+        item_name = enter_text("Item name: ")
+        if len(item_name) < 50 :
+            break
+        else:
+            print(f"Item name must be less than 200 characters")
 
     # Check if this item was entered before, and lock its unit
     locked_unit = ""
