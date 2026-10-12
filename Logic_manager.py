@@ -18,25 +18,26 @@ def get_age_from_KCAL(age: int):
     return age
 
 # get each calorie from each family member
-def calculate_family_weekly_kcal(family_member, KCAL_TABLE):
+def calculate_family_kcal(family_member, days_until_next_visit, KCAL_TABLE):
     daily_total = 0
     for person in family_member:
         age = get_age_from_KCAL(person["Age"])
         gender = person["Gender"]
         daily_total += KCAL_TABLE[age][gender] #male + female calorie
-    return daily_total * 7    
+    return daily_total * days_until_next_visit   
 
 # calculating calories surplus
-def calories_surplus(database, total_estimated_calories):   
+def calories_surplus(database, total_estimated_calories, days_until_next_visit):   
     
     #extract name, gender from household info from db.json
     family_members = database.get("household_info", [])
-    family_weekly_calorie = calculate_family_weekly_kcal(family_members, KCAL_TABLE)
-    send_log(f"Total family weekly calorie: {family_weekly_calorie}")
-    exceed_calorie = total_estimated_calories - family_weekly_calorie   
+    family_calorie_until_next_visit = calculate_family_kcal(family_members, days_until_next_visit, KCAL_TABLE)
+
+    send_log(f"Total family calories until next visit: {family_calorie_until_next_visit}")
+    exceed_calorie = total_estimated_calories - family_calorie_until_next_visit
 
     # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
-    if total_estimated_calories > family_weekly_calorie: 
+    if total_estimated_calories > family_calorie_until_next_visit: 
         send_log(f"[LOGIC] Calories surplus is: True")
         return True, f"Exceeded recommended calories values by {exceed_calorie}kcal"
     else:

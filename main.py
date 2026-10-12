@@ -80,7 +80,7 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 
 #logic for database 
 
-extra_calories, calories_message = calories_surplus(database, total_planned_calories)
+extra_calories, calories_message = calories_surplus(database, total_planned_calories, days_until_next_visit)
 risk_of_expiry_messages = []
 underbuy_messages = []
 
