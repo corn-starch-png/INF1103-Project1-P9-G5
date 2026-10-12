@@ -6,7 +6,7 @@ import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
-from IO_manager import send_log
+from DB_manager import send_log
 
 #region API config
 load_dotenv()

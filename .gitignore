@@ -28,6 +28,7 @@ env/
 Thumbs.db
 
 # Logs
+logs/
 *.log
 
 # Test / cache files

@@ -3,18 +3,18 @@ try:
     from datetime import date, timedelta
     import sys
     import json
-    from DB_manager import (database_exists, load_database, save_database, update_household_info, 
-                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity)
+    from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
+                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, send_log)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
-                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, 
+                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_message, 
                             show_exit, output_recommendations)
     from AI_manager import get_ai_recommendations
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
-except ImportError:
-    raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory")
+except ImportError as e :
+    raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 
-
+log_exists()
 database_exists()  # Ensure the database folder and file exist
 db_success, database = load_database('database')  # Load the database into memory
 if db_success == False:

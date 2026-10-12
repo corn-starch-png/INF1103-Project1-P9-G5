@@ -1,6 +1,7 @@
 import os
 import json
-from IO_manager import send_log
+from datetime import datetime
+
 
 DB_FILENAME = 'db.json'
 FILE_STRUCTURE = {
@@ -10,6 +11,26 @@ FILE_STRUCTURE = {
 }
 
 
+
+#LOGGING FUNCTIONS--------------
+#current_datetime used to generate log filename
+#only used by send_log function 
+current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+def send_log(message):
+    filename=f"logs/{current_datetime}.log"
+    if not os.path.exists(filename):
+        with open(filename, 'w') as f:
+            f.write(message)
+    else:
+        with open(filename, 'a') as f:
+            f.write(f"\n{message}")
+
+
+#creates log folder for log files
+def log_exists(folder='logs'):
+        if not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+  
 
 #VALIDATION FUCNTIONS---------------
 #checks if individual entries in the database have the correct data types and values
