@@ -368,10 +368,11 @@ def ask_menu_choice():
         print("\nWhat would you like to do?")
         print("  1. Update consumption and plan groceries")
         print("  2. Edit expiry dates or delete items from your fridge")
-        choice = input("Enter 1 or 2: ").strip()
-        if choice in ["1", "2"]:
+        print("  3. Save database and exit the program")
+        choice = input("Enter 1, 2 or 3: ").strip()
+        if choice in ["1", "2", "3"]:
             return choice
-        print("Please enter 1 or 2.")
+        print("Please enter 1, 2 or 3.")
 
 
 # Let the user edit expiry dates or delete items from their fridge until they are done.
@@ -598,6 +599,12 @@ def show_welcome():
 # Print the welcome-back message for a returning user (Person_ID 1 is the user).
 def show_welcome_back(household_info):
     print(f"Welcome back, {household_info[0]['Name']}!")
+
+
+# Print exit message
+def show_exit():
+    print(f"Your data has been recorded into the system")
+    print(f"Thank you for using the Waste Management System!")
 
 
 def send_message(message):

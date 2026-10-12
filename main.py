@@ -1,12 +1,14 @@
 #-------START OF DEPENDENCY LINE----------#
 try:
     from datetime import date, timedelta
+    import sys
     import json
     from DB_manager import (database_exists, load_database, save_database, update_household_info, 
                             add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
-                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, output_recommendations)
+                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, 
+                            show_exit, output_recommendations)
     from AI_manager import get_ai_recommendations
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError:
@@ -43,10 +45,12 @@ else:
             database = update_consumption_history(database, consumed_items)
             show_consumption(consumed_items)
             break
-        else:
+        elif choice == "2":
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
+        else:
             save_database(database, 'database')  # Save the database to the specified folder
+            show_exit()
             sys.exit(1)
 
 
@@ -102,15 +106,13 @@ for item in recommendations:
         need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) 
         
         if underbuy_message is not None:
-                underbuy_messages.append(underbuy_message) 
+            underbuy_messages.append(underbuy_message) 
 
-
-    confidence_score = calculate_confidence_score(item_name, database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
-    item["Confidence_Score"] = confidence_score
+    item["Confidence_Score"] = calculate_confidence_score(item_name, database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
 
 output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
-
 
 final_checkout = shopping_cart_conclusion(recommendations, remarks)
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder
+show_exit()
