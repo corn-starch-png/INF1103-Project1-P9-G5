@@ -597,7 +597,7 @@ def show_consumption(consumed_items):
     print(f"  Over the last {consumed_items[0]['Date_Range']} day(s), remarks: {consumed_items[0]['Remarks']}")
     for i in range(len(consumed_items)):
         record = consumed_items[i]
-        print(f"  {i + 1}. {record['Quantity']:g}{record['Unit']} of {record['Item_Name']}")
+        print(f"  {i + 1}. {record['Quantity']:g} {record['Unit']} of {record['Item_Name']}")
  
  
 # Print the start-up welcome message.
