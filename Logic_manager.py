@@ -122,36 +122,18 @@ def data_quantity_score(observation_count, target_observations = 30):
 
     return score
 
-#second confidence score function taking into account S/D
-def calculate_data_standard_deviation(item_name,consumption_history,fridge): #calculate for each item 
-    
-    quantities = [] #list to feed into stats funciton later
-
-    for row in consumption_history: #iterate through list, searchingin Item_Name column to find the find item user enterd "item_name"
-        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None" : #find item, omit if remarks is ticked
-            quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
-
-    for row in fridge:
-        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None":
-                quantities.append(float(row["Quantity"])) #everything theres a match in item name, go to column quantity and take the value
-
-    # Ensure at least 2 data points exist before calculating standard deviation to prevent StatisticsError
-    # can't calculate s/d with one value
-    if len(quantities) < 2:
+#consistency score (was calculate_data_standard_deviation)
+#scores how consistent past consumption has been
+def consumption_consistency_score(normalized_daily_consumption):
+    if len(normalized_daily_consumption) < 2:
         return 0.0
-    #print (quantities)
-    sd = statistics.stdev(quantities) # once list of quantities is made, calculate s/d
-   
-    mean = statistics.mean(quantities)  
 
-    if mean == 0: #so our program dont commit suicide by dividing with zero
-        return 1.0
+    sd = statistics.stdev(normalized_daily_consumption)
+    mean = statistics.mean(normalized_daily_consumption)
 
-    cv = sd / mean #calculating relative standard deviation 
+    cv = sd / mean
+    return 1 / (1 + cv)
 
-    standard_deviation = 1 / (1 + cv) #keeping score <=1.0
-
-    return standard_deviation
 
 def calculate_historical_score(item_name, database):
     # Retrieve consumption history and fridge stock from the existing database
