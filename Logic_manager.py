@@ -90,7 +90,7 @@ def under_buy(item, next_purchase_date, total_amt):
         amount_to_topup = round (quantity_needed - total_amt, 2)
 
         if amount_to_topup > 0:
-            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]} {item["Unit"]}, Recommeneded to buy {quantity_needed} {item["Unit"]} instead"
+            return True, f"{item["Planned_Quantity"]} {item["Unit"]} of {item["Item_Name"]} is predicted to finish before your next grocery run, recommended to buy more"
 
         elif amount_to_topup <=0:
             send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")
