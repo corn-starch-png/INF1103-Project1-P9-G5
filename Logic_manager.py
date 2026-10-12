@@ -69,39 +69,47 @@ def risk_of_expiry(item, total_amt_of_items):
         # estimated_consumption_rate <= 0:
         send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item["Item_Name"]}")
         return False, None 
+
+
+# underbuy logic
+def under_buy(item, next_purchase_date, total_amt):
+    # processing dates and calculating new variable with them
+    if item["Estimated_Consumption_Rate"] >0: #no consumption rate how uw me calculate? just ignore. 
+        today = date.today()
+        #prevents small positive consumption rates from being rounded down to zero before division.
+        daily_consumption_rate = item["Estimated_Consumption_Rate"] / 7
+        item_expiry_date = datetime.strptime(item["Estimated_Expiry_Date"], "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
         
-# evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
-""" def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
-        # calling calorie_surplus and expiry risk functions
-        calorie_surplus = calories_surplus(
-            total_estimated_calories=total_estimated_calories
-        )
-        expiry_risk = risk_of_expiry(
-            estimated_consumption_rate=estimated_consumption_rate,
-            planned_quantity=planned_quantity,
-            item_expiry_date=item_expiry_date,
-            item_name=item_name,
-            unit=unit
-        )
+        #calculating Nth amount needed to not run out of food
+        next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
+        days_to_next_purchase = (next_purchase_date - today).days  #extra n from datetime.timedelta(days=n)
+        quantity_needed = daily_consumption_rate * days_to_next_purchase
+        amount_to_topup = round (quantity_needed - total_amt, 2)
 
-        print("Checking if either is T/F:")
-        print(f"calorie_surplus is {calorie_surplus}")
-        print(f"expiry_risk is {expiry_risk}")
+        if amount_to_topup > 0:
+            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]} {item["Unit"]}, Recommeneded to buy {quantity_needed} {item["Unit"]} instead"
 
-        # if calorie_surplus and expiry_risk == False
-        if calorie_surplus is False and expiry_risk is False:
-            print("Calling underbuy function...")
-            under_buy(
-                item_name=item_name,
-                planned_quantity=planned_quantity,
-                item_expiry_date=item_expiry_date,
-                next_purchase_date=next_purchase_date,
-                estimated_consumption_rate=estimated_consumption_rate
-        )
-        else:
-            print("Not underbuy")
-            return None
-       """
+        elif amount_to_topup <=0:
+            send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")
+            return False, None
+
+    elif item["Estimated_Consumption_Rate"] <=0:
+        send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item["Item_Name"]}")
+        return False, None
+    
+
+#CONFIDENCE SCORE
+#normalizes all history values into a single list, each entry represents the consumption rate for 1 day
+def normalize_history(item_name, consumption_history):
+        normalized_daily_consumption = []
+        for log in consumption_history:
+            if log["Item_Name"].lower() == item_name.lower(): #take into account items with remarks as we need it to keep accurate freshness tracking
+                daily_avg_consumption = log["Quantity"]/log["Date_Range"]
+                for i in range(log["Date_Range"]):
+                    normalized_daily_consumption.append(daily_avg_consumption)
+        print(f"Normalized list for {item_name}:")
+        print(f"{normalized_daily_consumption}")
+        return normalized_daily_consumption
 
 #first confidence score function, some funky math going on here
 def calculate_historical_data_completeness(item_name, consumption_history, fridge):
@@ -124,7 +132,6 @@ def calculate_historical_data_completeness(item_name, consumption_history, fridg
 
     completeness_score = purchase_count / (purchase_count + k) #keeping score <=1.0
     return completeness_score
-
 
 #second confidence score function taking into account S/D
 def calculate_data_standard_deviation(item_name,consumption_history,fridge): #calculate for each item 
@@ -171,31 +178,40 @@ def calculate_historical_score(item_name, database):
 def should_evaluate_underbuy(calorie_surplus, expiry_risk):
     return calorie_surplus is False and expiry_risk is False
 
-#under_buy will pull from basket/grocery_list
-def under_buy(item, next_purchase_date, total_amt):
-    # processing dates and calculating new variable with them
-    if item["Estimated_Consumption_Rate"] >0: #no consumption rate how uw me calculate? just ignore. 
-        today = date.today()
-        #prevents small positive consumption rates from being rounded down to zero before division.
-        daily_consumption_rate = item["Estimated_Consumption_Rate"] / 7
-        item_expiry_date = datetime.strptime(item["Estimated_Expiry_Date"], "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
-        
-        #calculating Nth amount needed to not run out of food
-        next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
-        days_to_next_purchase = (next_purchase_date - today).days  #extra n from datetime.timedelta(days=n)
-        quantity_needed = daily_consumption_rate * days_to_next_purchase
-        amount_to_topup = round (quantity_needed - total_amt, 2)
 
-        if amount_to_topup > 0:
-            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]} {item["Unit"]}, Recommeneded to buy {quantity_needed} {item["Unit"]} instead"
+# evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
+""" def evaluate_underbuy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate, unit, total_estimated_calories):
+        # calling calorie_surplus and expiry risk functions
+        calorie_surplus = calories_surplus(
+            total_estimated_calories=total_estimated_calories
+        )
+        expiry_risk = risk_of_expiry(
+            estimated_consumption_rate=estimated_consumption_rate,
+            planned_quantity=planned_quantity,
+            item_expiry_date=item_expiry_date,
+            item_name=item_name,
+            unit=unit
+        )
 
-        elif amount_to_topup <=0:
-            send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")
-            return False, None
+        print("Checking if either is T/F:")
+        print(f"calorie_surplus is {calorie_surplus}")
+        print(f"expiry_risk is {expiry_risk}")
 
-    elif item["Estimated_Consumption_Rate"] <=0:
-        send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item["Item_Name"]}")
-        return False, None
+        # if calorie_surplus and expiry_risk == False
+        if calorie_surplus is False and expiry_risk is False:
+            print("Calling underbuy function...")
+            under_buy(
+                item_name=item_name,
+                planned_quantity=planned_quantity,
+                item_expiry_date=item_expiry_date,
+                next_purchase_date=next_purchase_date,
+                estimated_consumption_rate=estimated_consumption_rate
+        )
+        else:
+            print("Not underbuy")
+            return None
+       """
+
 
 
 # ---------------V V V  execution code  V V V ---------------  
