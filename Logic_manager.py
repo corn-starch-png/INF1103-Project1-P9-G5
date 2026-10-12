@@ -111,27 +111,16 @@ def normalize_history(item_name, consumption_history):
         print(f"{normalized_daily_consumption}")
         return normalized_daily_consumption
 
-#first confidence score function, some funky math going on here
-def calculate_historical_data_completeness(item_name, consumption_history, fridge):
-    purchase_count = 0 #count how many times item was bought
 
-    for row in consumption_history:
-        if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None": #each seperate time user goes to NTUC to buy, CS increases
-            purchase_count += 1
+#completeness score (was calculate_historical_data_completeness)
+#scores how much data is available with a target of 1mth(30 days)
+def data_quantity_score(observation_count, target_observations = 30):
+    if observation_count <= 0:
+        return 0.0
+    k = target_observations / 2
+    score = observation_count / (observation_count + k)
 
-    for row in fridge:
-            if row["Item_Name"].lower() == item_name.lower() and row["Remarks"] == "None": #each seperate time user goes to NTUC to buy, CS increases
-                purchase_count += 1
-                
-    if purchase_count == 0: #for items with no records
-        completeness_score = 0
-        return completeness_score
-
-    k = 8 #arbitary value i smoked out to control how fast completeness is given
-    # K is inverse to the rate CS grows 
-
-    completeness_score = purchase_count / (purchase_count + k) #keeping score <=1.0
-    return completeness_score
+    return score
 
 #second confidence score function taking into account S/D
 def calculate_data_standard_deviation(item_name,consumption_history,fridge): #calculate for each item 
