@@ -2,7 +2,6 @@
 try:
     from datetime import date, timedelta
     import sys
-    import json
     from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
                             add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, send_log)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 

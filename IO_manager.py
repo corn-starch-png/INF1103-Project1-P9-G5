@@ -108,15 +108,14 @@ def enter_date(question):
             is_leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
             days_in_month = [31, 29 if is_leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
             valid = 1 <= month <= 12 and 1 <= day <= days_in_month[month - 1]
-        if not valid:
-            print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
-        elif date(year, month, day) < date.today() - timedelta(days=365):
-            print("That date is more than a year ago. Please enter a more recent date.")
-        elif date(year, month, day) > date.today() + timedelta(days=3 * 365):
-            print("That date is more than 3 years ahead. Please check the year and try again.")
         else:
-            if date(year, month, day) < date.today():
-                print("That date has already passed! This item is marked as expired.")
+            print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
+
+        if date(year, month, day) < date.today():
+            print("That date has already passed!")
+        elif date(year, month, day) > date.today() + timedelta(days=5 * 365):
+            print("That date is more than 5 years ahead. Please check the year and try again.")
+        else:
             return text
  
 
