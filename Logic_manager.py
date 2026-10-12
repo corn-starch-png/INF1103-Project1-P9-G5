@@ -157,7 +157,7 @@ def calculate_data_standard_deviation(item_name,consumption_history,fridge): #ca
 
     return standard_deviation
 
-def calculate_confidence_score(item_name, database):
+def calculate_historical_score(item_name, database):
     # Retrieve consumption history and fridge stock from the existing database
     #pull out the 2 list i need to calculate confidence_score 
     consumption_history = database["consumption_history"]

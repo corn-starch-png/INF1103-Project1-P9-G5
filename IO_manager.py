@@ -414,23 +414,28 @@ def display_cart(item_list):
     name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
 
     # Print header
+    print(f"\nGrocery Cart")
     print(
         f"{'No.':<4}| "
         f"{'Item name':<{name_width}}| "
         f"{'Current amt':<12}| "
-        f"{'Recommended amt':<16}|"
+        f"{'Recommended amt':<16}| "
+        f"{'HS*':<6}| "
     )
 
     # Print rows
     for i in range(0,len(item_list)):
         cur_amt_formatted = f"{item_list[i]['Planned_Quantity']} {item_list[i]['Unit']}"
         recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
+        historical_score_formatted = f"{round(item_list[i]['Historical_Score'], 1)}%"
         print(
             f"{i+1:<4}| "
             f"{item_list[i]['Item_Name']:<{name_width}}| "
             f"{cur_amt_formatted:<12}| "
-            f"{recommened_amt_formatted:<16}|"
+            f"{recommened_amt_formatted:<16}| "
+            f"{historical_score_formatted:<6}| "
         )
+    print(f"* HS --> Historical score: calculation of historical data quantity and consistency")
 
 
 #displays recommendations made by business logic
@@ -439,12 +444,13 @@ def output_recommendations(calories_message, risk_of_expiry_messages, underbuy_m
     print(f"\n{calories_message}")
     print(f"\n--------------------------------------------------------------------------------")
     if len(risk_of_expiry_messages) != 0:
-        print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able to finish:")
+        print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able" 
+              f"\n to finish the following items before your next grocery trip:")
         for i in range(len(risk_of_expiry_messages)):
             print(f"  {i+1}. {risk_of_expiry_messages[i]}") 
         print(f"\n--------------------------------------------------------------------------------")
     if len(underbuy_messages) != 0:
-        print(f"You are forcasted to finish the following items before your next indicated grocery run:")
+        print(f"You are forcasted to finish the following items before your next indicated grocery trip:")
         for i in range(len(underbuy_messages)):
             print(f"  {i+1}. {underbuy_messages[i]}") 
         print(f"\n--------------------------------------------------------------------------------")

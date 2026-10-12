@@ -9,7 +9,7 @@ try:
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, output_recommendations)
     from AI_manager import get_ai_recommendations
-    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
+    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_historical_score, should_evaluate_underbuy)
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
@@ -18,7 +18,6 @@ except ImportError:
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
 send_log(f"[MAIN] check database is loaded: {database}")
-
 household_info = database['household_info']
 history = database['consumption_history']
 fridge = database['fridge']
@@ -80,7 +79,6 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 
 
 #logic for database 
-
 extra_calories, calories_message = calories_surplus(database, total_planned_calories, days_until_next_visit)
 risk_of_expiry_messages = []
 underbuy_messages = []
@@ -99,17 +97,16 @@ for item in recommendations:
 
     next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
     if should_evaluate_underbuy(extra_calories, expire_before_consume):
-        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) #TODO under_buy not taking into account fridge values
+        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) 
         
         if underbuy_message is not None:
                 underbuy_messages.append(underbuy_message) 
 
 
-    historial_score = calculate_confidence_score(item_name, database)
-    item["historial_score"] = historial_score
+    historical_score = calculate_historical_score(item_name, database)
+    item["Historical_Score"] = historical_score
+
 output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
-
-
 
 
 final_checkout = shopping_cart_conclusion(recommendations, remarks)
