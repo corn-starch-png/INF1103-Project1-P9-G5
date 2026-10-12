@@ -99,91 +99,105 @@ def under_buy(item, next_purchase_date, total_amt):
     
 
 #CONFIDENCE SCORE
-#normalizes all history values into a single list, each entry represents the consumption rate for 1 day
-def normalize_history(item_name, consumption_history):
-        normalized_daily_consumption = []
-        for log in consumption_history:
-            if log["Item_Name"].lower() == item_name.lower(): #take into account items with remarks as we need it to keep accurate freshness tracking
-                daily_avg_consumption = log["Quantity"]/log["Date_Range"]
-                for i in range(log["Date_Range"]):
-                    normalized_daily_consumption.append(daily_avg_consumption)
-        print(f"Normalized list for {item_name}:")
-        print(f"{normalized_daily_consumption}")
-        return normalized_daily_consumption
+#utilizes weighted scores of past consumption history's quantity, consistency and alignment of AI's recommened quantity to own estimates
+def calculate_confidence_score(item_name, database, recommended_amt, fridge_amt, days_until_next_visit, remarks):
+    #normalizes all history values into a single list, each entry represents the consumption rate for 1 day
+    def normalize_history(item_name, consumption_history):
+            normalized_daily_consumption = []
+            for log in consumption_history:
+                if log["Item_Name"].lower() == item_name.lower(): #take into account items with remarks as we need it to keep accurate freshness tracking
+                    daily_avg_consumption = log["Quantity"]/log["Date_Range"]
+                    for i in range(log["Date_Range"]):
+                        normalized_daily_consumption.append(daily_avg_consumption)
+            send_log(f"[CONFIDENCE SCORE] Normalized list for {item_name}:")
+            send_log(f"[CONFIDENCE SCORE] {normalized_daily_consumption}")
+            return normalized_daily_consumption
 
 
-#completeness score (was calculate_historical_data_completeness)
-#scores how much data is available with a target of 1mth(30 days)
-def data_quantity_score(observation_count, target_observations = 30):
-    if observation_count <= 0:
+    #completeness score (was calculate_historical_data_completeness)
+    #scores how much data is available with a target of 1mth(30 days)
+    def data_quantity_score(observation_count, target_observations = 30):
+        if observation_count <= 0:
+            return 0.0
+        k = target_observations / 2
+        score = observation_count / (observation_count + k)
+
+        return score
+
+    #consistency score (was calculate_data_standard_deviation)
+    #scores how consistent past consumption has been
+    def consumption_consistency_score(normalized_daily_consumption):
+        if len(normalized_daily_consumption) < 2:
+            return 0.0
+
+        sd = statistics.stdev(normalized_daily_consumption)
+        mean = statistics.mean(normalized_daily_consumption)
+
+        cv = sd / mean
+        return 1 / (1 + cv)
+
+    #agreement score
+    #scores how closely AI estimations correlate with own calculations of past data
+    def ai_agreement_score(normalized_daily_consumption, recommended_amt, fridge_amt, days_until_next_visit):
+        #calculate recommeneded quantity based on past data
+        self_avg_consumption_rate = sum(normalized_daily_consumption)/len(normalized_daily_consumption)
+        algorithm_quantity = round((self_avg_consumption_rate * days_until_next_visit) - fridge_amt, 2)
+        if algorithm_quantity < 0: # no negative recommendations
+            algorithm_quantity = 0
+        ai_quantity = recommended_amt
+        send_log(f"[CONFIDENCE SCORE] calculated qty:{algorithm_quantity} AI qty: {ai_quantity}")
+
+        if algorithm_quantity == 0 and ai_quantity == 0:
+            return 1.0
+
+        #compare AI and own calculation values
+        largest_quantity = max(algorithm_quantity, ai_quantity)
+        difference = abs(algorithm_quantity - ai_quantity)
+        
+
+        agreement_score = 1 - (difference / largest_quantity)
+        return agreement_score
+
+    #bonus score (MAX 5%)
+    #bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
+    def calculate_bonus(remarks):
+        if not remarks or remarks == "None":
+            return 0.0
+        remarks = remarks.lower()
+
+        if any(word in remarks for word in BONUS_KEYWORDS_FULL_PTS):
+            return 5.0
+
+        if any(word in remarks for word in BONUS_KEYWORDS_HALF_PTS):
+            return 2.5
+
         return 0.0
-    k = target_observations / 2
-    score = observation_count / (observation_count + k)
 
-    return score
-
-#consistency score (was calculate_data_standard_deviation)
-#scores how consistent past consumption has been
-def consumption_consistency_score(normalized_daily_consumption):
-    if len(normalized_daily_consumption) < 2:
+    normalized_daily_consumption = normalize_history(item_name, database["consumption_history"])
+    if normalized_daily_consumption == []:
         return 0.0
 
-    sd = statistics.stdev(normalized_daily_consumption)
-    mean = statistics.mean(normalized_daily_consumption)
+    quantity_score = data_quantity_score(len(normalized_daily_consumption))
+    consistency_score = consumption_consistency_score(normalized_daily_consumption)
+    agreement_score = ai_agreement_score(normalized_daily_consumption, recommended_amt, fridge_amt, days_until_next_visit)
+    confidence_score = (
+        0.3 * quantity_score
+        + 0.3 * consistency_score
+        + 0.4 * agreement_score
+    ) * 100
 
-    cv = sd / mean
-    return 1 / (1 + cv)
+    bonus_score = calculate_bonus(remarks)
+    
+    send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item_name}---")
+    send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")
+    send_log(f"[CONFIDENCE SCORE] consistency_score: {consistency_score}")
+    send_log(f"[CONFIDENCE SCORE] AI agreement_score: {agreement_score}")
+    send_log(f"[CONFIDENCE SCORE] confidence_score: {confidence_score}")
+    send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
+    send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
 
-#agreement score
-#scores how closely AI estimations correlate with own calculations of past data
-def ai_agreement_score(normalized_daily_consumption, ai_recommendation, fridge_amt, days_until_next_visit):
-    #calculate recommeneded quantity based on past data
-    self_avg_consumption_rate = sum(normalized_daily_consumption)/len(normalized_daily_consumption)
+    return round(min(100, confidence_score + bonus_score), 1)
 
-    print(self_avg_consumption_rate)
-    algorithm_quantity = round((self_avg_consumption_rate * days_until_next_visit) - fridge_amt, 2)
-    if algorithm_quantity < 0: # no negative recommendations
-        algorithm_quantity = 0
-    ai_quantity = ai_recommendation["Recommended_Quantity"]
-
-    if algorithm_quantity == 0 and ai_quantity == 0:
-        return 1.0
-
-    #compare AI and own calculation values
-    largest_quantity = max(algorithm_quantity, ai_quantity)
-    difference = abs(algorithm_quantity - ai_quantity)
-    print(f"algorithm qty:{algorithm_quantity}")
-    print(largest_quantity)
-    print(difference)
-    agreement_score = 1 - (difference / largest_quantity)
-
-    return agreement_score
-
-#bonus score (MAX 5%)
-#bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
-def calculate_bonus(remarks):
-    if not remarks or remarks == "None":
-        return 0.0
-    remarks = remarks.lower()
-
-    if any(word in remarks for word in BONUS_KEYWORDS_FULL_PTS):
-        return 5.0
-
-    if any(word in remarks for word in BONUS_KEYWORDS_HALF_PTS):
-        return 2.5
-
-    return 0.0
-
-def calculate_historical_score(item_name, database):
-    # Retrieve consumption history and fridge stock from the existing database
-    #pull out the 2 list i need to calculate confidence_score 
-    consumption_history = database["consumption_history"]
-    fridge = database["fridge"]
-
-    standard_deviation = calculate_data_standard_deviation(item_name=item_name, consumption_history = consumption_history, fridge = fridge)
-    consistency_score = calculate_historical_data_completeness(item_name = item_name ,consumption_history = consumption_history, fridge = fridge)
-    confidence_score = standard_deviation * consistency_score #will add more scores if needed
-    return round(confidence_score, 3) *100 #round off to 3 d.p in case of irrational number
 
 def should_evaluate_underbuy(calorie_surplus, expiry_risk):
     return calorie_surplus is False and expiry_risk is False
