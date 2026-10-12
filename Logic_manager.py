@@ -196,6 +196,8 @@ def calculate_confidence_score(item_name, database, recommended_amt, fridge_amt,
     send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
     send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
 
+    if confidence_score == 0: #do not add bonus if score is 0 
+        return 0.0
     return round(min(100, confidence_score + bonus_score), 1)
 
 
