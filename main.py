@@ -17,7 +17,6 @@ except ImportError:
 
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
-send_log(f"[MAIN] check database is loaded: {database}")
 household_info = database['household_info']
 history = database['consumption_history']
 fridge = database['fridge']
@@ -27,8 +26,10 @@ existing_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
+#region user IO 
 show_welcome()
-if household_info == []:
+#if new user, direct them to create a new profile then add items they have in thier fridge
+if household_info == []: 
     household_info = create_profile()
     show_profile(household_info)
     existing_items = enter_home_items()
@@ -39,20 +40,22 @@ else:
     show_welcome_back(household_info)
     while True:
         choice = ask_menu_choice()
-        if choice == "1":
+        #update consumption history then break loop and continue
+        if choice == "1": 
             consumed_items = update_consumption(fridge)
             database = remove_from_fridge(database, consumed_items)
             database = update_consumption_history(database, consumed_items)
             show_consumption(consumed_items)
             break
-        elif choice == "2":
+        #give user option to edit AI estimated expiry dates or delete items(for example if expired)
+        elif choice == "2": 
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
-        else:
+        #exit program
+        else: 
             save_database(database, 'database')  # Save the database to the specified folder
             show_exit()
             sys.exit(1)
-
 
 days_until_next_visit = ask_days_until_next()
 grocery_list = enter_grocery_list(database)
@@ -65,6 +68,7 @@ send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
 send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
+#endregion 
 
 
 #region AI Recommendations
@@ -83,7 +87,7 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 #endregion
 
 
-#logic for database 
+#region logic
 extra_calories, calories_message = calories_surplus(database, total_planned_calories, days_until_next_visit)
 risk_of_expiry_messages = []
 underbuy_messages = []
@@ -109,10 +113,15 @@ for item in recommendations:
             underbuy_messages.append(underbuy_message) 
 
     item["Confidence_Score"] = calculate_confidence_score(item_name, database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
+#endregion
 
+
+#region user IO confirmation
 output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
 
 final_checkout = shopping_cart_conclusion(recommendations, remarks)
+
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder
 show_exit()
+#endregion
