@@ -1,5 +1,6 @@
 import os
 import json
+from IO_manager import send_log
 
 DB_FILENAME = 'db.json'
 FILE_STRUCTURE = {
@@ -7,9 +8,10 @@ FILE_STRUCTURE = {
     'household_info': 'Person_ID,Name,Age,Gender,Dietary_Restriction',
     'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date,Remarks'
 }
-KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 
 
+
+#VALIDATION FUCNTIONS---------------
 #checks if individual entries in the database have the correct data types and values
 #in-put: <dictionary> entry, <string> consumption_history/household_info/fridge
 #output: <boolean> True if the entry is valid, <string> error message if the entry is invalid else None
@@ -125,6 +127,7 @@ def check_database(database):
     return database, errors
 
 
+#DB CREATION/SAVING FUCNTIONS---------------
 #creates an empty database structure with the required tables and returns it
 #in-put: None
 #output: <dictionary> empty database structure
@@ -139,18 +142,18 @@ def create_empty_database():
 def database_exists(folder='database'):
     # Implementation for creating the database
     if not os.path.exists(folder):
-        print(f"Database not found. Creating database folder: {folder}")
+        send_log(f"[DATABASE] Database not found. Creating database folder: {folder}")
         os.makedirs(folder, exist_ok=True)
     filename = os.path.join(folder, DB_FILENAME)
     if not os.path.exists(filename):
-        print(f"File {filename} not found. Creating file: {filename}")
+        send_log(f"[DATABASE] File {filename} not found. Creating file: {filename}")
         with open(filename, 'w') as f:
             json.dump(create_empty_database(), f)  # Create an empty JSON file with the required structure
 
 
 #Loads the database from a JSON file in the specified folder and checks for errors
 #in-put: <string> folder to load json db from
-#output: <dictionary> database prints out any errors encountered during loading
+#output: <dictionary> database outputs out any errors encountered during loading
 def load_database(folder='database'):
     errors = []
     filename = os.path.join(folder, DB_FILENAME)
@@ -169,12 +172,12 @@ def load_database(folder='database'):
     errors.extend(validation_errors)  # Add any validation errors to the errors list
                     
     if not errors:
-        print("Database loaded successfully.")
+        send_log(f"[DATABASE] Database loaded successfully.")
     else:
-        print("****************** Errors encountered during loading ******************")
+        send_log(f"[DATABASE] ****************** Errors encountered during loading ******************")
         for error in errors:
-            print(error)  # Print any errors encountered during loading
-        print("***********************************************************************")
+            send_log(f"[DATABASE] {error}")  # Print any errors encountered during loading
+        send_log(f"[DATABASE] ***********************************************************************")
     return database
 
 
@@ -186,19 +189,17 @@ def save_database(database, folder='database'):
     filename = os.path.join(folder, DB_FILENAME)
     with open(filename, 'w') as f:
         json.dump(database, f)
-    print(f"Database saved successfully to {filename}.")
+    send_log(f"[DATABASE] Database saved successfully to {filename}.")
 
 
+#DB CRUD FUCNTIONS---------------
 #returns the total quantity of the item in the fridge and consumption_history tables
 #in-put: <dictionary> database, <string> item_name
 #output: <integer> total quantity of the item in the fridge and consumption_history tables
-def get_all_quantity(database, item_name):
+def get_all_fridge_quantity(database, item_name):
     # Implementation for retrieving all quantities of a specific item from the fridge table
     total_quantity = 0
     for entry in database.get('fridge', []):
-        if entry.get('Item_Name').lower() == item_name.lower():
-            total_quantity += entry.get('Quantity')
-    for entry in database.get('consumption_history', []):
         if entry.get('Item_Name').lower() == item_name.lower():
             total_quantity += entry.get('Quantity')
     return total_quantity
@@ -211,7 +212,7 @@ def update_household_info(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'household_info')
         if not check_result:
-            print(f"Invalid data in household_info: {item}. Error: {error_message}")
+            send_log(f"[DATABASE] Invalid data being added to  household_info: {item}. Error: {error_message}")
             continue  # Skip invalid entries
         database.get('household_info', []).append(item)  # Append each item in the update list to the household_info table
     return database
@@ -224,7 +225,7 @@ def update_consumption_history(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'consumption_history')
         if not check_result:
-            print(f"Invalid data in consumption_history: {item}. Error: {error_message}")
+            send_log(f"[DATABASE] Invalid data being added to consumption_history: {item}. Error: {error_message}")
             continue  # Skip invalid entries
         database.get('consumption_history', []).append(item)  # Append each item in the update list to the consumption_history table
     return database
@@ -237,7 +238,7 @@ def add_to_fridge(database, update_list):
     for item in update_list:
         check_result, error_message = check_data(item, 'fridge')
         if not check_result:
-            print(f"Invalid data in fridge: {item}. Error: {error_message}")
+            send_log(f"[DATABASE] Invalid data being added in fridge: {item}. Error: {error_message}")
             continue  # Skip invalid entries
         database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
     return database
@@ -264,36 +265,3 @@ def remove_from_fridge(database, update_list):
             
 
     return database 
-
-
-#--------------------------------------for testing----------------------------------------------
-#temporary code to load the kcal.csv file into a dictionary for testing purposes
-'''
-def load_kcal_database():
-    cal_db={}
-    with open('sample_database/kcal.csv', 'r') as f:
-        header = f.readline()  # Skip the header line
-        column_names = header.replace('\n', '').split(',')  # Split the header into individual column names
-        for line in f:
-            cal_values = line.strip().split(',')  # Split each line into individual values
-            cal_values[1] = int(cal_values[1]) 
-            cal_values[2] = int(cal_values[2]) 
-            cal_db[int(cal_values[0])] = {column_names[i]: cal_values[i] for i in range(1, len(column_names))}  # Create a dictionary for each food item with its corresponding values
-    print(cal_db)  # Print the entire kcal database dictionary for verification
-    return cal_db
-
-
-database_exists()  # Ensure the database folder and file exist
-database = load_database("sample_database")  # Load the database into memory
-record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Date_Range": 5, "Remarks": "None"}]
-fridge_record = [{"Item_Name": "Milk", "Quantity": 7, "Unit": "carton", "Purchase_Date": "2026-09-20", "Expiry_Date": "2026-10-04", "Remarks": "None"}]
-house_record = [{"Person_ID": 4, "Name": "Bob Johnson", "Age": 99, "Gender": "Male", "Dietary_Restriction": "None"}]
-database = add_to_fridge(database, fridge_record)
-database = remove_from_fridge(database, record)
-database = update_household_info(database, house_record)
-print(get_all_quantity(database, "milk"))  # Retrieve all quantities of "Milk" from the fridge table
-
-save_database(database, 'database')  # Save the database to the specified folder
-
-#load_kcal_database()  # Load the kcal database for testing purposes
-'''

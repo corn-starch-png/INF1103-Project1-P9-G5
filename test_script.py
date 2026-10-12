@@ -1,104 +1,64 @@
-import io
+import copy
 from datetime import date
 from unittest.mock import patch
 import Logic_manager as logic
+import AI_manager as ai
 
-# =========================================================
+#region Hardcoded data
+# HARDCODED GROCERY LIST
+GROCERY_LIST = [{"Item_Name": "milk", "Quantity": 3.0, "Unit": "l"}, {"Item_Name": "eggs", "Quantity": 6.0, "Unit": "pcs"},{"Item_Name": "rice", "Quantity": 1.0, "Unit": "kg"}]
+
 # HARDCODED AI RECOMMENDATIONS
 # These sample responses replace real AI output.
 # This means the tests do not need a live API connection.
-# =========================================================
 
 AI_RECOMMENDATIONS = [
     {
-        "item": "Milk",
-        "planned_quantity": 3,
-        "unit": "l",
-        "recommended_quantity": 1.7,
-        "consumption_rate": 2.0,
-        "estimated_calories": 1020,
-        "reason": "Expired milk stock leaves no usable supply."
+        "Item_Name": "milk",
+        "Planned_Quantity": 3.0,
+        "Unit": "l",
+        "Recommended_Quantity": 2.0,
+        "Estimated_Consumption_Rate": 2.0,
+        "Planned_Estimated_Calories": 1800,
+        "Estimated_Calories": 1200,
+        "Estimated_Expiration_Days": 7
     },
     {
-        "item": "Eggs",
-        "planned_quantity": 12,
-        "unit": "pcs",
-        "recommended_quantity": 7,
-        "consumption_rate": 7.7,
-        "estimated_calories": 490,
-        "reason": "Historical consumption indicates 7 eggs are needed."
+        "Item_Name": "eggs",
+        "Planned_Quantity": 6.0,
+        "Unit": "pcs",
+        "Recommended_Quantity": 8.0,
+        "Estimated_Consumption_Rate": 7.0,
+        "Planned_Estimated_Calories": 420,
+        "Estimated_Calories": 560,
+        "Estimated_Expiration_Days": 14
     },
     {
-        "item": "Chicken",
-        "planned_quantity": 0.5,
-        "unit": "kg",
-        "recommended_quantity": 1.0,
-        "consumption_rate": 1.2,
-        "estimated_calories": 1650,
-        "reason": "Expired chicken stock leaves no usable supply."
-    },
-    {
-        "item": "Fanta",
-        "planned_quantity": 30,
-        "unit": "l",
-        "recommended_quantity": 30,
-        "consumption_rate": 1.2,
-        "estimated_calories": 13500,
-        "reason": "A house party increases drink demand."
-    },
-    {
-        "item": "Apple",
-        "planned_quantity": 13,
-        "unit": "pcs",
-        "recommended_quantity": 3,
-        "consumption_rate": 2.8,
-        "estimated_calories": 240,
-        "reason": "Reduced household consumption lowers demand."
-    },
-    {
-        "item": "Rice",
-        "planned_quantity": 2,
-        "unit": "kg",
-        "recommended_quantity": 0,
-        "consumption_rate": 0.6,
-        "estimated_calories": 0,
-        "reason": "Existing rice stock is sufficient."
-    },
+        "Item_Name": "rice",
+        "Planned_Quantity": 1.0,
+        "Unit": "kg",
+        "Recommended_Quantity": 1.0,
+        "Estimated_Consumption_Rate": 0.5,
+        "Planned_Estimated_Calories": 3500,
+        "Estimated_Calories": 3500,
+        "Estimated_Expiration_Days": 365
+    }
 ]
 
+SAMPLE_AI_RESPONSE = {
+    "Recommendations_List": AI_RECOMMENDATIONS,
+    "Total_Planned_Estimated_Calories": 5720,
+    "Total_Estimated_Calories": 5260
+}
+#endregion
 
 # =========================================================
 # 1. AI RECOMMENDATION HANDLING
 # Input: planned quantity, recommended quantity and reason.
 # Expected: correct over/under/good classification and advice.
 # =========================================================
-
 def test_all_hardcoded_ai_recommendations():
-    expected_results = [
-        "over", "over", "under", "good", "over", "over"
-    ]
-
-    for recommendation, expected in zip(
-        AI_RECOMMENDATIONS, expected_results
-    ):
-        user_input = {
-            "item": recommendation["item"],
-            "unit": recommendation["unit"],
-            "planned_quantity": recommendation["planned_quantity"],
-        }
-
-        result = logic.give_recommendation(user_input, recommendation)
-
-        # Check the classification against the expected result.
-        assert result["result"] == expected
-
-        # Check that the reason from the AI response is preserved.
-        assert result["advice"] == recommendation["reason"]
-
-        # These fields are currently unimplemented in the function.
-        assert result["waste_risk"] is None
-        assert result["confidence_score"] is None
-
+    assert ai.check_ai_output(AI_RECOMMENDATIONS,GROCERY_LIST) is True
 
 # =========================================================
 # 2. QUANTITY COMPARISON BOUNDARIES
@@ -107,18 +67,23 @@ def test_all_hardcoded_ai_recommendations():
 #           and good if both quantities are equal.
 # =========================================================
 
-def test_quantity_comparison_boundaries():
-    cases = [
-        (0, 2, "under"),       # Planned quantity is zero.
-        (1.99, 2, "under"),    # Planned quantity is slightly lower.
-        (2, 2, "good"),        # Both quantities are equal.
-        (2.01, 2, "over"),     # Planned quantity is slightly higher.
-        (0, 0, "good"),        # Both quantities are zero.
-    ]
+def test_ai_output_wrong_order():
+    reversed_list = AI_RECOMMENDATIONS[::-1]
+    assert ai.check_ai_output(reversed_list, GROCERY_LIST) is False
 
-    for planned, recommended, expected in cases:
-        assert logic.check_over_under(planned, recommended) == expected
+def test_ai_output_changed_quantity():
+    modified = copy.deepcopy(AI_RECOMMENDATIONS)
+    modified[0]["Planned_Quantity"] = 5.0
+    assert ai.check_ai_output(modified, GROCERY_LIST) is False
 
+def test_ai_output_changed_unit():
+    modified = copy.deepcopy(AI_RECOMMENDATIONS)
+    modified[0]["Unit"] = "kg"
+    assert ai.check_ai_output(modified, GROCERY_LIST) is False
+
+def test_ai_output_missing_item():
+    modified = AI_RECOMMENDATIONS[:-1]
+    assert ai.check_ai_output(modified, GROCERY_LIST) is False
 
 # =========================================================
 # 3. AGE CATEGORY MAPPING
@@ -131,7 +96,7 @@ def test_age_mapping():
         (0, 0),
         (18, 18),
         (19, 19),
-        (30, 19),
+        (30, 30),
         (31, 30),
         (59, 30),
         (60, 60),
@@ -166,7 +131,6 @@ def test_family_weekly_calories():
 
     assert result == 29400
 
-
 # =========================================================
 # 5. CALORIE SURPLUS
 # Input: estimated calories and family weekly calorie needs.
@@ -174,33 +138,23 @@ def test_family_weekly_calories():
 # so the test uses controlled sample data.
 # Expected: True only when estimated calories exceed the need.
 # =========================================================
-
 def run_calorie_test(calories, weekly_need):
-    with patch(
-        "builtins.open",
-        return_value=io.StringIO('{"household_info": []}')
-    ), patch.object(
-        logic,
-        "calculate_family_weekly_kcal",
-        return_value=weekly_need
-    ):
-        return logic.calories_surplus(calories)
-
+    database = {"household_info": []}
+    with patch.object(logic,"calculate_family_weekly_kcal",return_value=weekly_need):
+        result, message = logic.calories_surplus(database, calories)
+    return result
 
 def test_calories_above_weekly_need():
     # 14,001 exceeds 14,000, so a surplus exists.
     assert run_calorie_test(14001, 14000) is True
 
-
 def test_calories_equal_weekly_need():
     # Exactly meeting the need is not considered a surplus.
     assert run_calorie_test(14000, 14000) is False
 
-
 def test_calories_below_weekly_need():
     # 13,999 is below the family's weekly need.
     assert run_calorie_test(13999, 14000) is False
-
 
 # =========================================================
 # 6. EXPIRY RISK
@@ -221,14 +175,12 @@ def test_expiry_risk_true(mock_date):
         item_name="Milk",
         unit="l"
     )
-
-    assert result is True
-
+    assert result[0] is True
+    assert result[1] is not None
 
 @patch.object(logic, "date")
 def test_expiry_risk_false(mock_date):
     mock_date.today.return_value = date(2026, 10, 9)
-
     result = logic.risk_of_expiry(
         estimated_consumption_rate=7,
         planned_quantity=1,
@@ -236,28 +188,18 @@ def test_expiry_risk_false(mock_date):
         item_name="Milk",
         unit="l"
     )
-
-    assert result is False
-
+    assert result == (False, None)
 
 def test_zero_consumption_rate():
     # No consumption means the function cannot estimate
     # how many days the food will take to finish.
-    result = logic.risk_of_expiry(
-        0, 3, "2026-12-31", "Milk", "l"
-    )
-
-    assert result is None
-
+    result = logic.risk_of_expiry(0, 3, "2026-12-31", "Milk", "l")
+    assert result == (False, None)
 
 def test_negative_consumption_rate():
     # A negative rate is invalid for estimating consumption.
-    result = logic.risk_of_expiry(
-        -1, 3, "2026-12-31", "Milk", "l"
-    )
-
-    assert result is None
-
+    result = logic.risk_of_expiry(-1, 3, "2026-12-31", "Milk", "l")
+    assert result == (False, None)
 
 # =========================================================
 # 7. UNDER-BUY EVALUATION
@@ -265,55 +207,17 @@ def test_negative_consumption_rate():
 # Expected: under_buy() runs only when both values are False.
 # Mocking: prevent the real functions and advice from running.
 # =========================================================
-
-def run_underbuy_case(surplus, expiry):
-    with patch.object(
-        logic, "calories_surplus", return_value=surplus
-    ), patch.object(
-        logic, "risk_of_expiry", return_value=expiry
-    ), patch.object(
-        logic, "under_buy"
-    ) as mock_underbuy:
-
-        logic.evaluate_underbuy(
-            item_name="Milk",
-            planned_quantity=3,
-            item_expiry_date="2026-11-04",
-            next_purchase_date="2026-10-18",
-            estimated_consumption_rate=1.37,
-            unit="l",
-            total_estimated_calories=15000
-        )
-
-        # Return the mock so each test can check whether
-        # under_buy() was called.
-        return mock_underbuy
-
-
-def test_no_surplus_no_expiry_calls_underbuy():
-    # Neither risk exists, so under-buy advice is allowed.
-    mock = run_underbuy_case(False, False)
-    mock.assert_called_once()
-
+def test_no_surplus_no_expiry_allows_underbuy():
+    assert logic.should_evaluate_underbuy(False, False) is True
 
 def test_surplus_only_skips_underbuy():
-    # Calorie surplus exists, so skip under-buy advice.
-    mock = run_underbuy_case(True, False)
-    mock.assert_not_called()
-
+    assert logic.should_evaluate_underbuy(True, False) is False
 
 def test_expiry_only_skips_underbuy():
-    # Expiry risk exists, so skip under-buy advice.
-    mock = run_underbuy_case(False, True)
-    mock.assert_not_called()
-
+    assert logic.should_evaluate_underbuy(False, True) is False
 
 def test_surplus_and_expiry_skip_underbuy():
-    # Both risks exist, so skip under-buy advice.
-    mock = run_underbuy_case(True, True)
-    mock.assert_not_called()
-
-
+    assert logic.should_evaluate_underbuy(True, True) is False
 
 # =========================================================
 # 8. TEST THE UNDER_BUY FUNCTION
@@ -324,69 +228,35 @@ def test_surplus_and_expiry_skip_underbuy():
 # Only the date and confidence-score calculation
 # are controlled where needed.
 # =========================================================
-
 @patch.object(logic, "date")
-def test_under_buy_calculates_top_up(mock_date, capsys):
-    # Fix today's date so the test is repeatable.
+def test_under_buy_calculates_top_up(mock_date):
     mock_date.today.return_value = date(2026, 10, 9)
 
-    # Avoid reading the real database for the confidence score.
-    with patch.object(
-        logic, "calculate_confidence_score", return_value=80.0
-    ):
-        result = logic.under_buy(
-            item_name="Milk",
-            planned_quantity=3,
-            item_expiry_date="2026-10-20",
-            next_purchase_date="2026-10-18",
-            estimated_consumption_rate=7
-        )
-
-    output = capsys.readouterr().out
-
-    # Weekly consumption = 7 L.
-    # Daily consumption = 7 / 7 = 1 L.
-    # Planned 3 L will last 3 days.
-    # Next purchase is 9 days away.
-    # Quantity needed = 1 x 9 = 9 L.
-    # Top-up = 9 - 3 = 6 L.
-
-    assert result is None
-    assert "Milk" in output
-    assert "3 days" in output
-    assert "buy 6.0 more" in output
-    assert "80.0%" in output
-
+    result = logic.under_buy(
+        item_name="Milk",
+        planned_quantity=3,
+        item_expiry_date="2026-10-20",
+        next_purchase_date="2026-10-18",
+        estimated_consumption_rate=7
+    )
+    assert result[0] is True
+    assert "Milk" in result[1]
+    assert "9.0" in result[1]
 
 @patch.object(logic, "date")
-def test_under_buy_skips_advice_if_food_expires_first(
-    mock_date, capsys
-):
+def test_under_buy_skips_advice_if_food_expires_first(mock_date):
     mock_date.today.return_value = date(2026, 10, 9)
 
-    with patch.object(
-        logic, "calculate_confidence_score", return_value=80.0
-    ):
-        result = logic.under_buy(
-            item_name="Milk",
-            planned_quantity=3,
-            item_expiry_date="2026-10-10",
-            next_purchase_date="2026-10-18",
-            estimated_consumption_rate=7
-        )
+    result = logic.under_buy(
+        item_name="Milk",
+        planned_quantity=3,
+        item_expiry_date="2026-10-10",
+        next_purchase_date="2026-10-18",
+        estimated_consumption_rate=7
+    )
+    assert result == (False, None)
 
-    output = capsys.readouterr().out
-
-    # The planned quantity takes 3 days to consume,
-    # finishing on 12 October, after the 10 October expiry.
-    # Therefore, no under-buy advice should be displayed.
-
-    assert result is None
-    assert output == ""
-
-
-def test_under_buy_handles_zero_consumption(capsys):
-    # This calls the REAL under_buy() function.
+def test_under_buy_handles_zero_consumption():
     result = logic.under_buy(
         item_name="Milk",
         planned_quantity=3,
@@ -394,13 +264,7 @@ def test_under_buy_handles_zero_consumption(capsys):
         next_purchase_date="2026-10-18",
         estimated_consumption_rate=0
     )
-
-    output = capsys.readouterr().out
-
-    assert result is None
-    assert "Consumption rate is 0" in output
-
-
+    assert result == (False, None)
 # =========================================================
 # 9. HISTORICAL DATA COMPLETENESS
 # Input: consumption history and fridge records.
@@ -413,9 +277,7 @@ def test_no_history_completeness():
     result = logic.calculate_historical_data_completeness(
         "Milk", [], []
     )
-
     assert result == 0
-
 
 def test_history_completeness_matching_records():
     history = [
@@ -480,22 +342,13 @@ def test_standard_deviation_zero_mean():
 # Mocking ensures this test checks the combination formula,
 # rather than recalculating the underlying historical data.
 # =========================================================
-
 def test_confidence_score():
-    with patch(
-        "builtins.open",
-        return_value=io.StringIO(
-            '{"consumption_history": [], "fridge": []}'
-        )
-    ), patch.object(
-        logic,
-        "calculate_data_standard_deviation",
-        return_value=0.8
-    ), patch.object(
-        logic,
-        "calculate_historical_data_completeness",
-        return_value=0.5
+    database = {
+        "consumption_history": [],
+        "fridge": []
+    }
+    with patch.object(logic,"calculate_data_standard_deviation",return_value=0.8
+    ), patch.object(logic,"calculate_historical_data_completeness",return_value=0.5
     ):
-        result = logic.calculate_confidence_score("Milk")
-
+        result = logic.calculate_confidence_score( "Milk", database)
     assert result == 40.0

@@ -1,61 +1,75 @@
 #-------START OF DEPENDENCY LINE----------#
-import sys
 try:
     from datetime import date, timedelta
+    import sys
     import json
-    from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history
-    from IO_manager import show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message
+    from DB_manager import (database_exists, load_database, save_database, update_household_info, 
+                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity)
+    from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
+                            update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
+                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, 
+                            show_exit, output_recommendations)
     from AI_manager import get_ai_recommendations
-    from Logic_manager import under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score
+    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError:
-    print("requried libraries do not exist")
-    sys.exit(1)
+    raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory")
+
+
 database_exists()  # Ensure the database folder and file exist
 database = load_database('database')  # Load the database into memory
-send_log(f"[MAIN] check database is loaded: {database}")
-
 household_info = database['household_info']
 history = database['consumption_history']
 fridge = database['fridge']
 
 
-existing_items = []
+existing_fridge_items = []
 consumed_items = []
 
 #-------END OF DEPENDENCY LINE----------#
+#region user IO 
 show_welcome()
-if household_info == []:
+#if new user, direct them to create a new profile then add items they have in thier fridge
+if household_info == []: 
     household_info = create_profile()
     show_profile(household_info)
-    existing_items = enter_home_items()
-    show_items("Items at home", existing_items)
+    existing_fridge_items = enter_home_items()
+    show_items("Items at home", existing_fridge_items)
     database = update_household_info(database, household_info)
-    database = add_to_fridge(database, existing_items)
+    database = add_to_fridge(database, existing_fridge_items)
 else:
     show_welcome_back(household_info)
     while True:
         choice = ask_menu_choice()
-        if choice == "1":
+        #update consumption history then break loop and continue
+        if choice == "1": 
             consumed_items = update_consumption(fridge)
             database = remove_from_fridge(database, consumed_items)
             database = update_consumption_history(database, consumed_items)
             show_consumption(consumed_items)
             break
-        else:
+        #give user option to edit AI estimated expiry dates or delete items(for example if expired)
+        elif choice == "2": 
             fridge = edit_fridge(fridge)
             database["fridge"] = fridge
+        #exit program
+        else: 
+            save_database(database, 'database')  # Save the database to the specified folder
+            show_exit()
+            sys.exit(1)
 
-grocery_list = enter_grocery_list(fridge + existing_items)
-remarks = ask_remarks()
 days_until_next_visit = ask_days_until_next()
+grocery_list = enter_grocery_list(database)
+remarks = ask_remarks()
 
 send_log(f"[MAIN] \n--- IO results ---")
 send_log(f"[MAIN] household_info = {household_info}")
-send_log(f"[MAIN] existing_items = {existing_items}")
+send_log(f"[MAIN] existing_items = {existing_fridge_items}")
 send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
-send_log(f"[MAIN] days_until_next = {days_until_next_visit}")
+send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
+#endregion 
+
 
 #region AI Recommendations
 send_message("Getting AI recommendations... This can take a while")
@@ -73,51 +87,36 @@ send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 #endregion
 
 
-#logic for database 
-extra_calories = calories_surplus(database, total_planned_calories)
-expiry_dates=[] #for saving to db later
-'''
-#TODO check that recommandations output contains same data as grocery_list
-if len(recommendations) == len(grocery_list):
-    for i in range(0,len(recommendations)):
-        ai_item_name = recommendations[i]["Item_Name"]
-        user_item_name = grocery_list[i]["Item_Name"]
-        ai_ori_quantity = recommendations[i]["Planned_Quantity"]
-        user_quantity = grocery_list[i]["Quantity"]
-        ai_units = recommendations[i]["Units"]
-        user_units = grocery_list[i]["Units"]
-        if ai_item_name == user_item_name and ai_ori_quantity == user_quantity and ai_units == user_units:
-            continue
-        else:
-            pass
-            #return False 
-    #return True
-else:
-    pass
-'''
+#region logic
+extra_calories, calories_message = calories_surplus(database, total_planned_calories, days_until_next_visit)
+risk_of_expiry_messages = []
+underbuy_messages = []
+
 for item in recommendations:
-    item_name = item["Item_Name"]
-    est_consume_rate = item["Estimated_Consumption_Rate"]
-    planned_amt = item["Planned_Quantity"]
-    expiry_date = item["Estimated_Expiry_Date"]
-    unit = item["Unit"]
+    fridge_amt = get_all_fridge_quantity(database, item["Item_Name"])
+    total_amt = fridge_amt + item["Planned_Quantity"] #total amount of item in grocery list AND currently in fridge
+
+    expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 
+    if expiry_message is not None:
+        risk_of_expiry_messages.append(expiry_message) 
+
     next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
-    #needed for saving to database
-    expiry_dates.append(expiry_date)
+    if should_evaluate_underbuy(extra_calories, expire_before_consume):
+        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) 
+        
+        if underbuy_message is not None:
+            underbuy_messages.append(underbuy_message) 
 
-    expire_before_consume = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit)
-    if expire_before_consume is False and extra_calories is False:
-        under_string = under_buy(item_name=item_name, planned_quantity= planned_amt,
-                      item_expiry_date= expiry_date, 
-                      estimated_consumption_rate= est_consume_rate,
-                      next_purchase_date=next_purchase_date)
-        print(f"Underbuy {under_string}")
+    item["Confidence_Score"] = calculate_confidence_score(item["Item_Name"], database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
+#endregion
 
 
-    confidence_score = calculate_confidence_score(item_name, database)
-    print(item_name, confidence_score)
-print("expiry dates:")
-print(expiry_dates)
-final_checkout = shopping_cart_conclusion(grocery_list, remarks, expiry_dates, fridge + existing_items)
+#region user IO confirmation
+output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
+
+final_checkout = shopping_cart_conclusion(recommendations, remarks)
+
 database = add_to_fridge(database, final_checkout)
 save_database(database, 'database')  # Save the database to the specified folder
+show_exit()
+#endregion

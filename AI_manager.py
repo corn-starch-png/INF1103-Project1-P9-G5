@@ -6,7 +6,7 @@ import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
-from IO_manager import send_message, send_log
+from IO_manager import send_log
 
 #region API config
 load_dotenv()
@@ -504,6 +504,28 @@ def process_ai_response(ai_response):
     return data, None
 #endregion
 
+#region check AI response order matches original grocery_list
+def check_ai_output(recommendations, grocery_list):
+    if not isinstance(recommendations, list) or not isinstance(grocery_list, list):
+        return False
+    if len(recommendations) != len(grocery_list):
+        return False
+    for ai_item, original in zip(recommendations, grocery_list):
+        if not isinstance(ai_item, dict) or not isinstance(original, dict):
+            return False
+        for ai_field, original_field in (
+            ("Item_Name", "Item_Name"),
+            ("Planned_Quantity", "Quantity"),
+            ("Unit", "Unit"),
+        ):
+            if ai_field not in ai_item or original_field not in original:
+                return False
+            if ai_item[ai_field] != original[original_field]:
+                return False
+    return True
+#endregion
+
+
 #region Functions to be implemented for main.py to call AI_manager.py
 # To use functions to get specific data from the AI output, you can implement the following functions in main.py:
 # ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next)
@@ -542,10 +564,16 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     update_ai_status("Validating AI output...")
     # Process and validate the AI response
     ai_output, error = process_ai_response(ai_response)
+
     if error:
         update_ai_status("AI output validation failed.")
         send_log(error)
         return None, error
 
+    if not check_ai_output( ai_output["Recommendations_List"], purchase_stock):
+        error = ("AI recommendations do not match the original grocery list: item names, quantities, units, or order.")
+        update_ai_status("AI output validation failed.")
+        send_log(error)
+        return None, error
     return ai_output, None
 #endregion
