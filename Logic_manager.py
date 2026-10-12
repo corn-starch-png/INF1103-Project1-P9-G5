@@ -1,7 +1,7 @@
 import json 
 import statistics
 from datetime import datetime,date,timedelta
-from DB_manager import KCAL_TABLE
+from DB_manager import KCAL_TABLE, BONUS_KEYWORDS_FULL_PTS, BONUS_KEYWORDS_HALF_PTS
 from IO_manager import send_log, send_message
 
 
@@ -158,6 +158,21 @@ def ai_agreement_score(normalized_daily_consumption, ai_recommendation, fridge_a
     agreement_score = 1 - (difference / largest_quantity)
 
     return agreement_score
+
+#bonus score (MAX 5%)
+#bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
+def calculate_bonus(remarks):
+    if not remarks or remarks == "None":
+        return 0.0
+    remarks = remarks.lower()
+
+    if any(word in remarks for word in BONUS_KEYWORDS_FULL_PTS):
+        return 5.0
+
+    if any(word in remarks for word in BONUS_KEYWORDS_HALF_PTS):
+        return 2.5
+
+    return 0.0
 
 def calculate_historical_score(item_name, database):
     # Retrieve consumption history and fridge stock from the existing database
