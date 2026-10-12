@@ -439,14 +439,14 @@ def output_recommendations(calories_message, risk_of_expiry_messages, underbuy_m
     print(f"\n{calories_message}")
     print(f"\n--------------------------------------------------------------------------------")
     if len(risk_of_expiry_messages) != 0:
-        print(f"\nBased on Estimated consumption rate and Expiry date, you will not able to finish:")
+        print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able to finish:")
         for i in range(len(risk_of_expiry_messages)):
-            print(f"{i+1}. {risk_of_expiry_messages[i]}") 
+            print(f"  {i+1}. {risk_of_expiry_messages[i]}") 
         print(f"\n--------------------------------------------------------------------------------")
     if len(underbuy_messages) != 0:
         print(f"You are forcasted to finish the following items before your next indicated grocery run:")
         for i in range(len(underbuy_messages)):
-            print(f"{i+1}. {underbuy_messages[i]}") 
+            print(f"  {i+1}. {underbuy_messages[i]}") 
         print(f"\n--------------------------------------------------------------------------------")
 
 

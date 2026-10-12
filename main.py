@@ -3,12 +3,13 @@ import sys
 try:
     from datetime import date, timedelta
     import json
-    from DB_manager import database_exists, load_database, save_database, update_household_info, add_to_fridge, remove_from_fridge, update_consumption_history
+    from DB_manager import (database_exists, load_database, save_database, update_household_info, 
+                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
-                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message,output_recommendations)
+                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_log, send_message, output_recommendations)
     from AI_manager import get_ai_recommendations
-    from Logic_manager import (under_buy,calories_surplus,risk_of_expiry,calculate_confidence_score,should_evaluate_underbuy)
+    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError:
     print("requried libraries do not exist")
     sys.exit(1)
@@ -90,17 +91,15 @@ for item in recommendations:
     planned_amt = item["Planned_Quantity"]
     expiry_date = item["Estimated_Expiry_Date"]
     unit = item["Unit"]
-    next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
+    total_amt = get_all_fridge_quantity(database, item_name) + planned_amt #total amount of item in grocery list AND currently in fridge
 
-    expire_before_consume, expiry_message = risk_of_expiry(est_consume_rate, planned_amt, expiry_date, item_name, unit) #TODO risk of expiry not taking into account fridge values
+    expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 
     if expiry_message is not None:
         risk_of_expiry_messages.append(expiry_message) 
 
+    next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
     if should_evaluate_underbuy(extra_calories, expire_before_consume):
-        need_to_buy_more, underbuy_message = under_buy(item_name=item_name, planned_quantity= planned_amt,
-                      item_expiry_date= expiry_date, 
-                      estimated_consumption_rate= est_consume_rate,
-                      next_purchase_date=next_purchase_date) #TODO under_buy not taking into account fridge values
+        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) #TODO under_buy not taking into account fridge values
         
         if underbuy_message is not None:
                 underbuy_messages.append(underbuy_message) 

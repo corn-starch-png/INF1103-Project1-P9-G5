@@ -33,7 +33,7 @@ def calories_surplus(database, total_estimated_calories, days_until_next_visit):
     family_members = database.get("household_info", [])
     family_calorie_until_next_visit = calculate_family_kcal(family_members, days_until_next_visit, KCAL_TABLE)
 
-    send_log(f"Total family calories until next visit: {family_calorie_until_next_visit}")
+    send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")
     exceed_calorie = total_estimated_calories - family_calorie_until_next_visit
 
     # if total calories (AI output)  > total calories that family needs (User input) and returns true, else false
@@ -42,32 +42,32 @@ def calories_surplus(database, total_estimated_calories, days_until_next_visit):
         return True, f"Exceeded recommended calories values by {exceed_calorie}kcal"
     else:
         send_log(f"[LOGIC] Calories surplus is: False")
-        return False, f"Short of {abs(exceed_calorie)}kcal to hit recommened calories"
+        return False, f"Short of {abs(exceed_calorie)}kcal to hit recommended calories"
     
 # RISK OF EXPIRY LOGIC------------------------
 # calculating risk of expiry
-def risk_of_expiry(estimated_consumption_rate, planned_quantity, item_expiry_date, item_name, unit):
-    if estimated_consumption_rate > 0:
+def risk_of_expiry(item, total_amt_of_items):
+    if item["Estimated_Consumption_Rate"] > 0:
         today = date.today()
         # calculation of daily consumption rate per day
         # Retain calculation precision to prevent very small positive rates from rounding to zero
-        daily_consumption_rate = estimated_consumption_rate / 7
+        daily_consumption_rate = item["Estimated_Consumption_Rate"] / 7
         # daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
 
         # days taken to finish consuming the item
-        estimated_days_to_consume = round(planned_quantity / daily_consumption_rate)
+        estimated_days_to_consume = round(total_amt_of_items / daily_consumption_rate)
                     
-        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        item_expiry_date = datetime.strptime(item["Estimated_Expiry_Date"], "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
         #if the days taken to consume an item is greater than days to expire
         if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
-            send_log(f"[LOGIC] Risk of expiry is True for {item_name}")
-            return True, f"{planned_quantity}{unit} of {item_name} expiring {item_expiry_date}. (you consume {estimated_consumption_rate} a week)"
+            send_log(f"[LOGIC] Risk of expiry is True for {item["Item_Name"]}")
+            return True, f"{item["Planned_Quantity"]} {item["Unit"]} of {item["Item_Name"]} expiring {item_expiry_date}. (you consume {item["Estimated_Consumption_Rate"]} {item["Unit"]} a week)"
         else:
-            send_log(f"[LOGIC] Risk of expiry is False for {item_name}")
+            send_log(f"[LOGIC] Risk of expiry is False for {item["Item_Name"]}")
             return False, None 
     else:
         # estimated_consumption_rate <= 0:
-        send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
+        send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item["Item_Name"]}")
         return False, None 
         
 # evalaute if both risk of expiry & calories surplus is False, then prompt underbuy()     
@@ -172,29 +172,29 @@ def should_evaluate_underbuy(calorie_surplus, expiry_risk):
     return calorie_surplus is False and expiry_risk is False
 
 #under_buy will pull from basket/grocery_list
-def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate):
+def under_buy(item, next_purchase_date, total_amt):
     # processing dates and calculating new variable with them
-    if estimated_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
+    if item["Estimated_Consumption_Rate"] >0: #no consumption rate how uw me calculate? just ignore. 
         today = date.today()
         #prevents small positive consumption rates from being rounded down to zero before division.
-        daily_consumption_rate = estimated_consumption_rate / 7
-        item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
+        daily_consumption_rate = item["Estimated_Consumption_Rate"] / 7
+        item_expiry_date = datetime.strptime(item["Estimated_Expiry_Date"], "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
         
         #calculating Nth amount needed to not run out of food
         next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
         days_to_next_purchase = (next_purchase_date - today).days  #extra n from datetime.timedelta(days=n)
         quantity_needed = daily_consumption_rate * days_to_next_purchase
-        amount_to_topup = round (quantity_needed - planned_quantity, 2)
+        amount_to_topup = round (quantity_needed - total_amt, 2)
 
         if amount_to_topup > 0:
-            return True, f"{item_name}: Originally {planned_quantity}, Recommeneded to buy {quantity_needed} instead"
+            return True, f"{item["Item_Name"]}: Originally {item["Planned_Quantity"]}, Recommeneded to buy {quantity_needed} instead"
 
         elif amount_to_topup <=0:
-            send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
+            send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")
             return False, None
 
-    elif estimated_consumption_rate <=0:
-        send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
+    elif item["Estimated_Consumption_Rate"] <=0:
+        send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item["Item_Name"]}")
         return False, None
 
 

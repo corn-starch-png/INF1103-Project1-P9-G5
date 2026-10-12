@@ -192,13 +192,10 @@ def save_database(database, folder='database'):
 #returns the total quantity of the item in the fridge and consumption_history tables
 #in-put: <dictionary> database, <string> item_name
 #output: <integer> total quantity of the item in the fridge and consumption_history tables
-def get_all_quantity(database, item_name):
+def get_all_fridge_quantity(database, item_name):
     # Implementation for retrieving all quantities of a specific item from the fridge table
     total_quantity = 0
     for entry in database.get('fridge', []):
-        if entry.get('Item_Name').lower() == item_name.lower():
-            total_quantity += entry.get('Quantity')
-    for entry in database.get('consumption_history', []):
         if entry.get('Item_Name').lower() == item_name.lower():
             total_quantity += entry.get('Quantity')
     return total_quantity
