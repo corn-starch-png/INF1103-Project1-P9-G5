@@ -1,5 +1,5 @@
-from datetime import date, timedelta, datetime
-import os
+from datetime import date, timedelta
+from DB_manager import send_log
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
@@ -610,17 +610,6 @@ def show_exit():
 def send_message(message):
     print(f"{message}")
 
-#current_datetime used to generate log filename
-#only used by send_log function so its down here for easier reference
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-def send_log(message):
-    filename=f"{current_datetime}.log"
-    if not os.path.exists(filename):
-        with open(filename, 'w') as f:
-            f.write(message)
-    else:
-        with open(filename, 'a') as f:
-            f.write(f"\n{message}")
 
  
 # =====================================================================
