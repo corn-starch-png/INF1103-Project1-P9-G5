@@ -134,6 +134,30 @@ def consumption_consistency_score(normalized_daily_consumption):
     cv = sd / mean
     return 1 / (1 + cv)
 
+#agreement score
+#scores how closely AI estimations correlate with own calculations of past data
+def ai_agreement_score(normalized_daily_consumption, ai_recommendation, fridge_amt, days_until_next_visit):
+    #calculate recommeneded quantity based on past data
+    self_avg_consumption_rate = sum(normalized_daily_consumption)/len(normalized_daily_consumption)
+
+    print(self_avg_consumption_rate)
+    algorithm_quantity = round((self_avg_consumption_rate * days_until_next_visit) - fridge_amt, 2)
+    if algorithm_quantity < 0: # no negative recommendations
+        algorithm_quantity = 0
+    ai_quantity = ai_recommendation["Recommended_Quantity"]
+
+    if algorithm_quantity == 0 and ai_quantity == 0:
+        return 1.0
+
+    #compare AI and own calculation values
+    largest_quantity = max(algorithm_quantity, ai_quantity)
+    difference = abs(algorithm_quantity - ai_quantity)
+    print(f"algorithm qty:{algorithm_quantity}")
+    print(largest_quantity)
+    print(difference)
+    agreement_score = 1 - (difference / largest_quantity)
+
+    return agreement_score
 
 def calculate_historical_score(item_name, database):
     # Retrieve consumption history and fridge stock from the existing database
