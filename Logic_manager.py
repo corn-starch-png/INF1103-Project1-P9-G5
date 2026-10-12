@@ -175,29 +175,22 @@ def should_evaluate_underbuy(calorie_surplus, expiry_risk):
 def under_buy(item_name, planned_quantity, item_expiry_date, next_purchase_date, estimated_consumption_rate):
     # processing dates and calculating new variable with them
     if estimated_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
-        #TODO remove redundant code, lines below are repeating ROE code
         today = date.today()
         #prevents small positive consumption rates from being rounded down to zero before division.
         daily_consumption_rate = estimated_consumption_rate / 7
-        #daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
-        estimated_day_to_consume = round(planned_quantity / daily_consumption_rate)
-    
         item_expiry_date = datetime.strptime(item_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
-        day_item_is_eaten = today + timedelta(days = estimated_day_to_consume)
-
+        
         #calculating Nth amount needed to not run out of food
         next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
         days_to_next_purchase = (next_purchase_date - today).days  #extra n from datetime.timedelta(days=n)
         quantity_needed = daily_consumption_rate * days_to_next_purchase
         amount_to_topup = round (quantity_needed - planned_quantity, 2)
 
-        if day_item_is_eaten < item_expiry_date and amount_to_topup > 0:
+        if amount_to_topup > 0:
             return True, f"{item_name}: Originally {planned_quantity}, Recommeneded to buy {quantity_needed} instead"
 
         elif amount_to_topup <=0:
             send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
-            return False, None
-        else:
             return False, None
 
     elif estimated_consumption_rate <=0:
