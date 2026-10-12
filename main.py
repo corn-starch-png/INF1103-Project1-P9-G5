@@ -16,7 +16,9 @@ except ImportError:
 
 
 database_exists()  # Ensure the database folder and file exist
-database = load_database('database')  # Load the database into memory
+db_success, database = load_database('database')  # Load the database into memory
+if db_success == False:
+    send_message(f"Database loading encountered issues, data may be missing")
 household_info = database['household_info']
 history = database['consumption_history']
 fridge = database['fridge']
