@@ -17,7 +17,8 @@ FILE_STRUCTURE = {
 #only used by send_log function 
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 def send_log(message):
-    filename=f"logs/{current_datetime}.log"
+    os.makedirs("logs", exist_ok=True)
+    filename = f"logs/{current_datetime}.log"
     if not os.path.exists(filename):
         with open(filename, 'w') as f:
             f.write(message)

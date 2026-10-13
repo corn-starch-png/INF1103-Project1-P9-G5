@@ -23,10 +23,8 @@ household_info = database['household_info']
 history = database['consumption_history']
 fridge = database['fridge']
 
-
 existing_fridge_items = []
 consumed_items = []
-
 #-------END OF DEPENDENCY LINE----------#
 #region user IO 
 show_welcome()
@@ -72,13 +70,11 @@ send_log(f"[MAIN] remarks = {remarks}")
 send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
 #endregion 
 
-
 #region AI Recommendations
 send_message("Getting AI recommendations... This can take a while")
 ai_recommendations, error = get_ai_recommendations(household_info, history, fridge, grocery_list,remarks,days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
-
 recommendations = ai_recommendations.get("Recommendations_List", [])
 total_planned_calories = ai_recommendations.get("Total_Planned_Estimated_Calories", 0)
 total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
@@ -86,7 +82,6 @@ total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 
 send_log(f"[MAIN] Total Planned Estimated Calories: {total_planned_calories}")
 send_log(f"[MAIN] Total Recommended Calories: {total_recommended_calories}")
 #endregion
-
 
 #region logic
 extra_calories, calories_message = calories_surplus(database, total_planned_calories, days_until_next_visit)
@@ -110,7 +105,6 @@ for item in recommendations:
 
     item["Confidence_Score"] = calculate_confidence_score(item["Item_Name"], database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
 #endregion
-
 
 #region user IO confirmation
 output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
