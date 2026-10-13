@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
-from DB_manager import MAX_ITEM_NAME_LENGTH, MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years
-
+from DB_manager import (MAX_ITEM_NAME_LENGTH, MAX_PERSON_NAME_LENGTH, MAX_DIETARY_LENGTH, 
+                        MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years)
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
 
@@ -138,12 +138,10 @@ def enter_date(question, allow_past=False, purchase_date=""):
             print("Warning: this item has already expired. Do not consume it.")
         return text
 
-
 # Collect a new user's profile and their family members' details.
 # Returns a list in the database's household_info format (the user is Person_ID 1).
 def create_profile():
-    name = enter_text("Please enter your name: ")
- 
+    name = enter_text("Please enter your name: ",max_length=MAX_PERSON_NAME_LENGTH)
     while True:
         age = input("Please enter your age: ").strip()
         if age.isdecimal() and 10 <= int(age) <= 120:
@@ -156,8 +154,8 @@ def create_profile():
         if gender in valid_genders:
             break
         print("Please enter male or female.")
- 
-    dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", True)
+
+    dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", allow_blank=True, max_length=MAX_DIETARY_LENGTH)
     if dietary_restrictions == "":
         dietary_restrictions = "none"
  
@@ -178,8 +176,8 @@ def create_profile():
     }
  
     for i in range(family - 1):
-        member_name = enter_text(f"Please enter the name of family member {i + 1}: ")
- 
+        member_name = enter_text(f"Please enter the name of family member {i + 1}: ", max_length=MAX_PERSON_NAME_LENGTH)
+
         while True:
             member_age = input(f"Please enter the age of {member_name}: ").strip()
             if member_age.isdecimal() and 1 <= int(member_age) <= 120:
@@ -192,8 +190,8 @@ def create_profile():
             if member_gender in valid_genders:
                 break
             print("Please enter male or female.")
- 
-        member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", True)
+
+        member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", allow_blank=True, max_length=MAX_DIETARY_LENGTH)
         if member_diet == "":
             member_diet = "none"
  
@@ -230,71 +228,84 @@ def create_profile():
  
 # For new users: Collect the food items they already have at home, with expiry dates.
 # Returns a list in the database's fridge format
-def enter_home_items():
-    def add_item(remaining_items):
-            item = enter_item(remaining_items)
-            expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
-            item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
-            if item_remarks == "":
-                item_remarks = "none"
-    
-            item["Purchase_Date"] = ""
-            item["Expiry_Date"] = expiry_date
-            item["Remarks"] = item_remarks
-    
-            # If the same item with the same expiry date was already entered, add to it
-            found = False
-            for existing in remaining_items:
-                if (existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]
-                        and existing["Expiry_Date"] == item["Expiry_Date"]):
-                    existing["Quantity"] += item["Quantity"]
-                    # Keep both remarks if they are different
-                    if item["Remarks"] != "none" and item["Remarks"] != existing["Remarks"]:
-                        if existing["Remarks"] == "none":
-                            existing["Remarks"] = item["Remarks"]
-                        else:
-                            existing["Remarks"] = existing["Remarks"] + ", " + item["Remarks"]
-                    found = True
-                    print(f"{existing['Item_Name']} is already in your home items. Total is now {format_item(existing)}.")
-                    return remaining_items
-    
-            if not found:
-                remaining_items.append(item)
-                print(f"Added {format_item(item)} to your home items.")
+def add_item(remaining_items):
+    item = enter_item(remaining_items)
+    expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
+    item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
+
+    if item_remarks == "":
+        item_remarks = "none"
+
+    item["Purchase_Date"] = ""
+    item["Expiry_Date"] = expiry_date
+    item["Remarks"] = item_remarks
+
+    # Check whether an identical item and expiry date already exist
+    for existing in remaining_items:
+        if (
+            existing["Item_Name"].lower() == item["Item_Name"].lower()
+            and existing["Unit"] == item["Unit"]
+            and existing["Expiry_Date"] == item["Expiry_Date"]
+        ):
+            # Add quantities using Decimal
+            combined_quantity = (Decimal(str(existing["Quantity"])) + Decimal(str(item["Quantity"])))
+            if combined_quantity > MAX_QUANTITY:
+                print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
                 return remaining_items
 
+            # Merge remarks safely
+            new_remarks = existing["Remarks"]
 
+            if item["Remarks"] != "none" and item["Remarks"] != new_remarks:
+                if new_remarks == "none":
+                    new_remarks = item["Remarks"]
+                else:
+                    new_remarks += ", " + item["Remarks"]
+
+            if len(new_remarks) > MAX_REMARKS_LENGTH:
+                print(f"Combined remarks cannot exceed {MAX_REMARKS_LENGTH} characters.")
+                return remaining_items
+
+            # Update the existing item after validation
+            existing["Quantity"] = normalize_quantity(combined_quantity)
+            existing["Remarks"] = new_remarks
+
+            print(f"{existing['Item_Name']} is already in your home items.\nTotal is now {format_item(existing)}.")
+            return remaining_items
+
+    # No matching item found then will add a new item
+    remaining_items.append(item)
+
+    print(f"Added {format_item(item)} to your home items.")
+    return remaining_items
+
+# Collect home inventory during initial registration
+def enter_home_items():
     while True:
         has_items = input("\nDo you have any food items at home you want to add? (yes/no): ").strip().lower()
-        if has_items in ["yes", "y", "no", "n"]:
-            break
+        if has_items in ("yes", "y", "no", "n"): break
         print("Please answer yes or no.")
- 
     remaining_items = []
-    if has_items in ["no", "n"]:
-        return remaining_items
-
-
-
+    if has_items in ("no", "n"): return remaining_items
     print("\nEnter the items you currently have at home.")
     remaining_items = add_item(remaining_items)
     while True:
         display_list("Fridge", remaining_items)
         user_choice = ask_add_another()
-        if user_choice == "1": # add items
+
+        if user_choice == "1":
             remaining_items = add_item(remaining_items)
-        elif user_choice == "2": #edit cart
+        elif user_choice == "2":
+            if not remaining_items:
+                print("No items to edit or remove.")
+                continue
             while True:
                 display_list("Fridge", remaining_items)
                 remaining_items, exit_code = edit_list(remaining_items)
-                if exit_code == True:
+                if exit_code:
                     break
-        else: # exit CRUD of cart 
-            break
-
- 
-    return remaining_items
- 
+        else:
+            return remaining_items
 
 # For returning users: Ask how much of each item they consumed since last visit.
 # Batches of the same item are combined into one question.
@@ -310,12 +321,10 @@ def update_consumption(previous_inventory):
     for item in previous_inventory:
         key = (item["Item_Name"].lower(), item["Unit"])
         if key in totals:
-            totals[key]["Quantity"] += item["Quantity"]
+            totals[key]["Quantity"] += Decimal(str(item["Quantity"]))
         else:
-            totals[key] = {"Item_Name": item["Item_Name"], "Quantity": item["Quantity"], "Unit": item["Unit"]}
- 
+            totals[key] = {"Item_Name": item["Item_Name"], "Quantity": Decimal(str(item["Quantity"])), "Unit": item["Unit"]} 
     print("\nUpdate Consumption.")
- 
     # Asked once for the whole consumption list
     while True:
         text = input("How many days has it been since you last used the app? ").strip()
@@ -326,7 +335,7 @@ def update_consumption(previous_inventory):
  
     for key in totals:
         name = totals[key]["Item_Name"]
-        total = round(totals[key]["Quantity"], 4)
+        total = totals[key]["Quantity"]
         unit = totals[key]["Unit"]
         while True:
             text = input(f"How much {name} did you consume? (you have {total} {unit}): ").strip()
@@ -427,17 +436,21 @@ def enter_grocery_list(database):
         # If the same item with the same unit was already entered, add to it
         found = False
         for existing in grocery_list:
-            if existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]:
-                existing["Quantity"] += item["Quantity"]
+            if (existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]):
+                combined_quantity = (Decimal(str(existing["Quantity"])) + Decimal(str(item["Quantity"])))
+                if combined_quantity > MAX_QUANTITY:
+                    print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
+                    return grocery_list
+                # To normalize to prevent e.g 0.30000000004 values
+                existing["Quantity"] = normalize_quantity(combined_quantity)
                 found = True
-                print(f"{existing['Item_Name']} is already in your list. Total is now {format_item(existing)}.")
+                print(f"{existing['Item_Name']} is already in your list.\nTotal is now {format_item(existing)}.")
                 return grocery_list
         if not found:
             grocery_list.append(item)
             print(f"Added {format_item(item)}.")
         return grocery_list
-
-        
+    
     fridge_items = database["fridge"]
     consumed_items = database["consumption_history"]
     if fridge_items is None:
@@ -588,10 +601,6 @@ def shopping_cart_conclusion(item_list, remarks):
         else:
             print("Invalid input. Please enter 'yes' or 'no'.")
 
-
-
-
-
 # Formatting----------- 
 def format_item(item):
     text = f"{item['Quantity']:g} {item['Unit']} of {item['Item_Name']}"
@@ -604,7 +613,11 @@ def format_item(item):
         text += f" ({', '.join(details)})"
     return text
 
-
+# Display four dp correctly
+def format_display_quantity(value):
+    text = format(Decimal(str(value)), "f")
+    if "." in text: text = text.rstrip("0").rstrip(".")
+    return text
 #display either the fridge, grocery cart or recommendations list in a numbered list format
 #list_name can ONLY be "Fridge" or "Grocery Cart" or "Recommendations List"
 def display_list(list_name, item_list):
@@ -625,7 +638,7 @@ def display_list(list_name, item_list):
         header += f"{'Recommended amt':<16}| {'CS*':<6}| "
         
     elif list_name == "Fridge":
-        header += f"{'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
+        header += f"{'Purchase date':<14}| {'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
     print(header)
 
 
@@ -633,12 +646,12 @@ def display_list(list_name, item_list):
     for i in range(0,len(item_list)):
         message = f"{i+1:<4}| {item_list[i]['Item_Name']:<{name_width}}| "
         if list_name == "Grocery Cart": #pre AI grocery list
-            cur_amt_formatted = f"{round(item_list[i]['Quantity'], 2)} {item_list[i]['Unit']}"
+            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
             message += f"{cur_amt_formatted:<12}| "
 
         elif list_name == "Recommendations List":
-            cur_amt_formatted = f"{round(item_list[i]['Planned_Quantity'], 2)} {item_list[i]['Unit']}"
-            recommened_amt_formatted = f"{item_list[i]['Recommended_Quantity']} {item_list[i]['Unit']}"
+            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Planned_Quantity'])} {item_list[i]['Unit']}"
+            recommened_amt_formatted = f"{format_display_quantity(item_list[i]['Recommended_Quantity'])} {item_list[i]['Unit']}"
             if item_list[i]['Confidence_Score'] == 0:
                 confidence_score_formatted = f"NA"
             else:
@@ -646,8 +659,8 @@ def display_list(list_name, item_list):
             message += f"{cur_amt_formatted:<12}| {recommened_amt_formatted:<16}| {confidence_score_formatted:<6}| "
 
         elif list_name == "Fridge":
-            cur_amt_formatted = f"{round(item_list[i]['Quantity'], 2)} {item_list[i]['Unit']}"
-            message += f"{cur_amt_formatted:<12}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
+            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
+            message += f"{cur_amt_formatted:<12}| {item_list[i]['Purchase_Date']:<14}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
         print(message)
 
     if list_name == "Recommendations List":
