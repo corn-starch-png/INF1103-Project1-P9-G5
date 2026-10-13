@@ -4,9 +4,9 @@ try:
     import sys
     from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
                             add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, send_log)
-    from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, show_items, show_welcome_back, 
+    from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, display_list, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
-                            shopping_cart_conclusion, ask_menu_choice, edit_fridge, send_message, 
+                            shopping_cart_conclusion, ask_menu_choice, update_fridge, send_message, 
                             show_exit, output_recommendations)
     from AI_manager import get_ai_recommendations
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
@@ -33,7 +33,7 @@ if household_info == []:
     household_info = create_profile()
     show_profile(household_info)
     existing_fridge_items = enter_home_items()
-    show_items("Items at home", existing_fridge_items)
+    display_list("Fridge", existing_fridge_items)
     database = update_household_info(database, household_info)
     database = add_to_fridge(database, existing_fridge_items)
 else:
@@ -49,7 +49,7 @@ else:
             break
         #give user option to edit AI estimated expiry dates or delete items(for example if expired)
         elif choice == "2": 
-            fridge = edit_fridge(fridge)
+            fridge = update_fridge(fridge)
             database["fridge"] = fridge
         #exit program
         else: 
