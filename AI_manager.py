@@ -458,15 +458,7 @@ def handle_ai_exception(error):
     elif isinstance(error, APIConnectionError):
         return("Error: Could not connect to Configured API URL.\nCheck API_URL and internet connectivity.")
     elif isinstance(error, BadRequestError):
-        print("\n========== OPENROUTER DEBUG ==========")
-        print(f"Error type: {type(error).__name__}")
-        print(f"Error details: {error}")
-        print(f"HTTP status: {error.status_code}")
-        if error.response is not None:
-            print(f"Response: {error.response.text}")
-        print("======================================\n")
-        return ("Error: OpenRouter rejected the request.\nCheck the model, prompt or response schema.")
-        #return("Error: OpenRouter rejected the request.\nCheck the model, prompt or response schema.")
+        return("Error: OpenRouter rejected the request.\nCheck the model, prompt or response schema.")
     elif isinstance(error, APIStatusError):
         return (f"Error: AI API has returned HTTP Error Code: {error.status_code}.")
     return(f"Unexpected AI API error: {error}")
