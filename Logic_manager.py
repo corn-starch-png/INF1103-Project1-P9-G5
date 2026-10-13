@@ -156,12 +156,12 @@ def calculate_confidence_score(item_name, database, recommended_amt, fridge_amt,
     #consistency score (was calculate_data_standard_deviation)
     #scores how consistent past consumption has been
     def consumption_consistency_score(normalized_daily_consumption):
-        if len(normalized_daily_consumption) < 2:
-            return 0.0
-
+        if len(normalized_daily_consumption) < 2: return 0.0
         sd = statistics.stdev(normalized_daily_consumption)
         mean = statistics.mean(normalized_daily_consumption)
-
+        # Prevent division by zero when all consumption is zero.
+        # Zero mean does not provide a meaningful coefficient of variation.
+        if mean == 0: return 0.0
         cv = sd / mean
         return 1 / (1 + cv)
 
