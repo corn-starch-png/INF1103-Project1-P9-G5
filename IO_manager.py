@@ -277,6 +277,7 @@ def enter_home_items():
 
 
     print("\nEnter the items you currently have at home.")
+    remaining_items = add_item(remaining_items)
     while True:
         display_list("Fridge", remaining_items)
         user_choice = ask_add_another()
@@ -608,7 +609,7 @@ def format_item(item):
 #list_name can ONLY be "Fridge" or "Grocery Cart" or "Recommendations List"
 def display_list(list_name, item_list):
     if not item_list:
-            print("  (empty! add some items to see something)")
+            print(f"\n{list_name}\n  (empty! add some items to see something)")
             return
     
     name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
@@ -704,6 +705,7 @@ if __name__ == "__main__":
     previous_inventory = []  # e.g. [{"Item_Name": "Milk", "Quantity": 2, "Unit": "l", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05", "Remarks": "None"}]
     remaining_items = []
     consumed_items = []
+    database = {'consumption_history': [], 'household_info': [], 'fridge': []}
  
     show_welcome()
  
@@ -723,7 +725,7 @@ if __name__ == "__main__":
             else:
                 previous_inventory = update_fridge(previous_inventory)
  
-    grocery_list = enter_grocery_list(previous_inventory + remaining_items)
+    grocery_list = enter_grocery_list(database)
  
     remarks = ask_remarks()
     days_until_next = ask_days_until_next()
