@@ -94,7 +94,7 @@ def enter_quantity(question):
 def ask_add_another():
     while True:
         print(f"\n1. Add item")
-        print(f"2. edit/remove an item")
+        print(f"2. Edit/Remove an item")
         print(f"3. Confirm and submit items")
         option = input("Choose your option (1,2 or 3): ").strip().lower()
         if option in ["1", "2", "3"]:
@@ -541,17 +541,41 @@ def update_fridge(fridge):
             print(f"Please enter a number between 1 and {len(fridge)}.")
 
         if action == "1":
-            expiry_date = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ", allow_past=True,purchase_date=fridge[number].get("Purchase_Date", ""))
-            similar_item = False
-            for item in fridge:
-                if item["Item_Name"] == fridge[number]["Item_Name"] and item["Unit"] == fridge[number]["Unit"] and item["Purchase_Date"] == fridge[number]["Purchase_Date"] and item["Expiry_Date"] != expiry_date and item["Remarks"] == fridge[number]["Remarks"]:
-                    similar_item = True
-                    item["Quantity"] += fridge[number]["Quantity"]
-                    fridge.pop(number)
-                    break
-            if similar_item == False:
-                fridge[number]["Expiry_Date"] = expiry_date
-            print(f"Updated: {format_item(fridge[number])}")
+            selected_item = fridge[number]
+            expiry_date = enter_date(f"New expiry date for {selected_item['Item_Name']} (YYYY-MM-DD): ",
+                allow_past=True, purchase_date=selected_item.get("Purchase_Date", ""))
+
+            matching_indices = []
+            total_quantity = Decimal(str(selected_item["Quantity"]))
+
+            for index, existing in enumerate(fridge):
+                if index == number:
+                    continue
+
+                if (
+                    existing["Item_Name"].lower() == selected_item["Item_Name"].lower()
+                    and existing["Unit"] == selected_item["Unit"]
+                    and existing.get("Purchase_Date", "") == selected_item.get("Purchase_Date", "")
+                    and existing["Expiry_Date"] == expiry_date
+                    and existing.get("Remarks", "none") == selected_item.get("Remarks", "none")
+                ):
+                    matching_indices.append(index)
+                    total_quantity += Decimal(str(existing["Quantity"]))
+
+            if total_quantity > MAX_QUANTITY:
+                print(f"Total quantity cannot exceed {MAX_QUANTITY:,}. Expiry date was not changed.")
+                continue
+
+            selected_item["Expiry_Date"] = expiry_date
+            selected_item["Quantity"] = normalize_quantity(total_quantity)
+
+            for index in reversed(matching_indices):
+                fridge.pop(index)
+
+            if matching_indices:
+                print(f"Updated and merged: {format_item(selected_item)}")
+            else:
+                print(f"Updated: {format_item(selected_item)}")
         else:
             removed = fridge.pop(number)
             print(f"{format_item(removed)} has been removed from your fridge.")
