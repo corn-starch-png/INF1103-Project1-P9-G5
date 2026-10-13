@@ -1,7 +1,20 @@
+# Environment variables / secrets
 .env
 .env.*
+
+# Database
 **/*.json
 database/
+
+# Logs
+logs/
+*.log
+
+# Python
 __pycache__/
-.git/
+.pytest_cache/
+*.py[cod]
 .venv/
+
+# Git
+.git/

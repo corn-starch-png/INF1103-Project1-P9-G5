@@ -1,12 +1,13 @@
 from datetime import date, timedelta
 import json
+import math
 import os
 import time
 import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
-from DB_manager import send_log
+from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
 
 #region API config
 load_dotenv()
@@ -19,15 +20,15 @@ def create_ai_client():
             raise ValueError("API_URL not found in environment file")
     return OpenAI(base_url=base_url,api_key=api_key)
 
-def get_ai_model():
-    ai_model = os.getenv("AI_MODEL")
+def get_ai_model(model_type="AI_MODEL"):
+    ai_model = os.getenv(model_type, "").strip()
     if not ai_model:
-        raise ValueError("AI_MODEL not found in environment file")
+        raise ValueError(f"{model_type} not found in environment file")
     return ai_model
 #endregion
 
 #region Date Conversion
-def date_convert(current_date, days_until_next):
+def get_next_purchase_date(current_date, days_until_next):
     try:
         next_purchase_date = current_date + timedelta(days=days_until_next)
         return next_purchase_date
@@ -42,7 +43,7 @@ def get_expiration_date(current_date, default_expiration_days):
         return expiration_date
     except ValueError:
         raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
-    
+
 def get_default_expiration_date(current_date, default_expiration_days):
     try:
         default_expiration_date = current_date + timedelta(days=default_expiration_days)
@@ -51,8 +52,7 @@ def get_default_expiration_date(current_date, default_expiration_days):
         raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
 #endregion
 
-#For main.py to prepare data for AI processing
-#region data preparation
+#region data preparation for ai prompt
 def prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input,remarks, current_date=None, next_purchase_date=None):
     return {
         "household_info": household_info,
@@ -333,16 +333,15 @@ OUTPUT RULES:
 
 #region Check AI API Connection
 def check_api_conn():
+    # Get the api keys and api connection url
     api_key = os.getenv("API_KEY")
     conn_url= os.getenv("API_CONN_URL")
-
     if not api_key:
         raise ValueError("API_KEY not found in environment file")
     if not conn_url:
             raise ValueError("API_CONN_URL not found in environment file")
-    
     headers = {"Authorization": f"Bearer {api_key}" }
-
+    # Send the a request to api url to check for connection
     try:
         response = requests.get(conn_url, headers=headers,timeout=10)
         if response.status_code == 200:
@@ -360,43 +359,82 @@ def check_api_conn():
         return False, (f"AI API connection error: {error}")
 #endregion
 
+
 #region Calling AI API
-def call_ai_api(prompt):
-    client = create_ai_client()
-    ai_model = get_ai_model()
-    max_retries = int(os.getenv("MAX_RETRIES", 2))
-
-    for attempt in range(max_retries + 1):
-        try:
-            if attempt == 0:
-                update_ai_status("Request sent. Waiting for AI response...")
-            else:
-                update_ai_status(f"Retrying AI request. \n({attempt}/{max_retries})")
-            start_time = time.time()
-
-            response = client.chat.completions.create(
-                model=ai_model,
-                messages=[{"role": "user","content": prompt}],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "food_waste_recommendations",
-                        "strict": True,
-                        "schema": get_recommendation_schema()
+def call_ai_api(prompt, purchase_stock):
+    try:
+        client = create_ai_client().with_options(max_retries=0)
+        models = [("Primary", get_ai_model()), ("Backup", get_ai_model("AI_BACKUP_MODEL"))]
+        if models[0][1] == models[1][1]:
+            return None, "Primary and backup AI models cannot be the same."
+        max_retries = int(os.getenv("MAX_RETRIES", 2))
+        if max_retries < 0:
+            raise ValueError("MAX_RETRIES cannot be negative.")
+    except ValueError as error:
+        return None, str(error)
+    last_error = None
+    # Both models will use the same processing workflow
+    for model_type, ai_model in models:
+        update_ai_status(f"Using {model_type.lower()} AI model: {ai_model}...")
+        # Independent retries for each model
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt:
+                    update_ai_status(f"Retrying {model_type.lower()} AI model. ({attempt}/{max_retries})...")
+                else:
+                    update_ai_status(f"Sending request to {model_type.lower()} AI model...")
+                start_time = time.time()
+                response = client.chat.completions.create(
+                    model=ai_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "food_waste_recommendations",
+                            "strict": True,
+                            "schema": get_recommendation_schema()
+                        }
                     }
-                }
-            )
-            elapsed_time = time.time() - start_time
-            update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
-            content = get_ai_response_content(response)
-            return content, None
-        except Exception as error:
-            if (should_retry_ai_error(error) and attempt < max_retries):
-                retry_delay = 3 * (attempt + 1)
-                update_ai_status(f"Temporary AI error.\nRetrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                continue
-            return None, handle_ai_exception(error)
+                )
+                # Validate response exists
+                content = get_ai_response_content(response)
+                elapsed_time = time.time() - start_time
+                update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
+                # Validate output inside retry loop
+                update_ai_status("Validating AI output...")
+                ai_output, error = process_ai_response(content)
+                if error:
+                    raise ValueError(error)
+                # Check original grocery list integrity
+                if not check_ai_output(ai_output["Recommendations_List"], purchase_stock):
+                    raise ValueError("AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order.")
+                # All checks successful
+                update_ai_status(f"Model used: {response.model}")
+                update_ai_status("AI output validation successful.")
+                return ai_output, None
+            # HTTP 404: Skip retries
+            except NotFoundError as error:
+                last_error = handle_ai_exception(error)
+                update_ai_status(f"{model_type} AI request failed (404). Skipping retries.")
+                break
+            # Authentication failure: Stop
+            except AuthenticationError as error:
+                return None, handle_ai_exception(error)
+            # Retry temporary errors and invalid output
+            except Exception as error:
+                last_error = (str(error) if isinstance(error, ValueError) else handle_ai_exception(error))
+                if should_retry_ai_error(error) and attempt < max_retries:
+                    retry_delay = 3 * (attempt + 1)
+                    update_ai_status(f"{model_type} AI error: {last_error}\nRetrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                update_ai_status(f"{model_type} AI model failed: {last_error}")
+                break
+        # Switch only after primary fails
+        if model_type == "Primary":
+            update_ai_status("Primary AI model failed. Switching to backup AI model...")
+    update_ai_status("Both primary and backup AI models failed.")
+    return None, f"Both AI models failed. Last error: {last_error}"
 #endregion
 
 #region get Response Content
@@ -446,61 +484,123 @@ def update_ai_status(message):
     send_log(f"[AI STATUS] {message}")
 #endregion
 
-#region Process AI output
+#region Process and validate AI output
 def process_ai_response(ai_response):
+    # Reject invalid JSON and non-finite JSON numbers
     try:
-        data = json.loads(ai_response)
-    except (json.JSONDecodeError, TypeError):
+        def reject_nonfinite_constant(value):
+            raise ValueError(f"Invalid JSON number: {value}")
+        data = json.loads(ai_response,parse_constant=reject_nonfinite_constant)
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None, "AI returned invalid JSON response."
-    # Top-level response must be a dictionary
+    # Validate top-level JSON structure
     if not isinstance(data, dict):
-        return None, (f"Invalid AI response structure. \nExpected dict, received {type(data).__name__}.")
-    # Validate recommendations list
-    recommendations = data.get("Recommendations_List")
+        return None, "AI response must be a JSON object."
+    expected_top = {"Recommendations_List", "Total_Planned_Estimated_Calories", "Total_Estimated_Calories"}
+    if set(data) != expected_top:
+        return None, "AI response has missing or unexpected top-level fields."
+
+    recommendations = data["Recommendations_List"]
     if not isinstance(recommendations, list):
-        return None, ("AI response does not contain a valid 'Recommendations_List' list.")
-    # Validate each recommendation object
-    for item in recommendations:
+        return None, "Recommendations_List must be a list."
+    # Validate non-negative, finite numeric values
+    def valid_number(value):
+        return (type(value) in (int, float) and math.isfinite(value) and value >= 0)
+    # Validate both calorie totals
+    for total_field in ("Total_Planned_Estimated_Calories", "Total_Estimated_Calories"):
+        if not valid_number(data[total_field]):
+            return None, f"{total_field} must be a non-negative finite number."
+    # Required item fields
+    required_item_fields = {
+        "Item_Name",
+        "Planned_Quantity",
+        "Unit",
+        "Recommended_Quantity",
+        "Estimated_Consumption_Rate",
+        "Planned_Estimated_Calories",
+        "Estimated_Calories",
+        "Estimated_Expiration_Days"
+    }
+    numeric_item_fields = (
+        "Planned_Quantity",
+        "Recommended_Quantity",
+        "Estimated_Consumption_Rate",
+        "Planned_Estimated_Calories",
+        "Estimated_Calories"
+    )
+    valid_units = {"kg", "g", "l", "ml", "pcs"}
+
+    # Validate each recommendation
+    for index, item in enumerate(recommendations, start=1):
         if not isinstance(item, dict):
-            return None, (f"Invalid recommendation structure. \nExpected dict, received {type(item).__name__}.")
-        item_name = item.get("Item_Name", "Unknown")
-        recommended_quantity = item.get("Recommended_Quantity")
-        if type(recommended_quantity) not in (int, float):
-            return None, (f"Recommended_Quantity for {item_name} must be numeric.")
-        if recommended_quantity < 0:
-            return None, (f"Recommended_Quantity for {item_name} cannot be negative.")
+            return None, f"Recommendation {index} must be a JSON object."
+        if set(item) != required_item_fields:
+            return None, f"Recommendation {index} has missing or unexpected fields."
+        item_name = item["Item_Name"]
+        # Validate item name and unit
+        if not isinstance(item_name, str) or not item_name.strip():
+            return None, f"Recommendation {index}: Item_Name must be a non-empty string."
+        if not isinstance(item["Unit"], str) or item["Unit"] not in valid_units:
+            return None, f"{item_name}: Unit must be kg, g, l, ml or pcs."
+        # Validate all numeric fields
+        for field in numeric_item_fields:
+            if not valid_number(item[field]):
+                return None, f"{item_name}: {field} must be a non-negative finite number."
+        planned_qty = item["Planned_Quantity"]
+        recommended_qty = item["Recommended_Quantity"]
+        planned_cal = item["Planned_Estimated_Calories"]
+        recommended_cal = item["Estimated_Calories"]
+        
+        # Validate AI quantity limits
+        if planned_qty > MAX_QUANTITY or recommended_qty > MAX_QUANTITY:
+            return None, (f"{item_name}: quantity exceeds\nthe supported maximum of {MAX_QUANTITY:,}.")
+        # Validate whole-number quantities for pcs
+        if item["Unit"] == "pcs" and (not float(planned_qty).is_integer() or not float(recommended_qty).is_integer()):
+            return None, f"{item_name}: Quantities in pcs must be whole numbers."
         # Validate estimated expiration days
-        estimated_expiration_days = item.get("Estimated_Expiration_Days")
-        if estimated_expiration_days is not None:
-            if type(estimated_expiration_days) is not int:
-                return None, (f"Estimated_Expiration_Days for {item_name} must be an integer.")
-            if estimated_expiration_days < 0:
-                return None, (f"Estimated_Expiration_Days for {item_name} cannot be negative.")
-        # Validate estimated calories
-        estimated_calories = item.get("Estimated_Calories")
-        if type(estimated_calories) not in (int, float):
-            return None, (f"Estimated_Calories for {item_name} must be numeric.")
-        if estimated_calories < 0:
-            return None, (f"Estimated_Calories for {item_name} cannot be negative.")
-    # Validate total estimated calories
-    total_calories = data.get("Total_Estimated_Calories")
-    if type(total_calories) not in (int, float):
-        return None, ("Total_Estimated_Calories must be numeric.")
-    if total_calories < 0:
-        return None, ("total_estimated_calories cannot be negative.")
-    # Validate total against item calorie sum
-    calculated_total = sum(item["Estimated_Calories"] for item in recommendations)
-    if abs(calculated_total - total_calories) > 0.01:
-        return None, ("Total_Estimated_Calories does not match the sum of Estimated_Calories.")
-    # Add Estimated_Expiry_Date after successful validation
+        expiration_days = item["Estimated_Expiration_Days"]
+        if expiration_days is not None and (type(expiration_days) is not int or expiration_days < 0):
+            return None, f"{item_name}: Estimated_Expiration_Days must be a non-negative integer or null."
+        if planned_qty == 0 and recommended_qty == 0 and expiration_days is not None:
+            return None, f"{item_name}: Expiration days must be null when both quantities are zero."
+        # Validate zero-quantity calorie calculations
+        if planned_qty == 0 and planned_cal != 0:
+            return None, f"{item_name}: Planned calories must be zero when planned quantity is zero."
+        if recommended_qty == 0 and recommended_cal != 0:
+            return None, f"{item_name}: Estimated calories must be zero when recommended quantity is zero."
+
+        # Validate calorie consistency per unit
+        if planned_qty > 0 and recommended_qty > 0:
+            planned_per_unit = planned_cal / planned_qty
+            recommended_per_unit = recommended_cal / recommended_qty
+            if not math.isclose(planned_per_unit, recommended_per_unit, rel_tol=0.05,abs_tol=1.0):
+                return None, f"{item_name}: Planned and recommended calories per unit are inconsistent."
+
+    # Validate totals against individual item calorie sums
+    totals = (("Total_Planned_Estimated_Calories", "Planned_Estimated_Calories"),
+        ("Total_Estimated_Calories", "Estimated_Calories"))
+
+    for total_field, item_field in totals:
+        calculated = sum(item[item_field] for item in recommendations)
+        if not math.isclose(data[total_field], calculated, rel_tol=0, abs_tol=0.01):
+            return None, f"{total_field} does not match the sum of {item_field}."
+        
+    # Add estimated expiry date after validation
     for item in recommendations:
-        estimated_expiration_days = item.get("Estimated_Expiration_Days")
-        if estimated_expiration_days is not None:
-            item["Estimated_Expiry_Date"] = get_expiration_date(date.today(), estimated_expiration_days).isoformat()
-            item["Expiry_Date_Is_Default"] = False
-        else:
-            item["Estimated_Expiry_Date"] = get_default_expiration_date(date.today(), 365).isoformat()
-            item["Expiry_Date_Is_Default"] = True
+        expiration_days = item["Estimated_Expiration_Days"]
+        is_default = expiration_days is None
+
+        try:
+            expiry_date = get_expiration_date(date.today(),365 if is_default else expiration_days)
+        except (OverflowError, ValueError):
+            return None, (f"{item['Item_Name']}: Expiration days are outside the supported date range.")
+        # Validate AI estimated expiry date (max 3 years)
+        if expiry_date > shift_calendar_years(date.today(), 3):
+            return None, (f"{item['Item_Name']}: estimated expiry exceeds the 3-year stock limit.")
+
+        item["Estimated_Expiry_Date"] = expiry_date.isoformat()
+        item["Expiry_Date_Is_Default"] = is_default
+    send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
     return data, None
 #endregion
 
@@ -516,8 +616,7 @@ def check_ai_output(recommendations, grocery_list):
         for ai_field, original_field in (
             ("Item_Name", "Item_Name"),
             ("Planned_Quantity", "Quantity"),
-            ("Unit", "Unit"),
-        ):
+            ("Unit", "Unit")):
             if ai_field not in ai_item or original_field not in original:
                 return False
             if ai_item[ai_field] != original[original_field]:
@@ -525,55 +624,30 @@ def check_ai_output(recommendations, grocery_list):
     return True
 #endregion
 
-
-#region Functions to be implemented for main.py to call AI_manager.py
-# To use functions to get specific data from the AI output, you can implement the following functions in main.py:
-# ai_recommendations, error = get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next)
-# recommendations = ai_recommendations.get("recommendations", [])
-# total_estimated_calories = ai_recommendations.get("total_estimated_calories", 0)
+#region Function to call AI API with all reqiured args
 def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next):
     update_ai_status("Checking AI API connection...")
     connected, errMsg = check_api_conn()
-
     # Check if the connection to the AI API is successful
     if not connected: 
         update_ai_status("AI API connection failed.")
-        send_log(errMsg) 
+        send_log(f"[AI] {errMsg}") 
         return None, errMsg
     update_ai_status("AI API connection successful.")
-    
     update_ai_status("Preparing AI input...")
     # Prepare data for AI processing
     current_date = date.today()
-    next_purchase_date = date_convert(current_date,days_until_next)
+    next_purchase_date = get_next_purchase_date(current_date,days_until_next)
     data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date)
-
     update_ai_status("Building AI prompt...")
     #build the prompt for AI processing
     prompt = build_ai_prompt(data)
-
     update_ai_status("Sending prompt to AI...")
-    #Output of the AI response
-    ai_response, error = call_ai_api(prompt)
-
-    if error: 
-        update_ai_status("AI request failed.")
-        send_log(error) 
-        return None, error
-    
-    update_ai_status("Validating AI output...")
-    # Process and validate the AI response
-    ai_output, error = process_ai_response(ai_response)
-
+    ai_output, error = call_ai_api(prompt, purchase_stock)
     if error:
-        update_ai_status("AI output validation failed.")
-        send_log(error)
-        return None, error
-
-    if not check_ai_output( ai_output["Recommendations_List"], purchase_stock):
-        error = ("AI recommendations do not match the original grocery list: item names, quantities, units, or order.")
-        update_ai_status("AI output validation failed.")
-        send_log(error)
+        update_ai_status("AI request failed.")
+        send_log(f"[AI] {error}")
         return None, error
     return ai_output, None
+
 #endregion
