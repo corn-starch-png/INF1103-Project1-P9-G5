@@ -296,19 +296,19 @@ def shift_calendar_years(value, years):
 #returns the total quantity of the item in the fridge and consumption_history tables
 #in-put: <dictionary> database, <string> item_name
 #output: <integer> total quantity of the item in the fridge and consumption_history tables
+# prevents this precision issue when calculating the total fridge stock.
 def get_all_fridge_quantity(database, item_name, include_expired=True):
-    total_quantity = 0
+    total_quantity = Decimal("0")
     for entry in database.get("fridge", []):
-        # Match item names (case insensitive)
         if entry["Item_Name"].strip().casefold() != item_name.strip().casefold():
             continue
-        # Exclude expired items if requested
         if not include_expired:
             expiry_date = date.fromisoformat(entry["Expiry_Date"])
             if expiry_date < date.today():
                 continue
-        total_quantity += entry["Quantity"]
-    return total_quantity
+        total_quantity += Decimal(str(entry["Quantity"]))
+
+    return float(total_quantity)
 
 #adds dictionary item to the household_info table in the database dictionary
 #in-put: [{"Person_ID": <integer>, "Name": "<string>", "Age": <integer>, "Gender": "<string>", "Dietary_Restriction": "<string>"},...]
