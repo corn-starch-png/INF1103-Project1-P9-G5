@@ -1,8 +1,8 @@
 services:
-  food-waste-ai:
+  quantifresh:
     build: .
-    image: food-waste-ai
-    container_name: food-waste-ai
+    image: quantifresh
+    container_name: quantifresh
 
     stdin_open: true
     tty: true

@@ -1,4 +1,4 @@
-# AI Food Waste Management System
+# Quantifresh AI Food Waste Management System
 
 **INF1103 Programming Fundamentals with DevOps - Project 1 (P9-G5)**
 
@@ -91,7 +91,7 @@ These models form the recommended configuration deployment, however they remain 
 **3. Build and run the application.**
 ```bash
 docker compose build
-docker compose run --rm food-waste-ai
+docker compose run --rm quantifresh
 ```
 The Compose configuration mounts `./database` and `./logs`, so data and logs remain on host after the container exits, allowing persistent storage. Follow the interactive prompts in the terminal to start using the cli application.
 
@@ -111,7 +111,7 @@ python -m pytest test_script.py -v
 ```
 With Docker Compose:
 ```bash
-docker compose run --rm food-waste-ai python -m pytest test_script.py -v
+docker compose run --rm quantifresh python -m pytest test_script.py -v
 ```
 The test suite will need to cover output structure, preservation of grocery list data, calculations, AI misbehaving and edge cases. Passing test suite/CICD success can be added here once verified separately.
 
