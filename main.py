@@ -3,7 +3,7 @@ try:
     from datetime import date, timedelta
     import sys
     from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
-                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, send_log)
+                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, merge_fridge_batches, send_log)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, display_list, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, update_fridge, send_message, 
@@ -16,6 +16,7 @@ except ImportError as e :
 log_exists()
 database_exists()  # Ensure the database folder and file exist
 db_success, database = load_database('database')  # Load the database into memory
+database["fridge"][:] = merge_fridge_batches(database["fridge"])
 send_log(f"[MAIN] database: {database}")
 if db_success == False:
     send_message(f"Database loading encountered issues, data may be missing")
