@@ -87,6 +87,7 @@ AI_BACKUP_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 MAX_RETRIES=2
 ```
 These models form the recommended configuration deployment, however they remain subject to real-time availability and compatibility constraints. Both models must support the applications requested `json_schema` response format. `MAX_RETRIES=2` allows up to 3 attempts per model.
+
 **3. Build and run the application.**
 ```bash
 docker compose build
