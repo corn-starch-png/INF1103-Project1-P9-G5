@@ -541,16 +541,16 @@ def update_fridge(fridge):
             print(f"Please enter a number between 1 and {len(fridge)}.")
 
         if action == "1":
-            fridge[number]["Expiry_Date"] = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ", allow_past=True,purchase_date=fridge[number].get("Purchase_Date", ""))
+            expiry_date = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ", allow_past=True,purchase_date=fridge[number].get("Purchase_Date", ""))
             similar_item = False
             for item in fridge:
-                if item["Item_Name"] == fridge[number]["Item_Name"] and item["Unit"] == fridge[number]["Unit"] and item["Purchase_Date"] == fridge[number]["Purchase_Date"] and item["Expiry_Date"] == fridge[number]["Expiry_Date"] and item["Remarks"] == fridge[number]["Remarks"]:
+                if item["Item_Name"] == fridge[number]["Item_Name"] and item["Unit"] == fridge[number]["Unit"] and item["Purchase_Date"] == fridge[number]["Purchase_Date"] and item["Expiry_Date"] != expiry_date and item["Remarks"] == fridge[number]["Remarks"]:
                     similar_item = True
                     item["Quantity"] += fridge[number]["Quantity"]
                     fridge.pop(number)
                     break
             if similar_item == False:
-                fridge[number]["Expiry_Date"]
+                fridge[number]["Expiry_Date"] = expiry_date
             print(f"Updated: {format_item(fridge[number])}")
         else:
             removed = fridge.pop(number)
