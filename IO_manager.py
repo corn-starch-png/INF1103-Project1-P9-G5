@@ -1,5 +1,6 @@
 from datetime import date, timedelta
-from DB_manager import send_log
+from decimal import Decimal
+from DB_manager import MAX_ITEM_NAME_LENGTH, MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years
 
 valid_units = ["kg", "g", "l", "ml", "pcs"]
 valid_genders = ["male", "female"]
@@ -10,12 +11,7 @@ valid_genders = ["male", "female"]
 def enter_item(existing_items=None):
     if existing_items is None:
         existing_items = []
-    while True:
-        item_name = enter_text("Item name: ")
-        if len(item_name) < 50 :
-            break
-        else:
-            print(f"Item name must be less than 200 characters")
+    item_name = enter_text("Item name: ", max_length=MAX_ITEM_NAME_LENGTH)
 
     # Check if this item was entered before, and lock its unit
     locked_unit = ""
@@ -50,10 +46,17 @@ def enter_item(existing_items=None):
         elif locked_unit != "" and unit != "" and unit != locked_unit:
             print(f"{item_name} must be entered in {locked_unit}.")
         else:
-            if unit == "pcs" and not number_part.isdigit():
-                print(f"items in pcs must be a whole number.")
+            if (unit or locked_unit) == "pcs" and not number_part.isdigit():
+                print("Items in pcs must be a whole number.")
             else:
-                quantity = round(float(number_part), 4)
+                try:
+                    quantity = normalize_quantity(number_part)
+                except ValueError:
+                    print(f"Quantity must be a valid number no greater than {MAX_QUANTITY:,}.")
+                    continue
+                if quantity == 0:
+                    print("Quantity is too small after rounding to 4 decimal places.")
+                    continue
                 if unit == "":
                     unit = locked_unit
                 break
@@ -62,13 +65,15 @@ def enter_item(existing_items=None):
  
 
 # Double quote checks, reasks user to prevent JSON errors
-def enter_text(question, allow_blank=False):
+def enter_text(question, allow_blank=False, max_length=MAX_REMARKS_LENGTH):
     while True:
         text = input(question).strip()
         if '"' in text or "\\" in text:
-            print('Please don\'t use double quotes (") or backslashes (\\) in your answer.')
-        elif text == "" and not allow_blank:
+            print('Please do not use double quotes or backslashes.')
+        elif not text and not allow_blank:
             print("This can't be empty.")
+        elif len(text) > max_length:
+            print(f"Please enter no more than {max_length} characters.")
         else:
             return text
 
@@ -93,31 +98,41 @@ def ask_add_another():
             return more in ["yes", "y"]
         print("Please answer yes or no.")
  
- 
 # Ask for a date in YYYY-MM-DD format and check it is a real date.
-def enter_date(question):
+def enter_date(question, allow_past=False, purchase_date=""):
+    today = date.today()
+    earliest = shift_calendar_years(today, -1) if allow_past else today
+    # maximum expiry date
+    latest = shift_calendar_years(today, 3)
     while True:
         text = input(question).strip()
-        parts = text.split("-")
-        valid = (len(parts) == 3 and len(parts[0]) == 4 and len(parts[1]) == 2 and len(parts[2]) == 2
-                 and parts[0].isdecimal() and parts[1].isdecimal() and parts[2].isdecimal())
-        if valid:
-            year = int(parts[0])
-            month = int(parts[1])
-            day = int(parts[2])
-            is_leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
-            days_in_month = [31, 29 if is_leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-            valid = 1 <= month <= 12 and 1 <= day <= days_in_month[month - 1]
-        else:
-            print("Please enter a real date in the format YYYY-MM-DD, e.g. 2026-10-20.")
-
-        if date(year, month, day) < date.today():
-            print("That date has already passed!")
-        elif date(year, month, day) > date.today() + timedelta(days=5 * 365):
-            print("That date is more than 5 years ahead. Please check the year and try again.")
-        else:
-            return text
- 
+        if (
+            len(text) != 10
+            or text[4] != "-"
+            or text[7] != "-"
+            or not text[:4].isdigit()
+            or not text[5:7].isdigit()
+            or not text[8:].isdigit()
+        ):
+            print("Please enter a date in YYYY-MM-DD format.")
+            continue
+        try:
+            entered_date = date.fromisoformat(text)
+        except ValueError:
+            print("Invalid calendar date. Please try again.")
+            continue
+        if entered_date < earliest:
+            print(f"Expiry date cannot be earlier than {earliest.isoformat()}.")
+            continue
+        if entered_date > latest:
+            print(f"Expiry date cannot be later than {latest.isoformat()}.")
+            continue
+        if purchase_date and entered_date < date.fromisoformat(purchase_date):
+            print("Expiry date cannot be earlier than the recorded purchase date.")
+            continue
+        if entered_date < today:
+            print("Warning: this item has already expired. Do not consume it.")
+        return text
 
 # Collect a new user's profile and their family members' details.
 # Returns a list in the database's household_info format (the user is Person_ID 1).
@@ -162,7 +177,7 @@ def create_profile():
  
         while True:
             member_age = input(f"Please enter the age of {member_name}: ").strip()
-            if member_age.isdecimal() and int(member_age) <= 120:
+            if member_age.isdecimal() and 1 <= int(member_age) <= 120:
                 member_age = int(member_age)
                 break
             print("Please enter a valid age (whole number between 0 and 120).")
@@ -288,16 +303,28 @@ def update_consumption(previous_inventory):
  
     for key in totals:
         name = totals[key]["Item_Name"]
-        total = round(totals[key]["Quantity"], 2)
+        total = round(totals[key]["Quantity"], 4)
         unit = totals[key]["Unit"]
         while True:
             text = input(f"How much {name} did you consume? (you have {total} {unit}): ").strip()
             if not text.replace(".", "", 1).isdecimal():
                 print("Please enter a valid number.")
-            elif float(text) > total:
-                print(f"That's more than you have ({total} {unit}). Please try again.")
+            # Ensure pcs quantities are whole numbers
+            elif unit == "pcs" and not text.isdecimal():
+                print("Quantity in pcs must be a whole number.")
             else:
-                consumed = round(float(text), 4)
+                raw_consumed = Decimal(text)
+                if raw_consumed > Decimal(str(total)):
+                    print(f"That's more than you have ({total} {unit}). Please try again.")
+                    continue
+                try:
+                    consumed = normalize_quantity(text)
+                except ValueError:
+                    print("Invalid or excessively large quantity.")
+                    continue
+                if raw_consumed > 0 and consumed == 0:
+                    print("Quantity is too small after rounding to 4 decimal places.")
+                    continue
                 break
  
         consumed_items.append({
@@ -437,7 +464,7 @@ def edit_fridge(fridge):
             print(f"Please enter a number between 1 and {len(fridge)}.")
 
         if action == "1":
-            fridge[number]["Expiry_Date"] = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ")
+            fridge[number]["Expiry_Date"] = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ", allow_past=True,purchase_date=fridge[number].get("Purchase_Date", ""))
             print(f"Updated: {format_item(fridge[number])}")
         else:
             removed = fridge.pop(number)
@@ -541,7 +568,18 @@ def shopping_cart_conclusion(item_list, remarks):
                                     if item_list[item_index]['Unit'] == 'pcs' and not edited_quantity.isdigit():
                                         print("quantity must be a whole number for unit pcs")
                                         continue
-                                    item_list[item_index]["Planned_Quantity"] = float(edited_quantity)
+                                    try:
+                                        new_qty = normalize_quantity(edited_quantity)
+                                    except ValueError:
+                                        print(f"Quantity cannot exceed {MAX_QUANTITY:,}.")
+                                        continue
+                                    if new_qty == 0:
+                                        if Decimal(edited_quantity) != 0:
+                                            print("Quantity is too small after rounding to 4 decimal places.")
+                                            continue
+                                        del item_list[item_index]
+                                    else:
+                                        item_list[item_index]["Planned_Quantity"] = new_qty
                                 break
                             else:
                                 print("Invalid input. Enter a positive number")

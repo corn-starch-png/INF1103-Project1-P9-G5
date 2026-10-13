@@ -1,7 +1,8 @@
 import os
 import json
-from datetime import datetime
-
+import math
+from datetime import datetime, date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 DB_FILENAME = 'db.json'
 FILE_STRUCTURE = {
@@ -10,7 +11,21 @@ FILE_STRUCTURE = {
     'fridge': 'Item_Name,Quantity,Unit,Purchase_Date,Expiry_Date,Remarks'
 }
 
+MAX_ITEM_NAME_LENGTH = 50
+MAX_PERSON_NAME_LENGTH = 50
+MAX_REMARKS_LENGTH = 500
+MAX_DIETARY_LENGTH = 200
+MAX_QUANTITY = 1_000_000
+QUANTITY_STEP = Decimal("0.0001")
 
+def normalize_quantity(value):
+    try:
+        amount = Decimal(str(value))
+        if not amount.is_finite() or not 0 <= amount <= MAX_QUANTITY:
+            raise ValueError("Quantity must be between 0 and 1,000,000.")
+        return float(amount.quantize(QUANTITY_STEP,rounding=ROUND_HALF_UP))
+    except (InvalidOperation, TypeError) as error:
+        raise ValueError("Invalid quantity.") from error
 
 #LOGGING FUNCTIONS--------------
 #current_datetime used to generate log filename
@@ -37,81 +52,95 @@ def log_exists(folder='logs'):
 #checks if individual entries in the database have the correct data types and values
 #in-put: <dictionary> entry, <string> consumption_history/household_info/fridge
 #output: <boolean> True if the entry is valid, <string> error message if the entry is invalid else None
-def check_data(record, table):
-    def check_integer(value):
+
+# Validate individual database records
+def check_data(record: dict, table: str) -> tuple[bool, str | None]:
+    # Check table and record structure
+    if table not in FILE_STRUCTURE:
+        return False, f"Unknown table: {table}"
+    if not isinstance(record, dict):
+        return False, "Record must be a dictionary"
+    expected_keys = set(FILE_STRUCTURE[table].split(","))
+    if set(record.keys()) != expected_keys:
+        return False, "Record contains missing or unexpected fields"
+    
+    # Validate stored quantity precision
+    def check_quantity(value):
+        if type(value) not in (int, float):
+            return False
         try:
-            int(value)
-            return True
+            return Decimal(str(value)) == Decimal(str(normalize_quantity(value)))
         except ValueError:
             return False
-    def check_float(value):
-        try:
-            float(value)
-            return True
-        except ValueError:
-            return False
-    def check_string(value):
-        return isinstance(value, str)
+
+    # Check string values and text length validation to the database
+    def check_string(value, max_length, allow_blank=False):
+        return (isinstance(value, str) and len(value) <= max_length and (allow_blank or bool(value.strip())))
+
+    # Check units
     def check_unit(value):
-        valid_units = ['kg', 'g', 'L', 'ml', 'pcs']
+        return isinstance(value, str) and value in ("kg", "g", "l", "ml", "pcs")
+
+    # Check real calendar dates, including leap years
+    def check_date(value, allow_blank=False):
         if not isinstance(value, str):
             return False
-        return value.strip().lower() in [unit.lower() for unit in valid_units]
-    def check_date(value):
-        # Check if the date is in the format YYYY-MM-DD
+        if allow_blank and value == "":
+            return True
         try:
-            year, month, day = map(int, value.split('-'))
-            return 1 <= month <= 12 and 1 <= day <= 31
+            return date.fromisoformat(value).isoformat() == value
         except ValueError:
             return False
-    def check_gender(value):
-        valid_genders = ['Male', 'Female']
-        return value in valid_genders
-    
-    
-    data_length = len(record)
-    if table == 'consumption_history' and data_length == 5:
-        # Check if Date_Range is an integer
-        if not check_integer(record["Date_Range"]):
-            return False, "Date_Range must be an integer"
-        # Check if Quantity can be converted to float
-        if not check_float(record["Quantity"]):
-            return False, "Quantity must be a number"
-        # Check if Unit is valid
-        if not check_unit(record["Unit"]):
-            return False, "Invalid Unit"
-        return True, None
 
-    elif table == 'household_info' and data_length == 5:
-        # Check if Person_ID and Age is an integer
-        if not check_integer(record["Person_ID"]):
-            return False, "Person_ID must be an integer"
-        if not check_integer(record["Age"]):
-            return False, "Age must be an integer"
-        # check if Gender is valid
-        if not check_gender(record["Gender"]):
-            return False, "Invalid Gender, must be either: ['Male', 'Female']"
-        return True, None
-        
-    elif table == 'fridge' and data_length == 6:
-        # Check if Quantity can be converted to float
-        if not check_float(record["Quantity"]):
-            return False, "Quantity must be a number"
-        #check if Unit is valid
-        if not check_unit(record["Unit"]):
-            return False, "Invalid Unit."
-        #check if Purchase_Date and Expiry_Date are valid dates
-        if not check_date(record["Purchase_Date"]) and record["Purchase_Date"] != "":
-            return False, "Invalid Purchase_Date format, must be YYYY-MM-DD"
+    # consumption history validation
+    if table == "consumption_history":
+        days = record["Date_Range"]
+        if type(days) is not int or not 1 <= days <= 365:
+            return False, "Date_Range must be an integer between 1 and 365"
+        if not check_string(record["Item_Name"], MAX_ITEM_NAME_LENGTH):
+            return False, "Item_Name must be a non-empty string"
+        if not check_quantity(record["Quantity"]):
+            return False, "Quantity must be a non-negative number"
+        if not check_string(record["Remarks"], MAX_REMARKS_LENGTH, allow_blank=True):
+            return False, "Remarks must be a string (max 500 characters)"
+
+    # household info validation
+    elif table == "household_info":
+        if type(record["Person_ID"]) is not int or record["Person_ID"] < 1:
+            return False, "Person_ID must be a positive integer"
+        if not check_string(record["Name"], MAX_PERSON_NAME_LENGTH):
+            return False, "Name must be a non-empty string (max 50 characters)"
+        if type(record["Age"]) is not int or not 1 <= record["Age"] <= 120:
+            return False, "Age must be an integer between 1 and 120"
+        if record["Gender"] not in ("Male", "Female"):
+            return False, "Gender must be Male or Female"
+        if not check_string(record["Dietary_Restriction"], MAX_DIETARY_LENGTH, allow_blank=True):
+            return False, "Dietary_Restriction must be a string (max 200 characters)"
+
+    # fridge stock validation
+    elif table == "fridge":
+        if not check_string(record["Item_Name"], MAX_ITEM_NAME_LENGTH):
+            return False, "Item_Name must be a non-empty string (max 50 characters)"
+        if not check_quantity(record["Quantity"]) or record["Quantity"] == 0:
+            return False, "Fridge Quantity must be greater than 0"
+        if not check_date(record["Purchase_Date"], allow_blank=True):
+            return False, "Invalid Purchase_Date, expected YYYY-MM-DD or blank"
         if not check_date(record["Expiry_Date"]):
-            return False, "Invalid Expiry_Date format, must be YYYY-MM-DD"
-        if not check_string(record["Remarks"]):
-            return False, "Invalid Remarks format, must be a string"
-        return True, None
-        
-    else:
-        return False, "Data length is incorrect"
-
+            return False, "Invalid Expiry_Date, expected YYYY-MM-DD"
+        if record["Purchase_Date"] != "":
+            if date.fromisoformat(record["Purchase_Date"]) > date.fromisoformat(record["Expiry_Date"]):
+                return False, "Purchase_Date cannot be after Expiry_Date"
+        if not check_string(record["Remarks"], MAX_REMARKS_LENGTH, allow_blank=True):
+            return False, "Remarks must be a string (max 500 characters)"
+    # unit and qty validation
+    if table in ("consumption_history", "fridge"):
+        if not check_unit(record["Unit"]):
+            return False, "Unit must be kg, g, l, ml or pcs"
+        quantity = record["Quantity"]
+        if record["Unit"] == "pcs":
+            if not float(quantity).is_integer():
+                return False, "Quantity in pcs must be a whole number"
+    return True, None
 
 #checks if the database dictionary has all the required tables and entries, and if the entries have the correct data types
 #in-put: <dictionary> database
@@ -192,7 +221,14 @@ def load_database(folder='database'):
 
     database, validation_errors = check_database(database)
     errors.extend(validation_errors)  # Add any validation errors to the errors list
-                    
+    # Check existing records for conflicting units
+    try:
+        for table in ("fridge", "consumption_history"):
+            for entry in database[table]:
+                ensure_item_unit(database, entry["Item_Name"],entry["Unit"] )
+    except ValueError as error:
+        raise SystemExit(f"Database unit conflict: {error}") from error
+
     if not errors:
         send_log(f"[DATABASE] Database loaded successfully.")
         return True, database
@@ -203,8 +239,6 @@ def load_database(folder='database'):
         send_log(f"[DATABASE] ***********************************************************************")
         return False, database
     
-
-
 #saves the database dictionary to a JSON file in the specified folder
 #in-put: <dictionary> database, <string> folder to save json db to
 #output: None
@@ -215,19 +249,40 @@ def save_database(database, folder='database'):
         f.write(json.dumps(database, indent=2))
     send_log(f"[DATABASE] Database saved successfully to {filename}.")
 
+# Ensure the same item uses one unit across the database
+def ensure_item_unit(database, item_name, unit):
+    name = item_name.strip().casefold()
+    unit = unit.strip().lower()
+    for table in ("fridge", "consumption_history"):
+        for entry in database.get(table, []):
+            existing_name = entry["Item_Name"].strip().casefold()
+            existing_unit = entry["Unit"].strip().lower()
+            if existing_name == name and existing_unit != unit:
+                raise ValueError(f"{item_name} uses both {existing_unit} and {unit}.\nCorrect the existing data before proceeding.")
 
+def shift_calendar_years(value, years):
+    target_year = value.year + years
+    try:
+        return value.replace(year=target_year)
+    except ValueError:
+        return value.replace(year=target_year, month=2, day=28)
 #DB CRUD FUCNTIONS---------------
 #returns the total quantity of the item in the fridge and consumption_history tables
 #in-put: <dictionary> database, <string> item_name
 #output: <integer> total quantity of the item in the fridge and consumption_history tables
-def get_all_fridge_quantity(database, item_name):
-    # Implementation for retrieving all quantities of a specific item from the fridge table
+def get_all_fridge_quantity(database, item_name, include_expired=True):
     total_quantity = 0
-    for entry in database.get('fridge', []):
-        if entry.get('Item_Name').lower() == item_name.lower():
-            total_quantity += entry.get('Quantity')
+    for entry in database.get("fridge", []):
+        # Match item names (case insensitive)
+        if entry["Item_Name"].strip().casefold() != item_name.strip().casefold():
+            continue
+        # Exclude expired items if requested
+        if not include_expired:
+            expiry_date = date.fromisoformat(entry["Expiry_Date"])
+            if expiry_date < date.today():
+                continue
+        total_quantity += entry["Quantity"]
     return total_quantity
-
 
 #adds dictionary item to the household_info table in the database dictionary
 #in-put: [{"Person_ID": <integer>, "Name": "<string>", "Age": <integer>, "Gender": "<string>", "Dietary_Restriction": "<string>"},...]
@@ -251,6 +306,7 @@ def update_consumption_history(database, update_list):
         if not check_result:
             send_log(f"[DATABASE] Invalid data being added to consumption_history: {item}. Error: {error_message}")
             continue  # Skip invalid entries
+        ensure_item_unit(database, item["Item_Name"], item["Unit"])
         database.get('consumption_history', []).append(item)  # Append each item in the update list to the consumption_history table
     return database
 
@@ -264,6 +320,7 @@ def add_to_fridge(database, update_list):
         if not check_result:
             send_log(f"[DATABASE] Invalid data being added in fridge: {item}. Error: {error_message}")
             continue  # Skip invalid entries
+        ensure_item_unit(database, item["Item_Name"], item["Unit"])
         database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
     return database
 
@@ -271,21 +328,57 @@ def add_to_fridge(database, update_list):
 #removes the quantity from the fridge table FIFO order based on the item name and quantity specified in the update_list
 #in-put: [{"Item_Name": "<string>", "Quantity": <integer>,...},...]
 #output: <dictionary> database  
-def remove_from_fridge(database, update_list):  
+def remove_from_fridge(database, update_list):
+    fridge = database.get("fridge", [])
+    planned_removals = {}
+
+    # Validate all removals before modifying inventory list
     for item in update_list:
-        amount_to_remove = item.get('Quantity', 0)
-        for entry in database.get('fridge', []).copy():  # Use copy() to avoid modifying the list while iterating
-            if entry.get('Item_Name').lower() == item.get('Item_Name').lower():
-                if entry.get('Quantity') >= amount_to_remove:
-                    entry['Quantity'] -= amount_to_remove
-                    amount_to_remove = 0
-                    if entry['Quantity'] == 0:
-                        database.get('fridge', []).remove(entry)
+        name = item["Item_Name"].strip().casefold()
+        unit = item["Unit"].strip().lower()
+        amount = item["Quantity"]
+
+        if type(amount) not in (int, float):
+            raise ValueError(f"Invalid consumption quantity for {item['Item_Name']}.")
+        
+        amount_decimal = Decimal(str(amount))
+        if ( not amount_decimal.is_finite() or amount_decimal != Decimal(str(normalize_quantity(amount)))):
+            raise ValueError(f"Invalid consumption precision for {item['Item_Name']}.")
+
+        if unit == "pcs" and amount_decimal != amount_decimal.to_integral_value():
+            raise ValueError(f"{item['Item_Name']}: pcs must be whole numbers.")
+
+        key = (name, unit)
+        planned_removals[key] = (planned_removals.get(key, Decimal("0")) + amount_decimal)
+
+    # reject consumption exceeding available stock
+    for (name, unit), amount in planned_removals.items():
+        available = sum(
+            (
+                Decimal(str(entry["Quantity"]))
+                for entry in fridge
+                if entry["Item_Name"].strip().casefold() == name
+                and entry["Unit"].strip().lower() == unit
+            ),
+            Decimal("0")
+        )
+        if amount > available:
+            raise ValueError(f"Cannot consume {amount} {unit} of {name};\nonly {available} available.")
+    # Perform precise subtraction
+    for (name, unit), amount_to_remove in planned_removals.items():
+        if amount_to_remove == 0:
+            continue
+        for entry in fridge[:]:
+            if (entry["Item_Name"].strip().casefold() == name and entry["Unit"].strip().lower() == unit):
+                available = Decimal(str(entry["Quantity"]))
+                consumed = min(available, amount_to_remove)
+                remaining = available - consumed
+                amount_to_remove -= consumed
+
+                if remaining == 0:
+                    fridge.remove(entry)
                 else:
-                    amount_to_remove -= entry.get('Quantity')
-                    database.get('fridge', []).remove(entry)
+                    entry["Quantity"] = normalize_quantity(remaining)
                 if amount_to_remove == 0:
                     break
-            
-
-    return database 
+    return database

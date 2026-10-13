@@ -72,7 +72,12 @@ send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
 
 #region AI Recommendations
 send_message("Getting AI recommendations... This can take a while")
-ai_recommendations, error = get_ai_recommendations(household_info, history, fridge, grocery_list,remarks,days_until_next_visit)
+# retains expired items for review but excludes them from the AI's usable stock input.
+usable_fridge = [item for item in fridge if date.fromisoformat(item["Expiry_Date"]) >= date.today()]
+if len(usable_fridge) < len(fridge):
+    send_message(f"Warning: {len(fridge) - len(usable_fridge)} expired fridge batch(es) excluded from recommendations.\nReview/remove expired food.")
+
+ai_recommendations, error = get_ai_recommendations(household_info, history, usable_fridge, grocery_list, remarks, days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 recommendations = ai_recommendations.get("Recommendations_List", [])
@@ -89,7 +94,7 @@ risk_of_expiry_messages = []
 underbuy_messages = []
 
 for item in recommendations:
-    fridge_amt = get_all_fridge_quantity(database, item["Item_Name"])
+    fridge_amt = get_all_fridge_quantity(database, item["Item_Name"], include_expired=False)
     total_amt = fridge_amt + item["Planned_Quantity"] #total amount of item in grocery list AND currently in fridge
 
     expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 

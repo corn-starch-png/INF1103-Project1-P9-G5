@@ -7,7 +7,7 @@ import requests
 from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
-from DB_manager import send_log
+from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
 
 #region API config
 load_dotenv()
@@ -550,7 +550,10 @@ def process_ai_response(ai_response):
         recommended_qty = item["Recommended_Quantity"]
         planned_cal = item["Planned_Estimated_Calories"]
         recommended_cal = item["Estimated_Calories"]
-
+        
+        # Validate AI quantity limits
+        if planned_qty > MAX_QUANTITY or recommended_qty > MAX_QUANTITY:
+            return None, (f"{item_name}: quantity exceeds\nthe supported maximum of {MAX_QUANTITY:,}.")
         # Validate whole-number quantities for pcs
         if item["Unit"] == "pcs" and (not float(planned_qty).is_integer() or not float(recommended_qty).is_integer()):
             return None, f"{item_name}: Quantities in pcs must be whole numbers."
@@ -581,15 +584,20 @@ def process_ai_response(ai_response):
         calculated = sum(item[item_field] for item in recommendations)
         if not math.isclose(data[total_field], calculated, rel_tol=0, abs_tol=0.01):
             return None, f"{total_field} does not match the sum of {item_field}."
-
+        
     # Add estimated expiry date after validation
     for item in recommendations:
         expiration_days = item["Estimated_Expiration_Days"]
         is_default = expiration_days is None
+
         try:
-            expiry_date = get_expiration_date(date.today(), 365 if is_default else expiration_days)
+            expiry_date = get_expiration_date(date.today(),365 if is_default else expiration_days)
         except (OverflowError, ValueError):
-            return None, f"{item['Item_Name']}: Expiration days are outside the supported date range."
+            return None, (f"{item['Item_Name']}: Expiration days are outside the supported date range.")
+        # Validate AI estimated expiry date (max 3 years)
+        if expiry_date > shift_calendar_years(date.today(), 3):
+            return None, (f"{item['Item_Name']}: estimated expiry exceeds the 3-year stock limit.")
+
         item["Estimated_Expiry_Date"] = expiry_date.isoformat()
         item["Expiry_Date_Is_Default"] = is_default
     send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
