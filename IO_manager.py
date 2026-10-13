@@ -233,7 +233,7 @@ def add_item(remaining_items):
     expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
     item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
 
-    if item_remarks == "":
+    if item_remarks == "" or item_remarks.lower == "none":
         item_remarks = "none"
 
     item["Purchase_Date"] = ""
@@ -416,7 +416,7 @@ def edit_list(item_list):
 
 
     while True:
-        item_index = input("\nEnter item to edit/delete(1,2...) or enter 'exit' to save: ").strip().lower()
+        item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
         if item_index == "exit":
             return item_list, True
         elif item_index.isdecimal():
@@ -424,9 +424,9 @@ def edit_list(item_list):
                 item_index = int(item_index) - 1
                 return edit_item(item_list, item_index), False
             else:
-                print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
+                print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
         else:
-            print("Invalid input. Enter item to edit/delete(1,2...) or enter 'exit' to save")
+            print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
 
 
 # Collect the groceries the user plans to buy, until they say they are done.
@@ -527,6 +527,7 @@ def update_fridge(fridge):
         print("  3. Done")
         action = input("Enter 1, 2 or 3: ").strip()
         if action == "3":
+
             return fridge
         elif action not in ["1", "2"]:
             print("Please enter 1, 2 or 3.")
@@ -541,6 +542,15 @@ def update_fridge(fridge):
 
         if action == "1":
             fridge[number]["Expiry_Date"] = enter_date(f"New expiry date for {fridge[number]['Item_Name']} (YYYY-MM-DD): ", allow_past=True,purchase_date=fridge[number].get("Purchase_Date", ""))
+            similar_item = False
+            for item in fridge:
+                if item["Item_Name"] == fridge[number]["Item_Name"] and item["Unit"] == fridge[number]["Unit"] and item["Purchase_Date"] == fridge[number]["Purchase_Date"] and item["Expiry_Date"] == fridge[number]["Expiry_Date"] and item["Remarks"] == fridge[number]["Remarks"]:
+                    similar_item = True
+                    item["Quantity"] += fridge[number]["Quantity"]
+                    fridge.pop(number)
+                    break
+            if similar_item == False:
+                fridge[number]["Expiry_Date"]
             print(f"Updated: {format_item(fridge[number])}")
         else:
             removed = fridge.pop(number)
@@ -660,7 +670,11 @@ def display_list(list_name, item_list):
 
         elif list_name == "Fridge":
             cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
-            message += f"{cur_amt_formatted:<12}| {item_list[i]['Purchase_Date']:<14}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
+            if item_list[i]['Purchase_Date'] == "": 
+                purchase_date_formatted = f"NA"
+            else:
+                purchase_date_formatted = f"{item_list[i]['Purchase_Date']}"
+            message += f"{cur_amt_formatted:<12}| {purchase_date_formatted:<14}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
         print(message)
 
     if list_name == "Recommendations List":
