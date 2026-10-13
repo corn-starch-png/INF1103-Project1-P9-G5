@@ -638,7 +638,7 @@ def display_list(list_name, item_list):
         header += f"{'Recommended amt':<16}| {'CS*':<6}| "
         
     elif list_name == "Fridge":
-        header += f"{'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
+        header += f"{'Purchase date':<14}| {'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
     print(header)
 
 
@@ -660,7 +660,7 @@ def display_list(list_name, item_list):
 
         elif list_name == "Fridge":
             cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
-            message += f"{cur_amt_formatted:<12}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
+            message += f"{cur_amt_formatted:<12}| {item_list[i]['Purchase_Date']:<14}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
         print(message)
 
     if list_name == "Recommendations List":
