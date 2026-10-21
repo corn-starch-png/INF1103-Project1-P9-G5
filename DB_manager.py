@@ -292,6 +292,30 @@ def shift_calendar_years(value, years):
         return value.replace(year=target_year)
     except ValueError:
         return value.replace(year=target_year, month=2, day=28)
+
+def merge_fridge_batches(fridge):
+    merged = []
+    for item in fridge:
+        matching_item = None
+        for existing in merged:
+            if (
+                existing["Item_Name"].strip().casefold() == item["Item_Name"].strip().casefold()
+                and existing["Unit"] == item["Unit"]
+                and existing["Purchase_Date"] == item["Purchase_Date"]
+                and existing["Expiry_Date"] == item["Expiry_Date"]
+                and existing["Remarks"] == item["Remarks"]
+            ):
+                matching_item = existing
+                break
+        if matching_item is None:
+            merged.append(item.copy())
+        else:
+            total = Decimal(str(matching_item["Quantity"])) + Decimal(str(item["Quantity"]))
+            if total <= MAX_QUANTITY:
+                matching_item["Quantity"] = normalize_quantity(total)
+            else:
+                merged.append(item.copy())
+    return merged
 #DB CRUD FUCNTIONS---------------
 #returns the total quantity of the item in the fridge and consumption_history tables
 #in-put: <dictionary> database, <string> item_name
@@ -341,13 +365,17 @@ def update_consumption_history(database, update_list):
 #in-put: [{"Item_Name": "<string>", "Quantity": <integer>, "Unit": "<string>", "Purchase_Date": "<YYYY-MM-DD>", "Expiry_Date": "<YYYY-MM-DD>", "Remarks": "<string>"},...]
 #output: <dictionary> database 
 def add_to_fridge(database, update_list):
+    fridge = database.setdefault("fridge", [])
     for item in update_list:
-        check_result, error_message = check_data(item, 'fridge')
+        check_result, error_message = check_data(item, "fridge")
         if not check_result:
-            send_log(f"[DATABASE] Invalid data being added in fridge: {item}. Error: {error_message}")
-            continue  # Skip invalid entries
+            send_log(f"[DATABASE] Invalid fridge item: {item}. Error: {error_message}")
+            continue
         ensure_item_unit(database, item["Item_Name"], item["Unit"])
-        database.get('fridge', []).append(item)  # Append each item in the update list to the fridge table
+        fridge.append(item.copy())
+    # auto merge matching batches including existing duplicates
+    fridge[:] = merge_fridge_batches(fridge)
+
     return database
 
 
