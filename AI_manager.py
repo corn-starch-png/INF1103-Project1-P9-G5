@@ -1,3 +1,4 @@
+from AI_classes import AIProvider, OpenRouterProvider
 from datetime import date, timedelta
 import json
 import math
@@ -624,32 +625,10 @@ def check_ai_output(recommendations, grocery_list):
     return True
 #endregion
 
-#region Function to call AI API with all reqiured args
-def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock,remarks,days_until_next):
-    update_ai_status("Checking AI API connection...")
-    connected, errMsg = check_api_conn()
-    # Check if the connection to the AI API is successful
-    if not connected: 
-        update_ai_status("AI API connection failed.")
-        send_log(f"[AI] {errMsg}") 
-        return None, errMsg
-    update_ai_status("AI API connection successful.")
-    update_ai_status("Preparing AI input...")
-    # Prepare data for AI processing
-    current_date = date.today()
-    next_purchase_date = get_next_purchase_date(current_date,days_until_next)
-    data = prepare_data(household_info, consumption_history, fridge_stock, purchase_stock,remarks,current_date, next_purchase_date)
-    update_ai_status("Building AI prompt...")
-    #build the prompt for AI processing
-    prompt = build_ai_prompt(data)
-    update_ai_status("Sending prompt to AI...")
-    ai_output, error = call_ai_api(prompt, purchase_stock)
-    if error:
-        update_ai_status("AI request failed.")
-        send_log(f"[AI] {error}")
-        return None, error
-    return ai_output, None
-
+#region AI Recommendation Entry Point
+def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next):
+    manager = AIManager(OpenRouterProvider())
+    return manager.get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next)
 #endregion
 
 #region Prompt Builder
@@ -670,4 +649,47 @@ class AIResponseValidator:
         return get_expiration_date(current_date, expiration_days)
     def _get_default_expiration_date(self, current_date: date, default_expiration_days: int) -> date:
         return get_default_expiration_date(current_date, default_expiration_days)
+#endregion
+
+#region AI Manager
+class AIManager:
+    def __init__(self, provider: AIProvider) -> None:
+        self._provider = provider
+        self._prompt_builder = PromptBuilder()
+        self._validator = AIResponseValidator()
+
+    def _prepare_data(self, household_info: dict, consumption_history: list, fridge_stock: list, grocery_list_input: list, remarks: str, current_date: date, next_purchase_date: date) -> dict:
+        return prepare_data(household_info, consumption_history, fridge_stock, grocery_list_input, remarks, current_date, next_purchase_date)
+
+    def _get_next_purchase_date(self, current_date: date, days_until_next: int) -> date:
+        return get_next_purchase_date(current_date, days_until_next)
+
+    def get_ai_recommendations(self, household_info: dict, consumption_history: list, fridge_stock: list, purchase_stock: list, remarks: str, days_until_next: int) -> tuple:
+        # Check API connection
+        if isinstance(self._provider, OpenRouterProvider):
+            update_ai_status("Checking AI API connection...")
+            connected, message = self._provider.check_api_conn()
+            if not connected:
+                update_ai_status("AI API connection failed.")
+                send_log(f"[AI] {message}")
+                return None, message
+            update_ai_status("AI API connection successful.")
+        # Prepare AI input
+        update_ai_status("Preparing AI input...")
+        current_date = date.today()
+        next_purchase_date = self._get_next_purchase_date(current_date, days_until_next)
+        data = self._prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, remarks, current_date, next_purchase_date)
+
+        # Build AI prompt
+        update_ai_status("Building AI prompt...")
+        prompt = self._prompt_builder.build_ai_prompt(data)
+
+        # Generate AI recommendations
+        update_ai_status("Sending prompt to AI...")
+        result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), purchase_stock, self._validator)
+
+        if error:
+            update_ai_status("AI request failed.")
+            send_log(f"[AI] {error}")
+        return result, error
 #endregion
