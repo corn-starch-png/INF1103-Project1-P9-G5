@@ -11,70 +11,6 @@ from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
 #region API config
 load_dotenv()
 
-def get_ai_model(model_type="AI_MODEL"):
-    ai_model = os.getenv(model_type, "").strip()
-    if not ai_model:
-        raise ValueError(f"{model_type} not found in environment file")
-    return ai_model
-#endregion
-
-#region Date Conversion
-def get_next_purchase_date(current_date, days_until_next):
-    try:
-        next_purchase_date = current_date + timedelta(days=days_until_next)
-        return next_purchase_date
-    except ValueError:
-        raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
-#endregion
-
-#region Check AI API Connection
-def check_api_conn():
-    # Get the api keys and api connection url
-    api_key = os.getenv("API_KEY")
-    conn_url= os.getenv("API_CONN_URL")
-    if not api_key:
-        raise ValueError("API_KEY not found in environment file")
-    if not conn_url:
-            raise ValueError("API_CONN_URL not found in environment file")
-    headers = {"Authorization": f"Bearer {api_key}" }
-    # Send the a request to api url to check for connection
-    try:
-        response = requests.get(conn_url, headers=headers,timeout=10)
-        if response.status_code == 200:
-            return True, "API Connection Establish. API Key Valid."
-        if response.status_code == 501:
-            return False, "AI API authentication failed. API KEY Not Valid."
-        if response.status_code == 500:
-            return False, "API Server Error."
-        return False, (f"AI API connection failed. HTTP status: {response.status_code}")
-    except requests.exceptions.Timeout:
-        return False, "AI API connection timed out."
-    except requests.exceptions.ConnectionError:
-        return False, "Unable to connect to AI API."
-    except requests.exceptions.RequestException as error:
-        return False, (f"AI API connection error: {error}")
-#endregion
-
-#region check AI response order matches original grocery_list
-def check_ai_output(recommendations, grocery_list):
-    if not isinstance(recommendations, list) or not isinstance(grocery_list, list):
-        return False
-    if len(recommendations) != len(grocery_list):
-        return False
-    for ai_item, original in zip(recommendations, grocery_list):
-        if not isinstance(ai_item, dict) or not isinstance(original, dict):
-            return False
-        for ai_field, original_field in (
-            ("Item_Name", "Item_Name"),
-            ("Planned_Quantity", "Quantity"),
-            ("Unit", "Unit")):
-            if ai_field not in ai_item or original_field not in original:
-                return False
-            if ai_item[ai_field] != original[original_field]:
-                return False
-    return True
-#endregion
-
 #region AI Recommendation Entry Point
 def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next):
     manager = AIManager(OpenRouterProvider())
@@ -506,9 +442,14 @@ class AIManager:
         return {"household_info": household_info, "consumption_history": consumption_history, 
                 "fridge_stock": fridge_stock, "planned_grocery_list": grocery_list_input, 
                 "remarks": remarks, "current_date": current_date, "next_purchase_date": next_purchase_date}
+    
     def _get_next_purchase_date(self, current_date: date, days_until_next: int) -> date:
-        return get_next_purchase_date(current_date, days_until_next)
-
+        try:
+            next_purchase_date = current_date + timedelta(days=days_until_next)
+            return next_purchase_date
+        except ValueError:
+            raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
+        
     def get_ai_recommendations(self, household_info: dict, consumption_history: list, fridge_stock: list, purchase_stock: list, remarks: str, days_until_next: int) -> tuple:
         # Check API connection
         if isinstance(self._provider, OpenRouterProvider):
