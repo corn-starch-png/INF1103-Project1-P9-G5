@@ -651,3 +651,23 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
     return ai_output, None
 
 #endregion
+
+#region Prompt Builder
+class PromptBuilder:
+    def build_ai_prompt(self, data: dict) -> str:
+        return build_ai_prompt(data)
+#endregion
+
+#region AI Response Validator
+class AIResponseValidator:
+    def get_recommendation_schema(self) -> dict:
+        return get_recommendation_schema()
+    def process_ai_response(self, ai_response: str) -> tuple:
+        return process_ai_response(ai_response)
+    def check_ai_output(self, recommendations: list, grocery_list: list) -> bool:
+        return check_ai_output(recommendations, grocery_list)
+    def _get_expiration_date(self, current_date: date, expiration_days: int) -> date:
+        return get_expiration_date(current_date, expiration_days)
+    def _get_default_expiration_date(self, current_date: date, default_expiration_days: int) -> date:
+        return get_default_expiration_date(current_date, default_expiration_days)
+#endregion
