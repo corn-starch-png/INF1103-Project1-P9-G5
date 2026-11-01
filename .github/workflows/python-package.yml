@@ -1,4 +1,4 @@
-name: CI pipeline actons 
+name: CI pipeline actons #ENABLE REQUIRE STATUS CHECK before merging
 
 on:
   push: 
