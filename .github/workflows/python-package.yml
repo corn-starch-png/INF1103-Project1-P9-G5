@@ -1,4 +1,4 @@
-name: CI pipeline actons #ENABLE REQUIRE STATUS CHECK before merging
+name: CI pipeline actions #ENABLE REQUIRE STATUS CHECK before merging
 
 on:
   push: 
@@ -32,3 +32,23 @@ jobs:
 
     - name: Test with pytest #run application custom test script 
       run: python -m pytest test_script.py -v
+
+
+  test-docker-images:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14-slim
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Docker Image smoke test 
+      run : |
+        docker-compose \
+          -f docker-compose.ci.yml \
+          up \
+          --build \   #builds local file
+          --exit-code-from test \  # returns exit code of test service 
+          test
+
+   

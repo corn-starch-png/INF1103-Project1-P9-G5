@@ -1,0 +1,9 @@
+# docker-compose.ci.yml
+
+services:
+  test:
+    # Build the application in-place using Dockerfile
+    build: .
+    # Ensure that if everything went fine, our app closes with exit code 0
+    environment:
+      - CI_MODE=true
