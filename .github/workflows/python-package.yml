@@ -46,4 +46,4 @@ jobs:
       run: docker compose -f .github/workflows/docker-compose.ci.yml build test
 
     - name: Docker smoke test
-      run: bash .github/script/docker-smoke-test.sh 
+      run: bash .github/scripts/docker-smoke-test.sh 
