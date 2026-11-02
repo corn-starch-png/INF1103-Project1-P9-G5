@@ -1,5 +1,6 @@
 from ListFunctions import ListFunctions
 from CartItem import CartItem
+from Fridge import Fridge
 
 
 class Cart(ListFunctions):
@@ -23,3 +24,13 @@ class Cart(ListFunctions):
 
     def get_items(self) -> list:
         return list(self.__items)
+
+    def checkout(self, fridge: Fridge) -> None:
+        """
+        Move all items from the cart to the fridge, converting them to FridgeItem.
+        The cart is cleared after checkout.
+        """
+        for item in self.__items:
+            fridge_item = item.to_fridge_item()
+            fridge.add_item(fridge_item)
+        self.__items.clear()
