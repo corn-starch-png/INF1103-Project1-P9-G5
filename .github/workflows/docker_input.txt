@@ -1,8 +1,8 @@
-bing
-15
+Rick
+70
 male
 
 2
-bingus
-20
-female
+Morty
+15
+male

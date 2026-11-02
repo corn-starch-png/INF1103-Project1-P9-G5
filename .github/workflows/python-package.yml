@@ -34,21 +34,16 @@ jobs:
       run: python -m pytest test_script.py -v
 
 
-  test-docker-images:
+  test-docker-images: #name of second job, test our container
+    name: Build QuantiFresh Docker image with smoke test 
     runs-on: ubuntu-latest
-    container:
-      image: python:3.14-slim
+   #no container this time, we are already building docker image
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Docker Image smoke test 
-      run : |
-        docker-compose \
-          -f docker-compose.ci.yml \
-          up \
-          --build \   #builds local file
-          --exit-code-from test \  # returns exit code of test service 
-          test
+    - name: Build Docker image
+      run: docker compose -f docker-compose.ci.yml build test
 
-   
+    - name: Docker smoke test
+      run: bash .github/script/docker-smoke-test.sh 
