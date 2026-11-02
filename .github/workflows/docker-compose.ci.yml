@@ -5,6 +5,6 @@ services:
     # Build the application in-place using Dockerfile
     build: 
       context: ../.. #points to repo root for Dockerfile, this file is in github folder
-      dockerfile: DockerFile
+      dockerfile: Dockerfile
     environment:
       - CI_MODE=true
