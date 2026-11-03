@@ -29,10 +29,10 @@ class CaloriesSurplusAnalyzer(Analyzer):
         return daily_total * days_until_next_visit
     
     # calculating calories surplus
-    def analyze(self, database, total_estimated_calories, days_until_next_visit):   
+    def analyze(self, total_estimated_calories, days_until_next_visit):   
     
         #extract name, gender from household info from db.json
-        family_members = database.get("household_info", [])
+        family_members = self.__family
         family_calorie_until_next_visit = self.__calculate_family_kcal(family_members, days_until_next_visit, KCAL_TABLE)
 
         send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")
