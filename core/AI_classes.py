@@ -18,7 +18,10 @@ class AIProvider(ABC):
 #region OpenRouter Provider
 class OpenRouterProvider(AIProvider):
     def check_connection(self) -> tuple:
-        return self.check_api_conn()
+        try:
+            return self.check_api_conn()
+        except ValueError as error:
+            return False, str(error)
     def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
         try:
             client = self._create_ai_client().with_options(max_retries=0)
