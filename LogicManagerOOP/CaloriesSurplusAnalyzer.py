@@ -1,5 +1,3 @@
-import statistics
-from datetime import datetime,date,timedelta
 from DB_manager import send_log, KCAL_TABLE, BONUS_KEYWORDS_FULL_PTS, BONUS_KEYWORDS_HALF_PTS
 from Analyzer import Analyzer
 from Finding import Finding
@@ -52,7 +50,7 @@ class CaloriesSurplusAnalyzer(Analyzer):
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days")
             
         return Finding(
-            analyzer_name= self.analyzer_name,
+            analyzer_name= self.__analyzer_name,
             result=result,
             message=message
         )
