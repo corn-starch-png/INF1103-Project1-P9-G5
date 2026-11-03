@@ -12,7 +12,7 @@ from core.Fridge import Fridge
 from core.Household import Household
 from core.ConsumptionHistory import ConsumptionHistory
 
-def load_database(folder='database'):
+def load_database_refactored(folder='database'):
     errors = []
     fridge = Fridge()
     household = Household()
@@ -26,7 +26,7 @@ def load_database(folder='database'):
     print("Consumption history:", consumption_history.get_normalized_records("milk"))
     return errors, fridge, household, consumption_history
 
-def save_database(fridge, household, consumption_history, folder='database'):
+def save_database_refactored(fridge, household, consumption_history, folder='database'):
     json_repo = JsonRepository(fridge, household, consumption_history)
     json_repo.save()
 
