@@ -33,7 +33,7 @@ class RiskOfExpiryAnalyzer(Analyzer):
             if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
                 send_log(f"[LOGIC] Risk of expiry is True for {item_name}")
                 result = True
-                message = f"{item_quantity}{item_unit} of {item_name} --> estimated expiry: {item_expiry_date}. (avg consumption: {estimated_consumption_rate} {item_unit]} a week)"
+                message = f"{item_quantity}{item_unit} of {item_name} --> estimated expiry: {item_expiry_date}. (avg consumption: {estimated_consumption_rate} {item_unit} a week)"
             else:
                 result = False
                 send_log(f"[LOGIC] Risk of expiry is False for {item_name}")
