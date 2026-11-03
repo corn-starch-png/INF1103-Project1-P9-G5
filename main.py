@@ -3,7 +3,8 @@ try:
     from datetime import date, timedelta
     import sys
     from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
-                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity, merge_fridge_batches, send_log)
+                            add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity,
+                            merge_fridge_batches, send_log)
     from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, display_list, show_welcome_back, 
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, update_fridge, send_message, 
@@ -14,16 +15,26 @@ try:
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 
-log_exists()
-database_exists()  # Ensure the database folder and file exist
-db_success, database = load_database('database')  # Load the database into memory
-database["fridge"][:] = merge_fridge_batches(database["fridge"])
-send_log(f"[MAIN] database: {database}")
-if db_success == False:
-    send_message(f"Database loading encountered issues, data may be missing")
-household_info = database['household_info']
-history = database['consumption_history']
-fridge = database['fridge']
+#here for integration testing
+#will remove once the refactored code is fully implemented and tested
+USING_REFACTORED_CODE = False 
+if USING_REFACTORED_CODE:
+    from DB_manager import (load_database_refactored, save_database_refactored)
+    from core.Fridge import Fridge
+    from core.Household import Household
+    from core.ConsumptionHistory import ConsumptionHistory
+    errors, fridge, household_info, history = load_database_refactored("database")
+else:
+    log_exists()
+    database_exists()  # Ensure the database folder and file exist
+    db_success, database = load_database('database')  # Load the database into memory
+    database["fridge"][:] = merge_fridge_batches(database["fridge"])
+    send_log(f"[MAIN] database: {database}")
+    if db_success == False:
+        send_message(f"Database loading encountered issues, data may be missing")
+    household_info = database['household_info']
+    history = database['consumption_history']
+    fridge = database['fridge']
 
 existing_fridge_items = []
 consumed_items = []
@@ -122,6 +133,10 @@ output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messa
 final_checkout = shopping_cart_conclusion(recommendations, remarks)
 
 database = add_to_fridge(database, final_checkout)
-save_database(database, 'database')  # Save the database to the specified folder
+
+if USING_REFACTORED_CODE:
+    save_database_refactored(database, 'database')  # Save the database to the specified folder
+else:
+    save_database(fridge, household_info, history, 'database')  # Save the database to the specified folder
 show_exit()
 #endregion
