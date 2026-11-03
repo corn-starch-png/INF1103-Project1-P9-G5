@@ -6,7 +6,6 @@ from DB_manager import send_log
 class RiskOfExpiryAnalyzer(Analyzer):
     def __init__(self, analyzer_name):
         super().__init__(analyzer_name)
-        self.__analyzer_name = analyzer_name
         
         
     def analyze(self, item, total_amt_of_items):
@@ -31,7 +30,7 @@ class RiskOfExpiryAnalyzer(Analyzer):
                 send_log(f"[LOGIC] Risk of expiry is False for {item["Item_Name"]}")
                 
             return Finding(
-                analyzer_name= self.__analyzer_name,
+                analyzer_name= self.analyzer_name,
                 result=result,
                 message=message
             )

@@ -50,7 +50,7 @@ class CaloriesSurplusAnalyzer(Analyzer):
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days")
             
         return Finding(
-            analyzer_name= self.__analyzer_name,
+            analyzer_name= self.analyze_name,
             result=result,
             message=message
         )

@@ -35,7 +35,7 @@ class UnderbuyAnalyzer(Analyzer):
                     send_log(f"[LOGIC] underbuy: additional {item["Item_Name"]} is not needed")
                     
                 return Finding(
-                        analyzer_name= self.__analyzer_name,
+                        analyzer_name= self.analyzer_name,
                         result=result,
                         message=message
                         ) 
