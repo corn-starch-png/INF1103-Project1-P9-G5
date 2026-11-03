@@ -23,6 +23,11 @@ class CartItem(ItemRecord, ItemFunctions):
             "Unit": self._unit,
         }
 
+    @property
+    def ai_data(self) -> AIRecData:
+      """Returns the AI recommendation data associated with this item."""
+      return self.__ai_data  
+    
     @classmethod
     def from_dict(cls, data: dict) -> "CartItem":
         return cls(data["Item_Name"], data["Quantity"], data["Unit"])
