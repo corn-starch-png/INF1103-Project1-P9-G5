@@ -450,29 +450,29 @@ class AIManager:
     def get_ai_recommendations(self, household_info: dict, consumption_history: list, fridge_stock: list, purchase_stock: list, remarks: str, days_until_next: int) -> tuple:
         # Check API connection
         if isinstance(self._provider, OpenRouterProvider):
-            OpenRouterProvider._update_ai_statusupdate_ai_status("Checking AI API connection...")
+            send_log("Checking AI API connection...")
             connected, message = self._provider.check_api_conn()
             if not connected:
-                OpenRouterProvider._update_ai_status("AI API connection failed.")
+                send_log("AI API connection failed.")
                 send_log(f"[AI] {message}")
                 return None, message
-            OpenRouterProvider._update_ai_status("AI API connection successful.")
+            send_log("AI API connection successful.")
         # Prepare AI input
-        OpenRouterProvider._update_ai_status("Preparing AI input...")
+        send_log("[AI STATUS] Preparing AI input...")
         current_date = date.today()
         next_purchase_date = self._get_next_purchase_date(current_date, days_until_next)
         data = self._prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, remarks, current_date, next_purchase_date)
 
         # Build AI prompt
-        OpenRouterProvider._update_ai_status("Building AI prompt...")
+        send_log("[AI STATUS] Building AI prompt...")
         prompt = self._prompt_builder.build_ai_prompt(data)
 
         # Generate AI recommendations
-        OpenRouterProvider._update_ai_status("Sending prompt to AI...")
+        send_log("[AI STATUS] Sending prompt to AI...")
         result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), purchase_stock, self._validator)
 
         if error:
-            OpenRouterProvider._update_ai_status("AI request failed.")
+            send_log("[AI] AI request failed.")
             send_log(f"[AI] {error}")
         return result, error
 #endregion

@@ -56,7 +56,7 @@ class OpenRouterProvider(AIProvider):
                     self._update_ai_status(f"AI response received in {elapsed_time:.1f} seconds.")
                     # Validate output inside retry loop
                     self._update_ai_status("Validating AI output...")
-                    ai_output, error = self._process_ai_response(content)
+                    ai_output, error = validator.process_ai_response(content)
                     if error:
                         raise ValueError(error)
                     # Check original grocery list integrity
