@@ -1,6 +1,6 @@
-from ListFunctions import ListFunctions
-from CartItem import CartItem
-from Fridge import Fridge
+from core.ListFunctions import ListFunctions
+from core.CartItem import CartItem
+from core.Fridge import Fridge
 
 
 class Cart(ListFunctions):

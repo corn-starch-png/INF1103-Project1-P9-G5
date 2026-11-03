@@ -1,8 +1,8 @@
 from datetime import date
-from ItemRecord import ItemRecord
-from ItemFunctions import ItemFunctions
-from AIRecData import AIRecData
-from FridgeItem import FridgeItem
+from core.ItemRecord import ItemRecord
+from core.ItemFunctions import ItemFunctions
+from core.AIRecData import AIRecData
+from core.FridgeItem import FridgeItem
 
 
 class CartItem(ItemRecord, ItemFunctions):

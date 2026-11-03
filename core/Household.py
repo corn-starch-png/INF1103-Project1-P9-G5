@@ -1,5 +1,5 @@
-from Person import Person
-from CanBeStored import CanBeStored
+from core.Person import Person
+from core.CanBeStored import CanBeStored
 
 
 class Household(CanBeStored):

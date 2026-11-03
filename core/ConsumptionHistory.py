@@ -1,5 +1,5 @@
-from ConsumptionRecord import ConsumptionRecord
-from CanBeStored import CanBeStored
+from core.ConsumptionRecord import ConsumptionRecord
+from core.CanBeStored import CanBeStored
 
 class ConsumptionHistory(CanBeStored):
     """Past consumption records (aggregation of ConsumptionRecord)."""

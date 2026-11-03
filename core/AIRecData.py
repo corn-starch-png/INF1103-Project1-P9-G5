@@ -1,12 +1,8 @@
-
-import copy
 from ItemFunctions import ItemFunctions
-from CartItem import CartItem
-from FridgeItem import FridgeItem
 
 
 
-class AIRecItem(ItemFunctions):
+class AIRecData(ItemFunctions):
     """AI recommendation together with the user's original item."""
 
     MIN_CONFIDENCE = 0.0

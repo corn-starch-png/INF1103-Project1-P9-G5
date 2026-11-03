@@ -1,6 +1,6 @@
 from datetime import date
 
-from ItemRecord import ItemRecord
+from core.ItemRecord import ItemRecord
 
 
 class ConsumptionRecord(ItemRecord):

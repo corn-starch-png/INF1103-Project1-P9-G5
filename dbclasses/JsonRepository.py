@@ -1,7 +1,7 @@
 import json
 import os
 
-from RepositoryFunctions import RepositoryFunctions
+from dbclasses.RepositoryFunctions import RepositoryFunctions
 from core.Household import Household
 from core.Fridge import Fridge
 from core.ConsumptionHistory import ConsumptionHistory
