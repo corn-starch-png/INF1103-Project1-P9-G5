@@ -230,238 +230,194 @@ class TestAIManager:
 #endregion
 
 # =========================================================
-# 3. AGE CATEGORY MAPPING
-# Input: a person's age.
-# Expected: map the age to the correct calorie-table category.
+# 4. LOGIC MANAGER TESTS
+# Input: Household information, calorie requirements,
+# AI recommendations, consumption history and fridge stock.
+# Expected: Verify age mapping, calorie calculations,
+# expiry risk, under-buy decisions and confidence scores.
 # =========================================================
-
-def test_age_mapping():
-    cases = [
-        (0, 0),
-        (18, 18),
-        (19, 19),
-        (30, 30),
-        (31, 30),
-        (59, 30),
-        (60, 60),
-        (100, 60),
-    ]
-
-    for age, expected in cases:
-        assert logic.get_age_from_KCAL(age) == expected
-
-
-# =========================================================
-# 4. FAMILY WEEKLY CALORIE CALCULATION
-# Input: two family members and daily calorie requirements.
-# Male age 20 maps to age 19: 2,000 calories/day.
-# Female age 35 maps to age 30: 2,200 calories/day.
-# Expected: (2,000 + 2,200) x 7 = 29,400 calories/week.
-# =========================================================
-
-def test_family_weekly_calories():
-    family = [
-        {"Age": 20, "Gender": "Male"},
-        {"Age": 35, "Gender": "Female"},
-    ]
-    kcal_table = {
-        19: {"Male": 2000, "Female": 1800},
-        30: {"Male": 2500, "Female": 2200},
-        60: {"Male": 2000, "Female": 1800},
-    }
-    result = logic.calculate_family_kcal(family, 7, kcal_table)
-    assert result == 29400
-
-# =========================================================
-# 5. CALORIE SURPLUS
-# Input: estimated calories and family weekly calorie needs.
-# Mocking: replace file reading and the family-calorie function
-# so the test uses controlled sample data.
-# Expected: True only when estimated calories exceed the need.
-# =========================================================
-def run_calorie_test(calories, weekly_need):
-    database = {"household_info": []}
-    with patch.object(logic, "calculate_family_kcal", return_value=weekly_need):
-        result, message = logic.calories_surplus(database, calories, 7)
-    return result
-
-def test_calories_above_weekly_need():
-    # 14,001 exceeds 14,000, so a surplus exists.
-    assert run_calorie_test(14001, 14000) is True
-
-def test_calories_equal_weekly_need():
-    # Exactly meeting the need is not considered a surplus.
-    assert run_calorie_test(14000, 14000) is False
-
-def test_calories_below_weekly_need():
-    # 13,999 is below the family's weekly need.
-    assert run_calorie_test(13999, 14000) is False
-
-# =========================================================
-# 6. EXPIRY RISK
-# Input: consumption rate, planned quantity and expiry date.
-# The date is fixed at 9 October 2026 to make results repeatable.
-# Expected: True if estimated consumption finishes after expiry;
-#           False if the food should be consumed before expiry.
-# =========================================================
-@patch.object(logic, "date")
-def test_expiry_risk_true(mock_date):
-    mock_date.today.return_value = CAPTURE_DATE
-    item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-    item["Estimated_Consumption_Rate"] = 0.5
-    result = logic.risk_of_expiry(item, 3)
-    assert result[0] is True
-    assert result[1] is not None
-    assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
-
-@patch.object(logic, "date")
-def test_expiry_risk_false(mock_date):
-    mock_date.today.return_value = CAPTURE_DATE
-    item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-    item["Estimated_Consumption_Rate"] = 7
-    result = logic.risk_of_expiry(item, 1)
-    assert result == (False, None)
-
-def test_zero_consumption_rate():
-    for item in AI_RECOMMENDATIONS:
-        assert item["Estimated_Consumption_Rate"] == 0
-        assert logic.risk_of_expiry(item, item["Planned_Quantity"]) == (False, None)
-
-def test_negative_consumption_rate():
-    item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-    item["Estimated_Consumption_Rate"] = -1
-    assert logic.risk_of_expiry(item, 3) == (False, None)
-# =========================================================
-# 7. UNDER-BUY EVALUATION
-# Input: whether calorie surplus and expiry risk exist.
-# Expected: under_buy() runs only when both values are False.
-# Mocking: prevent the real functions and advice from running.
-# =========================================================
-def test_no_surplus_no_expiry_allows_underbuy():
-    assert logic.should_evaluate_underbuy(False, False) is True
-
-def test_surplus_only_skips_underbuy():
-    assert logic.should_evaluate_underbuy(True, False) is False
-
-def test_expiry_only_skips_underbuy():
-    assert logic.should_evaluate_underbuy(False, True) is False
-
-def test_surplus_and_expiry_skip_underbuy():
-    assert logic.should_evaluate_underbuy(True, True) is False
-
-# =========================================================
-# 8. TEST THE UNDER_BUY FUNCTION
-# Input: planned quantity, consumption rate, expiry date,
-#        and next purchase date.
-# Expected: correct advice and top-up amount.
-# Tests execute the REAL under_buy() function. 
-# Only the date and confidence-score calculation
-# are controlled where needed.
-# =========================================================
-@patch.object(logic, "date")
-def test_under_buy_calculates_top_up(mock_date):
-    mock_date.today.return_value = CAPTURE_DATE
-    item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-    item["Estimated_Consumption_Rate"] = 7
-    result = logic.under_buy(item, "2026-10-20", 3)
-    assert result[0] is True
-    assert "milk" in result[1]
-    assert "recommended to buy more" in result[1]
-    assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
-
-@patch.object(logic, "date")
-def test_under_buy_sufficient_stock(mock_date):
-    mock_date.today.return_value = CAPTURE_DATE
-    item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-    item["Estimated_Consumption_Rate"] = 7
-    result = logic.under_buy(item, "2026-10-20",10)
-    assert result == (False, None)
-
-def test_under_buy_handles_zero_consumption():
-    for item in AI_RECOMMENDATIONS:
-        result = logic.under_buy(item, "2026-10-20", item["Planned_Quantity"])
+#region Logic Manager Tests
+class TestLogicManager:
+    # Test 16 - Verify age category mapping
+    # Expected result: Each age maps to the correct calorie-table age category.
+    def test_age_mapping(self):
+        cases = [(0, 0), (18, 18), (19, 19), (30, 30), (31, 30), (59, 30), (60, 60), (100, 60)]
+        for age, expected in cases:
+            assert logic.get_age_from_KCAL(age) == expected
+    # Test 17 - Calculate family weekly calorie requirements
+    # Expected result: A male aged 20 and female aged 35 require 29,400 calories over 7 days.
+    def test_family_weekly_calories(self):
+        family = [{"Age": 20, "Gender": "Male"}, {"Age": 35, "Gender": "Female"},]
+        kcal_table = {19: {"Male": 2000, "Female": 1800}, 30: {"Male": 2500, "Female": 2200}, 60: {"Male": 2000, "Female": 1800},}
+        result = logic.calculate_family_kcal(family, 7, kcal_table)
+        assert result == 29400
+    # Helper method - Simulate calorie surplus calculation
+    # Expected result: Returns whether the supplied calories exceed the mocked family calorie requirement.
+    def run_calorie_test(self, calories, weekly_need):
+        database = {"household_info": []}
+        with patch.object(logic, "calculate_family_kcal", return_value=weekly_need):
+            result, message = logic.calories_surplus(database, calories, 7)
+        return result
+    # Test 18 - Detect calories above weekly requirement
+    # Expected result: Returns True when 14,001 calories exceed the weekly requirement of 14,000.
+    def test_calories_above_weekly_need(self):
+        assert self.run_calorie_test(14001, 14000) is True
+    # Test 19 - Detect calories equal to weekly requirement
+    # Expected result: Returns False when 14,000 calories exactly meet the weekly requirement.
+    def test_calories_equal_weekly_need(self):
+        assert self.run_calorie_test(14000, 14000) is False
+    # Test 20 - Detect calories below weekly requirement
+    # Expected result: Returns False when 13,999 calories are below the weekly requirement of 14,000.
+    def test_calories_below_weekly_need(self):
+        assert self.run_calorie_test(13999, 14000) is False
+    # Test 21 - Detect food expiry risk
+    # Expected result: Returns True when estimated consumption cannot finish before the expiry date.
+    @patch.object(logic, "date")
+    def test_expiry_risk_true(self, mock_date):
+        mock_date.today.return_value = CAPTURE_DATE
+        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
+        item["Estimated_Consumption_Rate"] = 0.5
+        result = logic.risk_of_expiry(item, 3)
+        assert result[0] is True
+        assert result[1] is not None
+        assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
+    # Test 22 - Verify no food expiry risk
+    # Expected result: Returns False and None when the food can be consumed before expiry.
+    @patch.object(logic, "date")
+    def test_expiry_risk_false(self, mock_date):
+        mock_date.today.return_value = CAPTURE_DATE
+        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
+        item["Estimated_Consumption_Rate"] = 7
+        result = logic.risk_of_expiry(item, 1)
         assert result == (False, None)
-# =========================================================
-# 9. HISTORICAL DATA AVAILABILITY
-# Input: Consumption history and fridge records.
-# Expected: Return 0 when no history exists.
-# With history, confidence should be between 0 and 100.
-# =========================================================
-def test_confidence_score_no_history():
-    database = {"consumption_history": [], "fridge": []}
-    result = logic.calculate_confidence_score("yogurt", database, 4, 0, 7, "none")
-    assert result == 0.0
+    # Test 23 - Handle zero consumption rate
+    # Expected result: Returns False and None when estimated consumption is zero.
+    def test_zero_consumption_rate(self):
+        for item in AI_RECOMMENDATIONS:
+            assert item["Estimated_Consumption_Rate"] == 0
+            assert logic.risk_of_expiry(item, item["Planned_Quantity"]) == (False, None)
+    # Test 24 - Handle negative consumption rate
+    # Expected result: Returns False and None for an invalid negative consumption rate.
+    def test_negative_consumption_rate(self):
+        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
+        item["Estimated_Consumption_Rate"] = -1
+        assert logic.risk_of_expiry(item, 3) == (False, None)
+    # Test 25 - Allow under-buy evaluation without calorie surplus or expiry risk
+    # Expected result: Returns True when both conditions are False.
+    def test_no_surplus_no_expiry_allows_underbuy(self):
+        assert logic.should_evaluate_underbuy(False, False) is True
+    # Test 26 - Skip under-buy evaluation when calorie surplus exists
+    # Expected result: Returns False when calorie surplus is True and expiry risk is False.
+    def test_surplus_only_skips_underbuy(self):
+        assert logic.should_evaluate_underbuy(True, False) is False
+    # Test 27 - Skip under-buy evaluation when expiry risk exists
+    # Expected result: Returns False when calorie surplus is False and expiry risk is True.
+    def test_expiry_only_skips_underbuy(self):
+        assert logic.should_evaluate_underbuy(False, True) is False
+    # Test 28 - Skip under-buy evaluation when both risks exist
+    # Expected result: Returns False when calorie surplus and expiry risk are both True.
+    def test_surplus_and_expiry_skip_underbuy(self):
+        assert logic.should_evaluate_underbuy(True, True) is False
+    # Test 29 - Calculate additional quantity needed
+    # Expected result: Returns True and recommends buying more milk when existing quantity is insufficient.
+    @patch.object(logic, "date")
+    def test_under_buy_calculates_top_up(self, mock_date):
+        mock_date.today.return_value = CAPTURE_DATE
+        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
+        item["Estimated_Consumption_Rate"] = 7
+        result = logic.under_buy(item, "2026-10-20", 3)
+        assert result[0] is True
+        assert "milk" in result[1]
+        assert "recommended to buy more" in result[1]
+        assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
+    # Test 30 - Verify sufficient existing stock
+    # Expected result: Returns False and None when the household already has enough stock.
+    @patch.object(logic, "date")
+    def test_under_buy_sufficient_stock(self, mock_date):
+        mock_date.today.return_value = CAPTURE_DATE
+        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
+        item["Estimated_Consumption_Rate"] = 7
+        result = logic.under_buy(item, "2026-10-20", 10)
+        assert result == (False, None)
+    # Test 31 - Handle zero consumption in under-buy calculation
+    # Expected result: Returns False and None when no additional quantity is required.
+    def test_under_buy_handles_zero_consumption(self):
+        for item in AI_RECOMMENDATIONS:
+            result = logic.under_buy(item, "2026-10-20", item["Planned_Quantity"])
+            assert result == (False, None)
+    # Test 32 - Calculate confidence score without history
+    # Expected result: Returns 0.0 when no consumption history exists.
+    def test_confidence_score_no_history(self):
+        database = {"consumption_history": [], "fridge": []}
+        result = logic.calculate_confidence_score("yogurt", database, 4, 0, 7, "none")
+        assert result == 0.0
+    # Test 33 - Calculate confidence score using consumption history
+    # Expected result: Returns a confidence score greater than 0 and not exceeding 100.
+    def test_confidence_score_using_existing_history(self):
+        database = {"consumption_history": history, "fridge": fridge}
+        result = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
+        assert 0 < result <= 100
+    # Test 34 - Handle zero-mean consumption history
+    # Expected result: Returns 49.5 without causing a division-by-zero error.
+    def test_confidence_score_zero_mean_should_not_crash(self):
+        zero_history = [{"Date_Range": 7, "Item_Name": "milk", "Quantity": 0, "Unit": "l", "Remarks": "none"}]
+        score = logic.calculate_confidence_score("milk", {"consumption_history": zero_history, "fridge": []}, 0, 0, 7, "none")
+        assert score == 49.5
+    # Test 35 - Verify remarks bonus
+    # Expected result: Actionable remarks increase the confidence score by 5 without exceeding 100.
+    def test_confidence_score_remarks_bonus(self):
+        database = {"consumption_history": history, "fridge": fridge}
+        qty = AI_RECOMMENDATIONS[0]["Recommended_Quantity"]
+        without_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "none")
+        with_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "hosting guests")
+        assert with_bonus == min(100, round(without_bonus + 5, 1))
+    # Test 36 - Verify confidence score agreement
+    # Expected result: A quantity closer to the calculated household requirement produces a higher confidence score.
+    def test_confidence_score_agreement(self):
+        database = {"consumption_history": history, "fridge": fridge}
+        # Historical milk consumption averages 1.65l per week.
+        # With 1.0l of existing stock, the calculated purchase requirement is 0.65l.
+        agreement = logic.calculate_confidence_score("milk", database, 0.65, 1.0, 7, "none")
+        captured_ai = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
+        assert agreement > captured_ai
+#endregion
 
-def test_confidence_score_using_existing_history():
-    database = {"consumption_history": history, "fridge": fridge}
-    result = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
-    assert 0 < result <= 100
-
-def test_confidence_score_zero_mean_should_not_crash():
-    zero_history = [
-        {
-            "Date_Range": 7,
-            "Item_Name": "milk",
-            "Quantity": 0,
-            "Unit": "l",
-            "Remarks": "none"
-        }
-    ]
-    score = logic.calculate_confidence_score("milk",{"consumption_history": zero_history, "fridge": []},0, 0, 7, "none")
-    assert score == 49.5
 # =========================================================
-# 10. CONFIDENCE SCORE REMARKS BONUS
-# Input: Consumption history, AI quantity and remarks.
-# Expected: Actionable remarks add a 5% bonus.
-# Final confidence score cannot exceed 100%.
+# 5. AI OUTPUT SNAPSHOT TESTS
+# Input: Previously captured AI recommendation data.
+# Expected: Verify calorie totals, expiry-date calculations,
+# nutritional consistency and JSON serialization.
 # =========================================================
-def test_confidence_score_remarks_bonus():
-    database = {"consumption_history": history, "fridge": fridge}
-    qty = AI_RECOMMENDATIONS[0]["Recommended_Quantity"]
-    without_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "none")
-    with_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "hosting guests")
-    assert with_bonus == min(100, round(without_bonus + 5, 1))
+#region AI Output Snapshot Tests
+class TestAIOutputSnapshot:
+    # Test 37 - Verify final calorie totals
+    # Expected result: Both calorie totals equal the sums of their respective item-level values.
+    def test_final_calorie_totals_match_individual_items(self):
+        assert SAMPLE_AI_RESPONSE["Total_Planned_Estimated_Calories"] == sum(item["Planned_Estimated_Calories"] for item in AI_RECOMMENDATIONS)
+        assert SAMPLE_AI_RESPONSE["Total_Estimated_Calories"] == sum(item["Estimated_Calories"] for item in AI_RECOMMENDATIONS)
+    # Test 38 - Verify estimated expiry dates
+    # Expected result: Each expiry date matches the captured date plus its estimated expiration days.
+    def test_final_expiry_dates_match_capture_date(self):
+        for item in AI_RECOMMENDATIONS:
+            days = item["Estimated_Expiration_Days"]
+            assert days is None or (type(days) is int and days >= 0)
+            assert type(item["Expiry_Date_Is_Default"]) is bool
+            assert item["Expiry_Date_Is_Default"] is (days is None)
+            expected = CAPTURE_DATE + timedelta(days=365 if days is None else days)
+            assert item["Estimated_Expiry_Date"] == expected.isoformat()
+    # Test 39 - Verify calorie consistency per unit
+    # Expected result: Planned and recommended calorie estimates use approximately the same calories per unit.
+    def test_snapshot_calories_per_unit_are_consistent(self):
+        for item in AI_RECOMMENDATIONS:
+            planned = item["Planned_Quantity"]
+            recommended = item["Recommended_Quantity"]
+            if planned > 0 and recommended > 0:
+                planned_kcal = item["Planned_Estimated_Calories"] / planned
+                recommended_kcal = item["Estimated_Calories"] / recommended
+                assert math.isclose(planned_kcal, recommended_kcal, rel_tol=0.05, abs_tol=1)
+    # Test 40 - Verify JSON serialization
+    # Expected result: Converting the response into JSON and back preserves all original data.
+    def test_snapshot_json_round_trip(self):
+        assert json.loads(json.dumps(SAMPLE_AI_RESPONSE)) == SAMPLE_AI_RESPONSE
+#endregion
 
-# =========================================================
-# 11. AI AGREEMENT SCORE
-# Input: Actual AI recommended quantity and consumption history.
-# Expected: A recommendation closer to the calculated
-# required quantity produces a higher confidence score.
-# =========================================================
-def test_confidence_score_agreement():
-    database = {"consumption_history": history, "fridge": fridge}
-    # Milk history: (1.5 + 1.8) / 2 = 1.65 l/week
-    # Existing fridge: 1.0 l
-    # Logic calculated purchase: 0.65 l
-    agreement = logic.calculate_confidence_score("milk", database, 0.65, 1.0, 7, "none")
-    captured_ai = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
-    assert agreement > captured_ai
-
-# =========================================================
-# 12. FINAL AI RESPONSE VALIDATION
-# =========================================================
-def test_final_calorie_totals_match_individual_items():
-    assert SAMPLE_AI_RESPONSE["Total_Planned_Estimated_Calories"] == sum(item["Planned_Estimated_Calories"] for item in AI_RECOMMENDATIONS)
-    assert SAMPLE_AI_RESPONSE["Total_Estimated_Calories"] == sum(item["Estimated_Calories"] for item in AI_RECOMMENDATIONS)
-
-def test_final_expiry_dates_match_capture_date():
-    for item in AI_RECOMMENDATIONS:
-        days = item["Estimated_Expiration_Days"]
-        assert days is None or (type(days) is int and days >= 0)
-        assert type(item["Expiry_Date_Is_Default"]) is bool
-        assert item["Expiry_Date_Is_Default"] is (days is None)
-        expected = CAPTURE_DATE + timedelta(days=365 if days is None else days)
-        assert item["Estimated_Expiry_Date"] == expected.isoformat()
-
-def test_snapshot_calories_per_unit_are_consistent():
-    for item in AI_RECOMMENDATIONS:
-        planned = item["Planned_Quantity"]
-        recommended = item["Recommended_Quantity"]
-
-        if planned > 0 and recommended > 0:
-            planned_kcal = (item["Planned_Estimated_Calories"] / planned )
-            recommended_kcal = (item["Estimated_Calories"] / recommended)
-            assert math.isclose(planned_kcal, recommended_kcal, rel_tol=0.05, abs_tol=1)
-
-def test_snapshot_json_round_trip():
-    assert json.loads(json.dumps(SAMPLE_AI_RESPONSE)) == SAMPLE_AI_RESPONSE
