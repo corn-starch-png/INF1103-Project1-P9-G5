@@ -1,7 +1,8 @@
 from Person import Person
+from CanBeStored import CanBeStored
 
 
-class Household:
+class Household(CanBeStored):
     """Holds the people who live in the household (aggregation of Person)."""
 
     def __init__(self):
@@ -17,3 +18,15 @@ class Household:
     def get_members(self) -> list:
         """Return a copy of the member list so callers cannot change it directly."""
         return list(self.__members)
+
+    def to_dicts(self) -> list:
+        return [person.to_dict() for person in self.__members]
+ 
+    def load_dicts(self, rows: list) -> list:
+        errors = []
+        for row in rows:
+            try:
+                self.add_member(Person.from_dict(row))
+            except (KeyError, TypeError, ValueError) as error:
+                errors.append(f"Skipped invalid household row {row!r}: {error!r}")
+        return errors

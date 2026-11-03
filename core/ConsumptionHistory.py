@@ -1,7 +1,7 @@
 from ConsumptionRecord import ConsumptionRecord
+from CanBeStored import CanBeStored
 
-
-class ConsumptionHistory:
+class ConsumptionHistory(CanBeStored):
     """Past consumption records (aggregation of ConsumptionRecord)."""
 
     def __init__(self):
@@ -25,3 +25,16 @@ class ConsumptionHistory:
             if record.name.strip().casefold() == wanted:
                 normalized.extend([record.daily_rate()] * record.date_range)
         return normalized
+
+    def to_dicts(self) -> list:
+        return [record.to_dict() for record in self.__records]
+ 
+    def load_dicts(self, rows: list) -> list:
+        errors = []
+        for row in rows:
+            try:
+                self.add_record(ConsumptionRecord.from_dict(row))
+            except (KeyError, TypeError, ValueError) as error:
+                errors.append(f"Skipped invalid consumption history row {row!r}: {error!r}")
+        return errors
+ 
