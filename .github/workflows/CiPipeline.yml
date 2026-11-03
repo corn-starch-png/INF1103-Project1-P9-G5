@@ -43,7 +43,7 @@ jobs: #gitub required status checks are expecting job names to pass!
       run: |
         python -m pip install --upgrade pip
         pip install -r python_dependencies.txt  
-
+      #rule set docs https://docs.astral.sh/ruff/rules/
     - name: Check Advisory rules 
       uses: astral-sh/ruff-action@v4.1.0
       with:
@@ -52,7 +52,7 @@ jobs: #gitub required status checks are expecting job names to pass!
     - name: Check enforced rules
       uses: astral-sh/ruff-action@v4.1.0
       with:
-        args: check --config .github/pyproject.toml --output-format=github --ignore I001,F401,F541,F841,SIM102,RUF059,FURB157,PLC0206.
+        args: check --config .github/pyproject.toml --output-format=github --ignore I001,F401,F541,F841,SIM102,RUF059,FURB157,PLC0206 .
 
     - name: Check formatting with Ruff
       uses: astral-sh/ruff-action@v4.1.0
