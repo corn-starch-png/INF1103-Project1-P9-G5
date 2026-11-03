@@ -29,7 +29,7 @@ jobs: #gitub required status checks are expecting job names to pass!
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #auto created by github to allow PR comments
 
-  Linting_and_customtest: #name of  job
+  Linting_with_ruff: #name of  job
     name: Linting and customtest
     runs-on: ubuntu-latest #spins up ubuntu vm
     container:
@@ -39,10 +39,6 @@ jobs: #gitub required status checks are expecting job names to pass!
     - name : Checkout repository 
       uses: actions/checkout@v6 #clones repo source code
 
-    - name: Install dependencies #install what our app needs to run
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r python_dependencies.txt  
       #rule set docs https://docs.astral.sh/ruff/rules/
     - name: Check Advisory rules 
       uses: astral-sh/ruff-action@v4.1.0
@@ -58,6 +54,21 @@ jobs: #gitub required status checks are expecting job names to pass!
       uses: astral-sh/ruff-action@v4.1.0
       with:
         args: format --check --diff .
+
+ CustomPytestScript: #name of  job
+    name: PytestScript 
+    runs-on: ubuntu-latest #spins up ubuntu vm
+    container:
+      image: python:3.14-slim  #pulls up docker image to finish the job
+
+    steps: #copies repo code into the created container
+    - name : Checkout repository 
+      uses: actions/checkout@v6 #clones repo source code
+
+    - name: Install dependencies #install what our app needs to run
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r python_dependencies.txt  
 
     - name: Test with pytest #run application custom test script 
       run: python -m pytest test_script.py -v
