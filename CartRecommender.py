@@ -1,30 +1,39 @@
-from datetime import date, timedelta
+from datetime import date
 
 from core.ConsumptionHistory import ConsumptionHistory
 from core.Fridge import Fridge
-from core.Cart import Cart
-from core.CartItem import CartItem
 
 class CartRecommender:
-
+    """
+    returns a list of item_names that the user frequently consumes, and is running out
+    """
     RECENT_DAYS_THRESHOLD = 14  # Number of days to consider a record as recent
 
     def __init__(self, fridge: Fridge, history: ConsumptionHistory):
         self.__fridge = fridge
         self.__history = history
 
-    def recommend_cart(self) -> list:
-        recommendations = Cart()
-        fridge_items = self.__fridge.get_unique_item_names()
-        for name in fridge_items:
+    def generate_recommendation(self) -> list:
+        recommendations = []
+        history_items = self.__history.get_unique_item_names()
+        for name in history_items:
             item_records = self.__history.search_records(name)
             if item_records:
                 latest_record_date = max(record.record_date for record in item_records)
                 if self.__check_item_recent(latest_record_date) and latest_record_date != 0:
                     if self.__check_item_consumption(name):
-                        pass
-                        #TODO: add logic to determine quantity to recommend
-                        #TODO: create CartItem and add to recommendations
+                        recommendations.append(name)
+        return recommendations
+
+    def display_recommendation(self) -> str:
+        recommendations = self.generate_recommendation()
+        message = f"Recommended items to buy: \n"
+        longest_string = max(max(len(name) for name in recommendations), len(message))
+        message += f"|{"-"*(longest_string-1)}|\n"
+        for item in recommendations:
+            message += f"| {item:<{longest_string-2}}|\n"
+            message += f"|{"-"*(longest_string-1)}|\n"
+        print(message)
 
     def __check_item_recent(self, record_date: str) -> bool:
         """
@@ -45,8 +54,11 @@ class CartRecommender:
             return False  # No consumption records found
 
         average_consumption = sum(normalized_records) / len(normalized_records)
-        fridge_quantity = self.__fridge.get_total_quantity(name, True)
+        fridge_quantity = self.__fridge.get_total_quantity(name, False)
+        
+        item_records = self.__history.search_records(name)
+        average_days_between_trips = sum(record.date_range for record in item_records)/len(item_records)
 
         # Recommend if the average consumption is greater than the current stock
-        return average_consumption > fridge_quantity
+        return (average_consumption * average_days_between_trips) > fridge_quantity
             

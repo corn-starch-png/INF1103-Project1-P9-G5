@@ -18,6 +18,10 @@ class ConsumptionRecord(ItemRecord):
         self.__remarks = remarks
 
     @property
+    def record_date(self) -> str:
+        return self.__record_date
+
+    @property
     def date_range(self) -> int:
         return self.__date_range
 

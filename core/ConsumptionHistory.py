@@ -14,6 +14,10 @@ class ConsumptionHistory(CanBeStored):
             raise ValueError("Cannot add an invalid record to the consumption history.")
         self.__records.append(record)
 
+    def get_unique_item_names(self) -> list:
+        """Return a list of unique item names consumed"""
+        return list({record.name.strip().casefold() for record in self.__records})
+
     def search_records(self, item_name: str) -> list:
         wanted = item_name.strip().casefold()
         wanted_records = []
