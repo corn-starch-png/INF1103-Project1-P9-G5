@@ -1,16 +1,16 @@
 from ConfidenceMetrics import ConfidenceMetrics
 from BonusCalculator import BonusCalculator
-#from ConsumptionHistory import ConsumptionHistory
+from core.ConsumptionHistory import ConsumptionHistory
 from DB_manager import send_log
 
 class ConfidenceCalculator:
     def __init__(self):
       self.__metrics = ConfidenceMetrics()
-      #self.__history = ConsumptionHistory()
+      self.__history = ConsumptionHistory()
       self.__bonusMetrics = BonusCalculator()
       
     def calculate_confidence_score(self, item_name, recommended_amt, fridge_amt, days_until_next_visit, remarks):
-        normalized_daily_consumption = self.__history.get_normalize_history(item_name)
+        normalized_daily_consumption = self.__history.get_normalized_records(item_name)
         if normalized_daily_consumption == []:
             return 0.0
 
