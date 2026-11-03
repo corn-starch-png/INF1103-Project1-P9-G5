@@ -19,11 +19,6 @@ def load_database_refactored(folder='database'):
     consumption_history = ConsumptionHistory()
     json_repo = JsonRepository(fridge, household, consumption_history)
     errors = json_repo.load()
-    #TESTING
-    print("Load errors:", errors)
-    print("Fridge contents:", fridge.get_items())
-    print("Household info:", household.get_members())
-    print("Consumption history:", consumption_history.get_normalized_records("milk"))
     return errors, fridge, household, consumption_history
 
 def save_database_refactored(fridge, household, consumption_history, folder='database'):
