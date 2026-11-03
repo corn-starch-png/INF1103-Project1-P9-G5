@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-output=$(timeout --signal=INT 3s docker compose -f .github/workflows/docker-compose.ci.yml \
-run --rm -T test < .github/workflows/docker_input.txt 2>&1 || true)
+output=$(timeout --signal=INT 3s docker compose -f .github/smoke_test/docker-compose.ci.yml \
+run --rm -T test < .github/smoke_test/docker_input.txt 2>&1 || true)
 #timeout will send interupt signal afer 3 second, || true ensures rest of this script runs if docker test fails
 echo "$output" #prints outpout of test to terminal 
 

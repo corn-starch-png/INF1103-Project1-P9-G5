@@ -64,7 +64,7 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Build Docker image
-      run: docker compose -f .github/workflows/docker-compose.ci.yml build test
+      run: docker compose -f .github/smoke_test/docker-compose.ci.yml build test
 
     - name: Docker smoke test
       run: bash .github/scripts/docker-smoke-test.sh 
