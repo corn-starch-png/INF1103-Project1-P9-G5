@@ -8,7 +8,8 @@ try:
                             update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
                             shopping_cart_conclusion, ask_menu_choice, update_fridge, send_message, 
                             show_exit, output_recommendations)
-    from AI_manager import get_ai_recommendations
+    from AI_manager import AIManager
+    from core.AI_classes import OpenRouterProvider
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
@@ -77,10 +78,13 @@ send_message("Getting AI recommendations... This can take a while")
 usable_fridge = [item for item in fridge if date.fromisoformat(item["Expiry_Date"]) >= date.today()]
 if len(usable_fridge) < len(fridge):
     send_message(f"Warning: {len(fridge) - len(usable_fridge)} expired fridge batch(es) excluded from recommendations.\nReview/remove expired food.")
-
-ai_recommendations, error = get_ai_recommendations(household_info, history, usable_fridge, grocery_list, remarks, days_until_next_visit)
+# Initialize AI Manager with OpenRouter provider
+ai_manager = AIManager(OpenRouterProvider())
+# Generate AI recommendations
+ai_recommendations, error = ai_manager.get_ai_recommendations(household_info, history, usable_fridge, grocery_list, remarks, days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
+# Extract recommendation data
 recommendations = ai_recommendations.get("Recommendations_List", [])
 total_planned_calories = ai_recommendations.get("Total_Planned_Estimated_Calories", 0)
 total_recommended_calories = ai_recommendations.get("Total_Estimated_Calories", 0)
