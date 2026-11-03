@@ -36,10 +36,10 @@ class BonusCalculator:
             return 0.0
         remarks = remarks.lower()
 
-        if any(word in remarks for word in self.__keywords):
+        if any(word in remarks for word in self.__keywords["FULL"]):
             return 5.0
 
-        if any(word in remarks for word in self.__keywords):
+        if any(word in remarks for word in self.__keywords["HALF"]):
             return 2.5
 
         return 0.0
