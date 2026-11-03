@@ -31,7 +31,7 @@ class BonusCalculator:
         
     #bonus score (MAX 5%)
     #bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
-    def bonus (remarks):
+    def bonus(self, remarks):
         if not remarks or remarks.lower() == "none":
             return 0.0
         remarks = remarks.lower()
