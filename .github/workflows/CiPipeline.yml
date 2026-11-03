@@ -9,8 +9,8 @@ on:
     branches: [ "main" ]  #runs when PR targeting main is received
   workflow_dispatch: #enables manual button to run workflow
 
-jobs:
-  gitleaks: #docs: https://github.com/gitleaks/gitleaks-action/blob/master/README.md
+jobs: #gitub required status checks are expecting job names to pass!
+  gitleaks: #name of job, docs: https://github.com/gitleaks/gitleaks-action/blob/master/README.md
     runs-on: ubuntu-latest #no container, static code analysis
 
     
@@ -29,33 +29,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #auto created by github to allow PR comments
 
-  Lint_and_customtest: #name of 1st job
-    name: Lint and customtest
+  Linting_and_customtest: #name of  job
+    name: Linting and customtest
     runs-on: ubuntu-latest #spins up ubuntu vm
     container:
       image: python:3.14-slim  #pulls up docker image to finish the job
 
     steps: #copies repo code into the created container
-    - uses: actions/checkout@v6 #clones repo source code
+    - name : Checkout repository 
+      uses: actions/checkout@v6 #clones repo source code
 
     - name: Install dependencies #install what our app needs to run
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
         pip install -r python_dependencies.txt  
 
-    - name: Lint with flake8 #explained in template
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Lint with Ruff
+      uses: astral-sh/ruff-action@v4.1.0
+      with:
+        args: check --output-format=github .
+
+    - name: Check formatting with Ruff
+      uses: astral-sh/ruff-action@v4.1.0
+      with:
+        args: format --check --diff .
 
     - name: Test with pytest #run application custom test script 
       run: python -m pytest test_script.py -v
 
 
-  test-docker-images: #name of second job, test our container
+  test-docker-images: #name of  job, test our container
     name: Build QuantiFresh Docker image with smoke test 
     runs-on: ubuntu-latest
    #no container this time, we are already building docker image
