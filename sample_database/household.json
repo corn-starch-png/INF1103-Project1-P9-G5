@@ -1,0 +1,23 @@
+[
+    {
+        "Person_ID": 1,
+        "Name": "John Doe",
+        "Age": 45,
+        "Gender": "Male",
+        "Dietary_Restriction": "none"
+    },
+    {
+        "Person_ID": 2,
+        "Name": "Jane Smith",
+        "Age": 42,
+        "Gender": "Female",
+        "Dietary_Restriction": "Vegetarian"
+    },
+    {
+        "Person_ID": 3,
+        "Name": "Bob Johnson",
+        "Age": 16,
+        "Gender": "Male",
+        "Dietary_Restriction": "none"
+    }
+]

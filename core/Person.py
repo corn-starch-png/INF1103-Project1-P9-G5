@@ -51,7 +51,7 @@ class Person(Record):
     @classmethod
     def from_dict(cls, data: dict) -> "Person":
         return cls(
-            id=data["ID"],
+            id=data["Person_ID"],
             name=data["Name"],
             age=data["Age"],
             gender=data["Gender"],

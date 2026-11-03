@@ -3,9 +3,10 @@ from decimal import Decimal
 from core.ListFunctions import ListFunctions
 from core.FridgeItem import FridgeItem
 from core.ConsumptionRecord import ConsumptionRecord
+from core.CanBeStored import CanBeStored
 
 
-class Fridge(ListFunctions):
+class Fridge(ListFunctions, CanBeStored):
     """Everything currently stored in the fridge (aggregation of FridgeItem)."""
 
     def __init__(self):
@@ -96,3 +97,15 @@ class Fridge(ListFunctions):
                 continue
             total += Decimal(str(stored.quantity))
         return float(total)
+    
+    def to_dicts(self) -> list:
+        return [item.to_dict() for item in self.__items]
+ 
+    def load_dicts(self, rows: list) -> list:
+        errors = []
+        for row in rows:
+            try:
+                self.add_item(FridgeItem.from_dict(row))
+            except (KeyError, TypeError, ValueError) as error:
+                errors.append(f"Skipped invalid fridge row {row!r}: {error!r}")
+        return errors

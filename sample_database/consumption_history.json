@@ -1,0 +1,23 @@
+[
+    {
+        "Item_Name": "milk",
+        "Quantity": 1,
+        "Unit": "l",
+        "Date_Range": 5,
+        "Remarks": "none"
+    },
+    {
+        "Item_Name": "rice",
+        "Quantity": 0.1,
+        "Unit": "kg",
+        "Date_Range": 5,
+        "Remarks": "none"
+    },
+    {
+        "Item_Name": "chicken",
+        "Quantity": 5,
+        "Unit": "kg",
+        "Date_Range": 1,
+        "Remarks": "20paxGathering"
+    }
+]
