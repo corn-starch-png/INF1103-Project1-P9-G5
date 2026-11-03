@@ -15,7 +15,7 @@ class CartItem(ItemRecord, ItemFunctions):
 
     def set_ai_data(self, ai_data: AIRecData) -> None:
         self.__ai_data = ai_data
-
+        
     def validate(self) -> bool:
         return self._validate_item_fields()
 
