@@ -3,4 +3,8 @@ line-length = 127
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B"]
+select = ["E", "F", "I", "B"] 
+# E	Basic Python style errors
+# F	Pyflakes: likely mistakes, unused imports, undefined names
+# I Import sorting
+# Bugbear: potential bugs and design issues
