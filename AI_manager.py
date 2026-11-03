@@ -1,4 +1,4 @@
-from AI_classes import AIProvider, OpenRouterProvider
+from core.AI_classes import AIProvider, OpenRouterProvider
 from datetime import date, timedelta
 import json
 import math
@@ -449,14 +449,13 @@ class AIManager:
         
     def get_ai_recommendations(self, household_info: dict, consumption_history: list, fridge_stock: list, purchase_stock: list, remarks: str, days_until_next: int) -> tuple:
         # Check API connection
-        if isinstance(self._provider, OpenRouterProvider):
-            send_log("Checking AI API connection...")
-            connected, message = self._provider.check_api_conn()
-            if not connected:
-                send_log("AI API connection failed.")
-                send_log(f"[AI] {message}")
-                return None, message
-            send_log("AI API connection successful.")
+        send_log("Checking AI API connection...")
+        connected, message = self._provider.check_connection()
+        if not connected:
+            send_log("AI API connection failed.")
+            send_log(f"[AI STATUS] {message}")
+            return None, message
+        send_log("[AI STATUS] AI provider ready.")
         # Prepare AI input
         send_log("[AI STATUS] Preparing AI input...")
         current_date = date.today()

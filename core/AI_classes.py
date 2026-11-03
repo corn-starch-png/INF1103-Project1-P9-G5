@@ -8,6 +8,8 @@ from DB_manager import send_log
 
 #region Abstract AI Provider
 class AIProvider(ABC):
+    def check_connection(self) -> tuple:
+        return True, "AI provider ready."
     @abstractmethod
     def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
         pass
@@ -15,6 +17,8 @@ class AIProvider(ABC):
 
 #region OpenRouter Provider
 class OpenRouterProvider(AIProvider):
+    def check_connection(self) -> tuple:
+        return self.check_api_conn()
     def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
         try:
             client = self._create_ai_client().with_options(max_retries=0)
@@ -61,7 +65,8 @@ class OpenRouterProvider(AIProvider):
                         raise ValueError(error)
                     # Check original grocery list integrity
                     if not validator.check_ai_output(ai_output["Recommendations_List"], grocery_list):
-                        raise ValueError("AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order.")                    # All checks successful
+                         # All checks successful
+                        raise ValueError("AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order.")
                     self._update_ai_status(f"Model used: {response.model}")
                     self._update_ai_status("AI output validation successful.")
                     return ai_output, None
