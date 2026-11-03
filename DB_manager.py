@@ -4,6 +4,36 @@ import math
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+
+#region: refactor: DB_manager.py
+
+from dbclasses.JsonRepository import JsonRepository
+from core.Fridge import Fridge
+from core.Household import Household
+from core.ConsumptionHistory import ConsumptionHistory
+
+def load_database_refactored(folder='database'):
+    errors = []
+    fridge = Fridge()
+    household = Household()
+    consumption_history = ConsumptionHistory()
+    json_repo = JsonRepository(fridge, household, consumption_history)
+    errors = json_repo.load()
+    #TESTING
+    print("Load errors:", errors)
+    print("Fridge contents:", fridge.get_items())
+    print("Household info:", household.get_members())
+    print("Consumption history:", consumption_history.get_normalized_records("milk"))
+    return errors, fridge, household, consumption_history
+
+def save_database_refactored(fridge, household, consumption_history, folder='database'):
+    json_repo = JsonRepository(fridge, household, consumption_history)
+    json_repo.save()
+
+#endregion: refactor: DB_manager.py
+
+
+
 KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
 BONUS_KEYWORDS_FULL_PTS = [
     "holiday",
