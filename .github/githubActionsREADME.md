@@ -11,3 +11,8 @@ what i am grepping (note the white space)
    && echo "$output" | grep -Fq '  2. Morty, 15, Male, diet: none';
 
 # use checkout @v6 (latest version)
+
+# why gitleaks when github native code protection exist?
+Because gitleaks catches more leaks.
+in .env.example, try commiting API_KEY=sk_test_7f9a2c8e4d1b6a3f0c9e5d2b8a6f4c1e
+github code protection allows it, but gitleaks fails it on CI piepline 
