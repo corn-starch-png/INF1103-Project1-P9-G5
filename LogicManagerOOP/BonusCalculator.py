@@ -29,17 +29,17 @@ class BonusCalculator:
             "HALF": self.BONUS_KEYWORDS_HALF_PTS
         }
         
-        #bonus score (MAX 5%)
-        #bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
-        def bonus (remarks):
-            if not remarks or remarks.lower() == "none":
-                return 0.0
-            remarks = remarks.lower()
-    
-            if any(word in remarks for word in self.__keywords):
-                return 5.0
-    
-            if any(word in remarks for word in self.__keywords):
-                return 2.5
-    
+    #bonus score (MAX 5%)
+    #bonus score is given if actionable remarks are provided to give the AI better context and hence estimations
+    def bonus (remarks):
+        if not remarks or remarks.lower() == "none":
             return 0.0
+        remarks = remarks.lower()
+
+        if any(word in remarks for word in self.__keywords):
+            return 5.0
+
+        if any(word in remarks for word in self.__keywords):
+            return 2.5
+
+        return 0.0
