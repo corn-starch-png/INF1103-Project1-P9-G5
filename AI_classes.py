@@ -1,14 +1,10 @@
 from abc import ABC, abstractmethod
-from datetime import date, timedelta
-import json
-import math
 import os
 import time
 import requests
-from dotenv import load_dotenv
 from openai import (OpenAI, APIConnectionError, AuthenticationError, 
                     BadRequestError, NotFoundError, RateLimitError, APIStatusError)
-from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
+from DB_manager import send_log
 
 #region Abstract AI Provider
 class AIProvider(ABC):
@@ -19,16 +15,10 @@ class AIProvider(ABC):
 
 #region OpenRouter Provider
 class OpenRouterProvider(AIProvider):
-    def __init__(self) -> None:
-        self._client = None
-        self._primary_model = None
-        self._backup_model = None
-        self._max_retries = None
-
     def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
         try:
             client = self._create_ai_client().with_options(max_retries=0)
-            models = [("Primary", self._get_ai_model()), ("Backup", self._get_ai_model("AI_BACKUP_MODEL"))]
+            models = [("Primary", self._get_ai_model("AI_MODEL")), ("Backup", self._get_ai_model("AI_BACKUP_MODEL"))]
             if models[0][1] == models[1][1]:
                 return None, "Primary and backup AI models cannot be the same."
             max_retries = int(os.getenv("MAX_RETRIES", 2))
@@ -56,7 +46,7 @@ class OpenRouterProvider(AIProvider):
                             "json_schema": {
                                 "name": "food_waste_recommendations",
                                 "strict": True,
-                                "schema": self._get_recommendation_schema()
+                                "schema": schema
                             }
                         }
                     )
@@ -70,11 +60,10 @@ class OpenRouterProvider(AIProvider):
                     if error:
                         raise ValueError(error)
                     # Check original grocery list integrity
-                    if not self._check_ai_output(ai_output["Recommendations_List"], self._purchase_stock):
-                        raise ValueError("AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order.")
-                    # All checks successful
-                    self.update_ai_status(f"Model used: {response.model}")
-                    self.update_ai_status("AI output validation successful.")
+                    if not validator.check_ai_output(ai_output["Recommendations_List"], grocery_list):
+                        raise ValueError("AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order.")                    # All checks successful
+                    self._update_ai_status(f"Model used: {response.model}")
+                    self._update_ai_status("AI output validation successful.")
                     return ai_output, None
                 # HTTP 404: Skip retries
                 except NotFoundError as error:

@@ -2,9 +2,6 @@ from AI_classes import AIProvider, OpenRouterProvider
 from datetime import date, timedelta
 import json
 import math
-import os
-import time
-import requests
 from dotenv import load_dotenv
 from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
 
@@ -459,23 +456,23 @@ class AIManager:
                 OpenRouterProvider._update_ai_status("AI API connection failed.")
                 send_log(f"[AI] {message}")
                 return None, message
-            OpenRouterProvider._update_ai_statusupdate_ai_status("AI API connection successful.")
+            OpenRouterProvider._update_ai_status("AI API connection successful.")
         # Prepare AI input
-        OpenRouterProvider._update_ai_statusupdate_ai_status("Preparing AI input...")
+        OpenRouterProvider._update_ai_status("Preparing AI input...")
         current_date = date.today()
         next_purchase_date = self._get_next_purchase_date(current_date, days_until_next)
         data = self._prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, remarks, current_date, next_purchase_date)
 
         # Build AI prompt
-        OpenRouterProvider._update_ai_statusupdate_ai_status("Building AI prompt...")
+        OpenRouterProvider._update_ai_status("Building AI prompt...")
         prompt = self._prompt_builder.build_ai_prompt(data)
 
         # Generate AI recommendations
-        OpenRouterProvider._update_ai_statusupdate_ai_status("Sending prompt to AI...")
+        OpenRouterProvider._update_ai_status("Sending prompt to AI...")
         result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), purchase_stock, self._validator)
 
         if error:
-            OpenRouterProvider._update_ai_statusupdate_ai_status("AI request failed.")
+            OpenRouterProvider._update_ai_status("AI request failed.")
             send_log(f"[AI] {error}")
         return result, error
 #endregion
