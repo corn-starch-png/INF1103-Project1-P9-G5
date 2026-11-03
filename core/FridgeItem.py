@@ -1,8 +1,8 @@
 from datetime import date
 
-from ItemRecord import ItemRecord
-from ItemFunctions import ItemFunctions
-from ConsumptionRecord import ConsumptionRecord
+from core.ItemRecord import ItemRecord
+from core.ItemFunctions import ItemFunctions
+from core.ConsumptionRecord import ConsumptionRecord
 
 
 class FridgeItem(ItemRecord, ItemFunctions):

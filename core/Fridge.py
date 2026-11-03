@@ -1,7 +1,8 @@
 from decimal import Decimal
-from ListFunctions import ListFunctions
-from FridgeItem import FridgeItem
-from ConsumptionRecord import ConsumptionRecord
+
+from core.ListFunctions import ListFunctions
+from core.FridgeItem import FridgeItem
+from core.ConsumptionRecord import ConsumptionRecord
 
 
 class Fridge(ListFunctions):

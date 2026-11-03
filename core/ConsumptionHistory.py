@@ -1,4 +1,4 @@
-from ConsumptionRecord import ConsumptionRecord
+from core.ConsumptionRecord import ConsumptionRecord
 
 
 class ConsumptionHistory:

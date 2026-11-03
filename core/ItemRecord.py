@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from Record import Record
+from core.Record import Record
 
 
 class ItemRecord(Record):
