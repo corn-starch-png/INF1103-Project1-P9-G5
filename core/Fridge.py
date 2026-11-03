@@ -57,10 +57,6 @@ class Fridge(ListFunctions, CanBeStored):
     def get_items(self) -> list:
         return list(self.__items)
 
-    def get_unique_item_names(self) -> list:
-        """Return a list of unique item names in the fridge."""
-        return list({item.name.strip().casefold() for item in self.__items})
-
     def consume(self, item_name: str, amount: float, units: str, date_range: int, consumption_remarks: str) -> ConsumptionRecord:
         """
         Consume a certain amount of an item in the fridge FIFO, reducing its quantity.
@@ -97,7 +93,7 @@ class Fridge(ListFunctions, CanBeStored):
         for stored in self.__items:
             if stored.name.strip().casefold() != item_name.strip().casefold():
                 continue
-            if stored.is_expired() or include_expired:
+            if stored.is_expired() and not include_expired:
                 continue
             total += Decimal(str(stored.quantity))
         return float(total)

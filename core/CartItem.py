@@ -9,10 +9,13 @@ from core.FridgeItem import FridgeItem
 class CartItem(ItemRecord, ItemFunctions):
     """A grocery item the user entered before it is sent to the AI."""
 
-    def __init__(self,ai_data: AIRecData, name: str, quantity: float, unit: str):
-        super().__init__(name, quantity, unit)
+    def __init__(self, name: str, quantity: float, unit: str):
+            super().__init__(name, quantity, unit)
+            self.__ai_data = ""
+    
+    def set_ai_data(self, ai_data: AIRecData) -> None:
         self.__ai_data = ai_data
-
+        
     def validate(self) -> bool:
         return self._validate_item_fields()
 
