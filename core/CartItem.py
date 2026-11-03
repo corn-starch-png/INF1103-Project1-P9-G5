@@ -24,7 +24,7 @@ class CartItem(ItemRecord, ItemFunctions):
         }
 
     @property
-    def ai_data(self) -> AIRecData:
+    def get_ai_data(self) -> AIRecData:
       """Returns the AI recommendation data associated with this item."""
       return self.__ai_data  
     
