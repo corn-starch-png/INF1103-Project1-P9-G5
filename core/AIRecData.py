@@ -2,7 +2,7 @@ from core.ItemFunctions import ItemFunctions
 
 
 
-class AIRecItem(ItemFunctions):
+class AIRecData(ItemFunctions):
     """AI recommendation together with the user's original item."""
 
     MIN_CONFIDENCE = 0.0
