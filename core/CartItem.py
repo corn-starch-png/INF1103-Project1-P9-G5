@@ -13,6 +13,9 @@ class CartItem(ItemRecord, ItemFunctions):
         super().__init__(name, quantity, unit)
         self.__ai_data = ""
 
+    @property
+    def ai_data(self) -> AIRecData:
+        return self.__ai_data
     def set_ai_data(self, ai_data: AIRecData) -> None:
         self.__ai_data = ai_data
 
@@ -39,6 +42,6 @@ class CartItem(ItemRecord, ItemFunctions):
             quantity=self._quantity,
             unit=self._unit,
             purchase_date=date.today().isoformat(),
-            expiry_date=self.__ai_data.est_expiry_date(),
+            expiry_date=self.__ai_data.est_expiry_date,
             remarks=remarks,
         )
