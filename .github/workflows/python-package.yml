@@ -15,7 +15,8 @@ jobs:
 
     
     permissions:
-      contents: read 
+      contents: read
+      pull_request: write 
 
     steps:
       - name: Checkout repository
@@ -26,7 +27,7 @@ jobs:
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v3
         env:
-          GITHUB_TOKEN: ${{ seecrets.GITHUB_TOKEN }} #auto created by github to allow PR comments
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #auto created by github to allow PR comments
 
   Lint_and_customtest: #name of 1st job
     name: Lint and customtest
