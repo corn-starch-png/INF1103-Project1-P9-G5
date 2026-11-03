@@ -1,8 +1,4 @@
-
-import copy
-from ItemFunctions import ItemFunctions
-from CartItem import CartItem
-from FridgeItem import FridgeItem
+from core.ItemFunctions import ItemFunctions
 
 
 

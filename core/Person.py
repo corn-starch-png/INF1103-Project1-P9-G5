@@ -1,4 +1,4 @@
-from Record import Record
+from core.Record import Record
 
 
 class Person(Record):
