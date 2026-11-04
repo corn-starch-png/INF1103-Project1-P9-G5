@@ -1,6 +1,6 @@
 from DB_manager import send_log
-from Analyzer import Analyzer
-from Finding import Finding
+from LogicManagerOOP.Analyzer import Analyzer
+from LogicManagerOOP.Finding import Finding
 from core.Household import Household
 
 class CaloriesSurplusAnalyzer(Analyzer):
@@ -52,7 +52,7 @@ class CaloriesSurplusAnalyzer(Analyzer):
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days")
             
         return Finding(
-            analyzer_name= self.analyzer_name,
+            analyzer_name= self.get_analyzer_name,
             result=result,
             message=message
         )

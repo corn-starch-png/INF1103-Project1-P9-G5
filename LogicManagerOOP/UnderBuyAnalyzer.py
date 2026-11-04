@@ -1,8 +1,8 @@
-from Analyzer import Analyzer
+from LogicManagerOOP.Analyzer import Analyzer
 from core.CartItem import CartItem
 from DB_manager import send_log
 from datetime import datetime,date,timedelta
-from Finding import Finding
+from LogicManagerOOP.Finding import Finding
 
 class UnderbuyAnalyzer(Analyzer):
     def __init__(self, analyzer_name):
@@ -42,7 +42,7 @@ class UnderbuyAnalyzer(Analyzer):
                     send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
                     
                 return Finding(
-                        analyzer_name= self.analyzer_name,
+                        analyzer_name= self.get_analyzer_name,
                         result=result,
                         message=message
                         ) 

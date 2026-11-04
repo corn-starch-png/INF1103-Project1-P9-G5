@@ -1,5 +1,5 @@
-from Analyzer import Analyzer
-from Finding import Finding
+from LogicManagerOOP.Analyzer import Analyzer
+from LogicManagerOOP.Finding import Finding
 from core.CartItem import CartItem
 from datetime import datetime,date,timedelta
 from DB_manager import send_log
@@ -37,9 +37,10 @@ class RiskOfExpiryAnalyzer(Analyzer):
             else:
                 result = False
                 send_log(f"[LOGIC] Risk of expiry is False for {item_name}")
+                message = None
                 
             return Finding(
-                analyzer_name= self.analyzer_name,
+                analyzer_name= self.get_analyzer_name,
                 result=result,
                 message=message
             )
