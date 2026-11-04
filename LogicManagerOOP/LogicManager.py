@@ -24,7 +24,7 @@ def process_recommendations(
         
     all_findings = []
     
-    total_estimated_calories = None # TODO: Replace with actual AI output of total estimated calories
+    total_estimated_calories = 5000 # TODO: Replace with actual AI output of total estimated calories
     
     cal_finding = calories_surplus.analyze(
         total_estimated_calories=total_estimated_calories, 
