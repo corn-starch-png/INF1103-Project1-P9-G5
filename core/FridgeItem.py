@@ -16,6 +16,18 @@ class FridgeItem(ItemRecord, ItemFunctions):
         self.__purchase_date = purchase_date  # "YYYY-MM-DD" or "" if unknown
         self.__expiry_date = expiry_date      # "YYYY-MM-DD"
         self.__remarks = remarks
+        
+    @property
+    def purchase_date(self) -> str:
+        return self.__purchase_date
+
+    @property
+    def expiry_date(self) -> str:
+        return self.__expiry_date
+
+    @property
+    def remarks(self) -> str:
+        return self.__remarks        
 
     @staticmethod
     def __is_valid_date(value, allow_blank: bool = False) -> bool:

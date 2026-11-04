@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import json
 import math
 from dotenv import load_dotenv
+from textwrap import dedent
 from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
 
 #region API config
@@ -17,7 +18,7 @@ def get_ai_recommendations(household_info, consumption_history, fridge_stock, pu
 #region Prompt Builder
 class PromptBuilder:
     def build_ai_prompt(self, data: dict) -> str:
-        return f"""
+        return dedent(f"""
         You are the food waste recommendation assistant for a household.
         Your task is to analyse the provided household information and determine the recommended quantity to buy for every item in the planned grocery list.
         Your goal is to meet the household's expected needs until the next planned purchase while avoiding unnecessary purchases that may contribute to food waste.
@@ -205,7 +206,7 @@ class PromptBuilder:
         - Total_Planned_Estimated_Calories must equal the sum of all Planned_Estimated_Calories values.
         - Total_Estimated_Calories must equal the sum of all Estimated_Calories values.
         - Return all fields using the exact names and data types defined in the JSON response schema.
-        """
+        """)
 #endregion
 
 #region AI Response Validator

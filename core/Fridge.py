@@ -93,7 +93,7 @@ class Fridge(ListFunctions, CanBeStored):
         for stored in self.__items:
             if stored.name.strip().casefold() != item_name.strip().casefold():
                 continue
-            if stored.is_expired() and include_expired:
+            if stored.is_expired() and not include_expired:
                 continue
             total += Decimal(str(stored.quantity))
         return float(total)
