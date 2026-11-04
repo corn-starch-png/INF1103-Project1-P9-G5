@@ -14,7 +14,7 @@ class RiskOfExpiryAnalyzer(Analyzer):
         item_name = item.name
         item_quantity= item.quantity
         item_unit = item.unit
-        ai_data = item.get_ai_data() #getting ai data instance
+        ai_data = item.get_ai_data #getting ai data instance
         estimated_consumption_rate = ai_data.consumption_rate
         estimated_expiry_date = ai_data.est_expiry_date
         
