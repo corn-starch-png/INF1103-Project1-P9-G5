@@ -16,6 +16,12 @@ class Person(Record):
         self.__age = age
         self.__gender = gender
         self.__dietary_restriction = dietary_restriction
+        
+    def get_age(self):
+        return self.__age
+    
+    def get_gender(self):
+        return self.__gender
 
     def validate(self) -> bool:
         #validate ID
