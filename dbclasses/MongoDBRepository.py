@@ -1,3 +1,6 @@
+import os
+from urllib.parse import quote_plus
+
 from pymongo import MongoClient
 
 from dbclasses.RepositoryFunctions import RepositoryFunctions
@@ -13,10 +16,28 @@ class MongoDBRepository(RepositoryFunctions):
         fridge: Fridge,
         household: Household,
         history: ConsumptionHistory,
-        uri: str,
         database_name: str = "food_waste"
     ):
-        self.__client = MongoClient(uri)
+        # Get MongoDB credentials from environment variables
+        username = os.getenv("MONGO_ROOT_USERNAME")
+        password = os.getenv("MONGO_ROOT_PASSWORD")
+
+        if not username or not password:
+            raise ValueError("MongoDB credentials are missing")
+
+        # Construct MongoDB connection URI
+        uri = (
+            f"mongodb://{quote_plus(username)}:"
+            f"{quote_plus(password)}"
+            "@mongo:27017/?authSource=admin"
+        )
+
+        # Connect to MongoDB
+        self.__client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=5000
+        )
+
         self.__database = self.__client[database_name]
 
         # Same injected objects as JsonRepository
