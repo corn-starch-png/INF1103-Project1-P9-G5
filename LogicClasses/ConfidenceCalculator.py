@@ -1,5 +1,5 @@
-from LogicManagerOOP.ConfidenceMetrics import ConfidenceMetrics
-from LogicManagerOOP.BonusCalculator import BonusCalculator
+from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
+from LogicClasses.BonusCalculator import BonusCalculator
 from core.ConsumptionHistory import ConsumptionHistory
 from DB_manager import send_log
 

@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 from typing import List, Dict, Any
 
-from LogicManagerOOP.ConfidenceCalculator import ConfidenceCalculator
-from LogicManagerOOP.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
-from LogicManagerOOP.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
-from LogicManagerOOP.UnderBuyAnalyzer import UnderbuyAnalyzer
+from LogicClasses.ConfidenceCalculator import ConfidenceCalculator
+from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from LogicClasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from LogicClasses.UnderBuyAnalyzer import UnderbuyAnalyzer
 
 from core.Cart import Cart
 from core.Household import Household

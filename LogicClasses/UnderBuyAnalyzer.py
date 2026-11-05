@@ -1,8 +1,8 @@
-from LogicManagerOOP.Analyzer import Analyzer
+from LogicClasses.Analyzer import Analyzer
 from core.CartItem import CartItem
 from DB_manager import send_log
 from datetime import datetime,date,timedelta
-from LogicManagerOOP.Finding import Finding
+from LogicClasses.Finding import Finding
 
 class UnderbuyAnalyzer(Analyzer):
     def __init__(self, analyzer_name):

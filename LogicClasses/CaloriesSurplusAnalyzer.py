@@ -1,6 +1,6 @@
 from DB_manager import send_log
-from LogicManagerOOP.Analyzer import Analyzer
-from LogicManagerOOP.Finding import Finding
+from LogicClasses.Analyzer import Analyzer
+from LogicClasses.Finding import Finding
 from core.Household import Household
 
 class CaloriesSurplusAnalyzer(Analyzer):
