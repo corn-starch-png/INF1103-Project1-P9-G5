@@ -13,11 +13,7 @@ class Fridge(ListFunctions, CanBeStored):
         self.__items = []
 
     def validate(self) -> bool:
-        """
-        should run after every addition or removal of items to ensure the fridge is valid.
-        checks for duplicate items with different units, and duplicate items where only the quantity is different 
-        (same name, unit, purchase date, expiry date, remarks)
-        """
+        """should run after every addition or removal of items to ensure the fridge is valid."""
         item_unit_pairs = list()
         for item in self.__items:
             if not item.validate():
@@ -28,18 +24,6 @@ class Fridge(ListFunctions, CanBeStored):
             else:
                 if (item.name.strip().casefold(), item.unit.strip().casefold()) in item_unit_pairs:
                     return False
-            #check for duplicate items where only the quantity is different 
-            #(same name, unit, purchase date, expiry date, remarks)
-            for other_item in self.__items:
-                if item is not other_item:
-                    if (item.name.strip().casefold() == other_item.name.strip().casefold() and
-                        item.unit.strip().casefold() == other_item.unit.strip().casefold() and
-                        item.purchase_date == other_item.purchase_date and
-                        item.expiry_date == other_item.expiry_date and
-                        item.remarks.strip().casefold() == other_item.remarks.strip().casefold()):
-                        #merge the two items by adding their quantities
-                        item.quantity += other_item.quantity
-                        self.__items.remove(other_item)
         return True
 
     def add_item(self, item: FridgeItem) -> None:
@@ -48,6 +32,7 @@ class Fridge(ListFunctions, CanBeStored):
         if not item.validate():
             raise ValueError("Cannot add an invalid item to the fridge.")
         self.__items.append(item)
+        self.remove_duplicates()
 
     def remove_item(self, item: FridgeItem) -> None:
         if item not in self.__items:
@@ -84,6 +69,27 @@ class Fridge(ListFunctions, CanBeStored):
                 if item.quantity == 0:
                     self.__items.remove(item)
         return ConsumptionRecord(item_name, amount, units, date_range, consumption_remarks)
+
+    def remove_duplicates(self):
+        """
+        should run after every addition or removal of items to ensure the fridge is valid.
+        checks for duplicate items with different units, and duplicate items where only the quantity is different 
+        (same name, unit, purchase date, expiry date, remarks)
+        MUST RUN when expiry date changes
+        """
+        #check for duplicate items where only the quantity is different 
+        #(same name, unit, purchase date, expiry date, remarks)
+        for item in self.__items:
+            for other_item in self.__items:
+                if item is not other_item:
+                    if (item.name.strip().casefold() == other_item.name.strip().casefold() and
+                        item.unit.strip().casefold() == other_item.unit.strip().casefold() and
+                        item.purchase_date == other_item.purchase_date and
+                        item.expiry_date == other_item.expiry_date and
+                        item.remarks.strip().casefold() == other_item.remarks.strip().casefold()):
+                        #merge the two items by adding their quantities
+                        item.quantity += other_item.quantity
+                        self.__items.remove(other_item)
 
     def get_total_quantity(self, item_name: str, include_expired: bool) -> float:
         """
