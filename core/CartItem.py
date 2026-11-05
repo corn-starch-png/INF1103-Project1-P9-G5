@@ -16,6 +16,12 @@ class CartItem(ItemRecord, ItemFunctions):
     @property
     def ai_data(self) -> AIRecData:
         return self.__ai_data
+
+    def set_confidence_score(self, score: float) -> None:
+        if self.__ai_data == "":
+            raise NotImplementedError("Cannot set Confidence score without AI data")
+        self.__ai_data.set_confidence_score(score)
+
     def set_ai_data(self, ai_data: AIRecData) -> None:
         self.__ai_data = ai_data
         
