@@ -11,6 +11,8 @@ class ConfidenceCalculator:
       self.__bonusMetrics = BonusCalculator()
       
     def calculate_confidence_score(self, item: CartItem, ctx: AnalysisContext) -> float:
+        if item.is_enhanced():
+            raise NotImplementedError("Item must have AI Data for confidence score to be calculated")
         fridge_amt = ctx.fridge.get_total_quantity(item.name, False)
         normalized_daily_consumption = ctx.history.get_normalized_records(item.name)
         #if no previous consumption, no score can be calculated

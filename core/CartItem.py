@@ -50,3 +50,8 @@ class CartItem(ItemRecord, ItemFunctions):
             expiry_date=self.__ai_data.est_expiry_date,
             remarks=remarks,
         )
+
+    def is_enhanced(self) -> bool:
+        if self.__ai_data == "":
+            return False
+        return True
