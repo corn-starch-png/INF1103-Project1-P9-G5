@@ -18,14 +18,14 @@ class AnalysisContext():
                  remarks: str,
                  total_item: int
                 ):
-        self.cart = cart, 
-        self.household = household, 
-        self.fridge = fridge, 
-        self.history = history,
-        self.total_est_calories = total_est_calories,
-        self.today = today,
-        self.next_purchase_date = next_purchase_date,
-        self.remarks = remarks,
+        self.cart = cart 
+        self.household = household
+        self.fridge = fridge
+        self.history = history
+        self.total_est_calories = total_est_calories
+        self.today = today
+        self.next_purchase_date = next_purchase_date
+        self.remarks = remarks
         self.total_item = total_item
 
             
