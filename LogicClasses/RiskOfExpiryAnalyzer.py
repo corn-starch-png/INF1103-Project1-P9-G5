@@ -1,16 +1,13 @@
-from LogicClasses.Analyzer import Analyzer
+from LogicClasses.ItemAnalyzer import ItemAnalyzer
 from LogicClasses.Finding import Finding
 from core.CartItem import CartItem
 from datetime import datetime,date,timedelta
 from DB_manager import send_log
 
 
-class RiskOfExpiryAnalyzer(Analyzer):
-    def __init__(self, analyzer_name):
-        super().__init__(analyzer_name)
-        
-        
-    def analyze(self, item:CartItem, total_amt_of_items):
+class RiskOfExpiryAnalyzer(ItemAnalyzer):
+    ANALYZER_NAME = "RiskOfExpiry"
+    def analyze(self, item: CartItem, total_amt_of_items):
         item_name = item.name
         item_quantity= item.quantity
         item_unit = item.unit
@@ -40,7 +37,7 @@ class RiskOfExpiryAnalyzer(Analyzer):
                 message = None
                 
             return Finding(
-                analyzer_name= self.get_analyzer_name,
+                analyzer_name= self.ANALYZER_NAME,
                 result=result,
                 message=message
             )

@@ -1,18 +1,12 @@
-from LogicClasses.Analyzer import Analyzer
+from LogicClasses.ItemAnalyzer import ItemAnalyzer
 from core.CartItem import CartItem
 from DB_manager import send_log
 from datetime import datetime,date,timedelta
 from LogicClasses.Finding import Finding
 
-class UnderbuyAnalyzer(Analyzer):
-    def __init__(self, analyzer_name):
-        super().__init__(analyzer_name)
-        
-    # evaluate if calories_surplus and risk_of_expiry is both true or false
-    def should_evaluate(extra_cal, expires_soon):
-        return extra_cal is False and expires_soon is False
-    
-    def analyze(self, item:CartItem, next_purchase_date, total_amt):
+class UnderbuyAnalyzer(ItemAnalyzer):        
+    ANALYZER_NAME = "Underbuy"
+    def analyze(self, item: CartItem, next_purchase_date, total_amt):
             item_name = item.name
             item_quantity= item.quantity
             item_unit = item.unit
@@ -42,7 +36,7 @@ class UnderbuyAnalyzer(Analyzer):
                     send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
                     
                 return Finding(
-                        analyzer_name= self.get_analyzer_name,
+                        analyzer_name= self.ANALYZER_NAME,
                         result=result,
                         message=message
                         ) 

@@ -1,16 +1,11 @@
 from DB_manager import send_log
-from LogicClasses.Analyzer import Analyzer
+from LogicClasses.CartAnalyzer import CartAnalyzer
 from LogicClasses.Finding import Finding
 from core.Household import Household
 
-class CaloriesSurplusAnalyzer(Analyzer):
-    
+class CaloriesSurplusAnalyzer(CartAnalyzer):
+    ANALYZER_NAME = "CaloriesSurplus"
     KCAL_TABLE={1: {'Male': 880, 'Female': 810}, 2: {'Male': 1080, 'Female': 1000}, 3: {'Male': 1160, 'Female': 1070}, 4: {'Male': 1310, 'Female': 1190}, 5: {'Male': 1440, 'Female': 1320}, 6: {'Male': 1550, 'Female': 1420}, 7: {'Male': 1600, 'Female': 1500}, 8: {'Male': 1740, 'Female': 1620}, 9: {'Male': 1940, 'Female': 1760}, 10: {'Male': 2110, 'Female': 1910}, 11: {'Male': 2280, 'Female': 2070}, 12: {'Male': 2530, 'Female': 2230}, 13: {'Male': 2740, 'Female': 2310}, 14: {'Male': 2920, 'Female': 2360}, 15: {'Male': 3030, 'Female': 2390}, 16: {'Male': 3120, 'Female': 2400}, 17: {'Male': 3180, 'Female': 2400}, 18: {'Male': 3230, 'Female': 2410}, 19: {'Male': 2700, 'Female': 2070}, 30: {'Male': 2590, 'Female': 2035}, 60: {'Male': 2235, 'Female': 1865}}
-    
-    def __init__(self, analyzer_name, family:Household):
-        super().__init__(analyzer_name)
-        self.__kcal_table = self.KCAL_TABLE
-        self.__family = family
         
     def __get_age_from_KCAL(self, age: int):
         if age >= 60:
@@ -52,7 +47,7 @@ class CaloriesSurplusAnalyzer(Analyzer):
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days")
             
         return Finding(
-            analyzer_name= self.get_analyzer_name,
+            analyzer_name= self.ANALYZER_NAME,
             result=result,
             message=message
         )

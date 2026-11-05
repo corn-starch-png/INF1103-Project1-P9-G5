@@ -1,23 +1,31 @@
+from core.ConsumptionHistory import ConsumptionHistory
+from LogicClasses.AnalysisContext import AnalysisContext
 from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
 from LogicClasses.BonusCalculator import BonusCalculator
-from core.ConsumptionHistory import ConsumptionHistory
 from DB_manager import send_log
 
 class ConfidenceCalculator:
     def __init__(self):
       self.__metrics = ConfidenceMetrics()
-      self.__history = ConsumptionHistory()
       self.__bonusMetrics = BonusCalculator()
       
-    def calculate_confidence_score(self, item_name, recommended_amt, fridge_amt, days_until_next_visit, remarks):
-        normalized_daily_consumption = self.__history.get_normalized_records(item_name)
+    def calculate_confidence_score(self, history: ConsumptionHistory, 
+                                   item_name: str, 
+                                   recommended_amt: int, 
+                                   fridge_amt: int, 
+                                   days_until_next_visit: int, 
+                                   remarks: int):
+        normalized_daily_consumption = history.get_normalized_records(item_name)
+        #if no previous consumption, no score can be calculated
         if normalized_daily_consumption == []:
             return 0.0
 
         quantity_score = self.__metrics.quality_score(len(normalized_daily_consumption))
         consistency_score = self.__metrics.consistency_score(normalized_daily_consumption)
         agreement_score = self.__metrics.agreement_score(normalized_consumption=normalized_daily_consumption, 
-                                                         recAmt=recommended_amt, fridgeAmt=fridge_amt, days_until_next_visit=days_until_next_visit)
+                                                         recAmt=recommended_amt, 
+                                                         fridgeAmt=fridge_amt, 
+                                                         days_until_next_visit=days_until_next_visit)
         confidence_score = (
             0.3 * quantity_score
             + 0.3 * consistency_score

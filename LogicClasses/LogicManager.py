@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-from typing import List, Dict, Any
 
 from LogicClasses.ConfidenceCalculator import ConfidenceCalculator
 from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
@@ -14,7 +13,8 @@ from core.Fridge import Fridge
 def process_recommendations(
     cart_items: Cart, 
     family_data: Household, 
-    days_until_next_purchase: int
+    days_until_next_purchase: int,
+    
 ):
     # Initialize Analyzers inside the function
     confidence_calc = ConfidenceCalculator()
