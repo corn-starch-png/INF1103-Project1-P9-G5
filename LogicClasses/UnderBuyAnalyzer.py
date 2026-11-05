@@ -1,12 +1,19 @@
 from LogicClasses.ItemAnalyzer import ItemAnalyzer
+from LogicClasses.AnalysisContext import AnalysisContext
 from core.CartItem import CartItem
 from DB_manager import send_log
-from datetime import datetime,date,timedelta
 from LogicClasses.Finding import Finding
 
-class UnderbuyAnalyzer(ItemAnalyzer):        
-    ANALYZER_NAME = "Underbuy"
-    def analyze(self, item: CartItem, next_purchase_date, total_amt):
+class UnderBuyAnalyzer(ItemAnalyzer):        
+    ANALYZER_NAME = "UnderBuy"
+    def analyze(self, item: CartItem, ctx: AnalysisContext):
+            if self.__should_analyze(item, ctx) == False:
+                return Finding(
+                        analyzer_name= self.ANALYZER_NAME,
+                        result=False,
+                        message=None
+                        ) 
+            
             item_name = item.name
             item_quantity= item.quantity
             item_unit = item.unit
@@ -14,17 +21,10 @@ class UnderbuyAnalyzer(ItemAnalyzer):
             estimated_consumption_rate = ai_data.consumption_rate
             
         # processing dates and calculating new variable with them
-            if estimated_consumption_rate >0: #no consumption rate how uw me calculate? just ignore. 
-                today = date.today()
-                #prevents small positive consumption rates from being rounded down to zero before division.
+            if estimated_consumption_rate > 0: 
                 daily_consumption_rate = estimated_consumption_rate / 7
-                #item_expiry_date = datetime.strptime(estimated_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
-                
-                #calculating Nth amount needed to not run out of food
-                next_purchase_date = datetime.strptime(next_purchase_date, "%Y-%m-%d").date()
-                days_to_next_purchase = (next_purchase_date - today).days  #extra n from datetime.timedelta(days=n)
-                quantity_needed = daily_consumption_rate * days_to_next_purchase
-                amount_to_topup = round (quantity_needed - total_amt, 2)
+                quantity_needed = daily_consumption_rate * ctx.next_purchase_date
+                amount_to_topup = round (quantity_needed - ctx.total_item, 2)
         
                 if amount_to_topup > 0:
                     result = True
@@ -41,10 +41,25 @@ class UnderbuyAnalyzer(ItemAnalyzer):
                         message=message
                         ) 
         
-            elif estimated_consumption_rate <=0:
-                send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
-                return False, None
             else:
-                return None
-        
+                send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
+                return Finding(
+                        analyzer_name= self.ANALYZER_NAME,
+                        result=False,
+                        message=None
+                        ) 
+
+    def __should_analyze(self, item: CartItem, ctx: AnalysisContext) -> bool:
+        """Checking if CalorieSurplus and RiskOfExpiry is false here instead of Cart Evaluator to adhere to LSP"""
+        findings = ctx.findings
+        for finding in findings:
+            if finding.analyzer_name == "CaloriesSurplus":
+                cal_result = finding.result
+            if finding.analyzer_name == "RiskOfExpiry" and finding.result == True and item.name in finding.message:
+                return False
+
+        if cal_result == False:
+            return True
+        return False
+
     

@@ -4,6 +4,7 @@ from core.Cart import Cart
 from core.Household import Household
 from core.Fridge import Fridge
 from core.ConsumptionHistory import ConsumptionHistory
+from LogicClasses.Finding import Finding
 
 
 class AnalysisContext():
@@ -27,5 +28,13 @@ class AnalysisContext():
         self.next_purchase_date = next_purchase_date
         self.remarks = remarks
         self.total_item = total_item
+        self.findings = []
+
+    def update_findings(self, new_findings: list) -> None:
+            if not isinstance(new_findings, list) or any(type(item) is not Finding for item in new_findings):
+                raise TypeError("findings must be a list of findings.")
+            self.findings.extend(new_findings)
+
+
 
             

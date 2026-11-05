@@ -7,7 +7,7 @@ from DB_manager import send_log
 
 class RiskOfExpiryAnalyzer(ItemAnalyzer):
     ANALYZER_NAME = "RiskOfExpiry"
-    def analyze(self, item: CartItem, total_amt_of_items):
+    def analyze(self, item: CartItem, ctx):
         item_name = item.name
         item_quantity= item.quantity
         item_unit = item.unit
@@ -23,7 +23,7 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
             # daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
     
             # days taken to finish consuming the item
-            estimated_days_to_consume = round(total_amt_of_items / daily_consumption_rate)
+            estimated_days_to_consume = round(ctx.total_item / daily_consumption_rate)
                         
             item_expiry_date = datetime.strptime(estimated_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
             #if the days taken to consume an item is greater than days to expire
@@ -44,4 +44,8 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
         else:
             # estimated_consumption_rate <= 0:
             send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
-            return False, None    
+            Finding(
+                analyzer_name= self.ANALYZER_NAME,
+                result=False,
+                message=None
+            )   

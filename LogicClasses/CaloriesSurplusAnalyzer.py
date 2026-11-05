@@ -1,6 +1,7 @@
 from DB_manager import send_log
 from LogicClasses.CartAnalyzer import CartAnalyzer
 from LogicClasses.Finding import Finding
+from LogicClasses.AnalysisContext import AnalysisContext
 from core.Household import Household
 
 class CaloriesSurplusAnalyzer(CartAnalyzer):
@@ -23,28 +24,27 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
         for person in family.get_members():
             age = self.__get_age_from_KCAL(person.get_age())
             gender = person.get_gender()
-            daily_total += self.__kcal_table[age][gender] #male + female calorie
+            daily_total += self.KCAL_TABLE[age][gender] #male + female calorie
         return daily_total * days_until_next_visit
     
     # calculating calories surplus
-    def analyze(self, total_estimated_calories, days_until_next_visit):   
-    
+    def analyze(self, ctx):   
         #extract name, gender from household info from Household.py
-        family_calorie_until_next_visit = self.__calculate_family_kcal(days_until_next_visit, self.__family)
+        family_calorie_until_next_visit = self.__calculate_family_kcal(ctx.next_purchase_date, ctx.household)
 
         send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")
         
         # if total calories (AI output)  > total calories that family needs (User in put) and returns true, else false
-        exceed_calorie = total_estimated_calories - family_calorie_until_next_visit
-        if total_estimated_calories > family_calorie_until_next_visit:
+        exceed_calorie = ctx.total_est_calories - family_calorie_until_next_visit
+        if ctx.total_est_calories > family_calorie_until_next_visit:
             send_log(f"[LOGIC] Calories surplus is: True") 
             result = True
-            message = (f"Grocery cart exceeds recommended calories values for {days_until_next_visit} days by {exceed_calorie}kcal")
+            message = (f"Grocery cart exceeds recommended calories values for {ctx.next_purchase_date} days by {exceed_calorie}kcal")
             
         else:
             send_log(f"[LOGIC] Calories surplus is: False")
             result = False
-            message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {days_until_next_visit} days")
+            message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {ctx.next_purchase_date} days")
             
         return Finding(
             analyzer_name= self.ANALYZER_NAME,
