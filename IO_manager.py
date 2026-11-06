@@ -2,13 +2,16 @@ from datetime import date
 from decimal import Decimal
 from DB_manager import (MAX_ITEM_NAME_LENGTH, MAX_PERSON_NAME_LENGTH, MAX_DIETARY_LENGTH,
                         MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years)
-from ioclasses import TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt
+from ioclasses import (TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt,
+                       QuantityUnitPrompt, EditQuantityPrompt)
 from core.Person import Person
 from core.Household import Household
+from core.Fridge import Fridge
 from core.FridgeItem import FridgeItem
 from core.ConsumptionRecord import ConsumptionRecord
 from core.CartItem import CartItem
 from core.Cart import Cart
+from core.UnitValidator import UnitValidator
 
 
 class IO_manager:
@@ -32,62 +35,19 @@ class IO_manager:
         latest = shift_calendar_years(today, 3)
         return DatePrompt(question, earliest, latest, purchase_date).ask()
 
-    def __name_unit_pairs(self, items):
-        return [(item.name, item.unit) for item in items]
-
     # Ask for one item's name, quantity and unit, validating bad input.
-    # If the item already exists in known_items, its unit is reused.
-    def __enter_item(self, known_items):
+    # If the item was entered before, its unit is reused.
+    def __enter_item(self, unit_validator, other_items=None):
         item_name = TextPrompt("Item name: ", max_length=MAX_ITEM_NAME_LENGTH).ask()
 
         # Check if this item was entered before, and lock its unit
-        locked_unit = ""
-        for name, unit in known_items:
-            if name.lower() == item_name.lower():
-                locked_unit = unit
-                print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
-                break
+        locked_unit = unit_validator.find_unit(item_name, other_items)
+        if locked_unit != "":
+            print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
 
         # Ask for quantity and unit together
-        while True:
-            if locked_unit != "":
-                text = input(f"Quantity in {locked_unit} (e.g. 3): ").strip().lower()
-            else:
-                text = input(f"Quantity and unit (e.g. 6kg, 500 g, 3 pcs) - units: {', '.join(self.__valid_units)}: ").strip().lower()
-
-            # Split where the number ends and the unit begins
-            split_at = 0
-            while split_at < len(text) and (text[split_at].isdecimal() or text[split_at] == "."):
-                split_at += 1
-            number_part = text[:split_at]
-            unit = text[split_at:].strip()
-
-            if not number_part.replace(".", "", 1).isdecimal():
-                print("Please start with a valid number, e.g. 6kg.")
-            elif float(number_part) <= 0:
-                print("Quantity must be more than 0.")
-            elif unit == "" and locked_unit == "":
-                print(f"Please include a unit ({', '.join(self.__valid_units)}), e.g. 6kg.")
-            elif unit != "" and unit not in self.__valid_units:
-                print(f"'{unit}' is not a valid unit. Please use one of: {', '.join(self.__valid_units)}.")
-            elif locked_unit != "" and unit != "" and unit != locked_unit:
-                print(f"{item_name} must be entered in {locked_unit}.")
-            else:
-                if (unit or locked_unit) == "pcs" and not number_part.isdigit():
-                    print("Items in pcs must be a whole number.")
-                else:
-                    try:
-                        quantity = normalize_quantity(number_part)
-                    except ValueError:
-                        print(f"Quantity must be a valid number no greater than {MAX_QUANTITY:,}.")
-                        continue
-                    if quantity == 0:
-                        print("Quantity is too small after rounding to 4 decimal places.")
-                        continue
-                    if unit == "":
-                        unit = locked_unit
-                    break
-
+        quantity, unit = QuantityUnitPrompt(item_name, self.__valid_units, locked_unit,
+                                            normalize_quantity, MAX_QUANTITY).ask()
         return item_name, quantity, unit
 
     # Ask whether the user wants to add another item or edit/delete an item.
@@ -97,8 +57,8 @@ class IO_manager:
                             "Please choose a valid option (1,2 or 3)").ask()
 
     # For new users: Collect the food items they already have at home, with expiry dates.
-    def __add_item(self, remaining_items):
-        item_name, quantity, unit = self.__enter_item(self.__name_unit_pairs(remaining_items))
+    def __add_item(self, home_items):
+        item_name, quantity, unit = self.__enter_item(UnitValidator(home_items))
         expiry_date = self.__ask_date("Expiry date (YYYY-MM-DD): ")
         item_remarks = TextPrompt("Any remarks about this item? e.g. opened, for a party (leave blank if none): ",
                                   allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
@@ -109,92 +69,38 @@ class IO_manager:
         item = FridgeItem(item_name, quantity, unit, "", expiry_date, item_remarks)
 
         # Check whether an identical item and expiry date already exist
-        for index in range(len(remaining_items)):
-            existing = remaining_items[index]
-            if (
-                existing.name.lower() == item.name.lower()
-                and existing.unit == item.unit
-                and existing.expiry_date == item.expiry_date
-            ):
-                # Add quantities using Decimal
-                combined_quantity = (Decimal(str(existing.quantity)) + Decimal(str(item.quantity)))
-                if combined_quantity > MAX_QUANTITY:
-                    print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
-                    return remaining_items
+        try:
+            merged, batch = home_items.add_or_merge(item)
+        except ValueError as error:
+            print(error)
+            return
+        if merged:
+            print(f"{batch.name} is already in your home items.\nTotal is now {self.format_item(batch)}.")
+        else:
+            print(f"Added {self.format_item(batch)} to your home items.")
 
-                # Merge remarks safely
-                new_remarks = existing.remarks
-
-                if item.remarks != "none" and item.remarks != new_remarks:
-                    if new_remarks == "none":
-                        new_remarks = item.remarks
-                    else:
-                        new_remarks += ", " + item.remarks
-
-                if len(new_remarks) > MAX_REMARKS_LENGTH:
-                    print(f"Combined remarks cannot exceed {MAX_REMARKS_LENGTH} characters.")
-                    return remaining_items
-
-                # Update the existing item after validation
-                existing = FridgeItem(existing.name, normalize_quantity(combined_quantity), existing.unit,
-                                      existing.purchase_date, existing.expiry_date, new_remarks)
-                remaining_items[index] = existing
-
-                print(f"{existing.name} is already in your home items.\nTotal is now {self.format_item(existing)}.")
-                return remaining_items
-
-        # No matching item found then will add a new item
-        remaining_items.append(item)
-
-        print(f"Added {self.format_item(item)} to your home items.")
-        return remaining_items
-
-    def __add_to_cart(self, cart, other_known_items):
-        item_name, quantity, unit = self.__enter_item(self.__name_unit_pairs(cart.get_items()) + other_known_items)
+    def __add_to_cart(self, cart, unit_validator):
+        item_name, quantity, unit = self.__enter_item(unit_validator, cart.get_items())
 
         # If the same item with the same unit was already entered, add to it
-        for existing in cart.get_items():
-            if existing.name.lower() == item_name.lower() and existing.unit == unit:
-                combined_quantity = (Decimal(str(existing.quantity)) + Decimal(str(quantity)))
-                if combined_quantity > MAX_QUANTITY:
-                    print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
-                    return
-                # To normalize to prevent e.g 0.30000000004 values
-                existing.edit_quantity(normalize_quantity(combined_quantity))
-                print(f"{existing.name} is already in your list.\nTotal is now {self.format_item(existing)}.")
-                return
-        item = CartItem(item_name, quantity, unit)
-        cart.add_item(item)
-        print(f"Added {self.format_item(item)}.")
+        try:
+            merged, cart_item = cart.add_or_merge(CartItem(item_name, quantity, unit))
+        except ValueError as error:
+            print(error)
+            return
+        if merged:
+            print(f"{cart_item.name} is already in your list.\nTotal is now {self.format_item(cart_item)}.")
+        else:
+            print(f"Added {self.format_item(cart_item)}.")
 
     def __edit_item(self, item, remove_item):
-        while True:
-            print(f"Selected {item.name}, Current Quantity: {item.quantity}")
-
-            edited_quantity = input("Enter new amount (enter 0 to delete item): ").strip()
-            if edited_quantity.replace(".", "", 1).isdecimal():
-                if float(edited_quantity) == 0:
-                    remove_item(item)
-                else:
-                    if item.unit == 'pcs' and not edited_quantity.isdigit():
-                        print("quantity must be a whole number for unit pcs")
-                        continue
-                    try:
-                        new_qty = normalize_quantity(edited_quantity)
-                    except ValueError:
-                        print(f"Quantity cannot exceed {MAX_QUANTITY:,}.")
-                        continue
-
-                    if new_qty == 0:
-                        if Decimal(edited_quantity) != 0:
-                            print("Quantity is too small after rounding to 4 decimal places.")
-                            continue
-                        remove_item(item)
-                    else:
-                        item.edit_quantity(new_qty)
-                return
-            else:
-                print("Invalid input. Enter a positive number")
+        new_qty = EditQuantityPrompt(f"Selected {item.name}, Current Quantity: {item.quantity}\n"
+                                     "Enter new amount (enter 0 to delete item): ",
+                                     item.unit == 'pcs', normalize_quantity, MAX_QUANTITY).ask()
+        if new_qty == 0:
+            remove_item(item)
+        else:
+            item.edit_quantity(new_qty)
 
     #can be used to edit grocery list or recommendation list
     def __edit_list(self, item_list, remove_item):
@@ -215,10 +121,8 @@ class IO_manager:
     def create_profile(self):
         genders = ", ".join(self.__valid_genders)
         household = Household()
-
         name = TextPrompt("Please enter your name: ", max_length=MAX_PERSON_NAME_LENGTH).ask()
-        age = IntRangePrompt("Please enter your age: ", 10, 120,
-                             "Please enter a valid age (whole number between 10 and 120).").ask()
+        age = IntRangePrompt("Please enter your age: ", 10, 120,"Please enter a valid age (whole number between 10 and 120).").ask()
         gender = ChoicePrompt(f"Please enter your gender ({genders}): ", self.__valid_genders,
                               "Please enter male or female.").ask()
         dietary_restrictions = TextPrompt("Please enter your dietary restrictions (leave blank if none): ",
@@ -247,27 +151,27 @@ class IO_manager:
 
     # Collect home inventory during initial registration
     def enter_home_items(self):
-        remaining_items = []
+        home_items = Fridge()
         if not self.__ask_yes_no("\nDo you have any food items at home you want to add? "):
-            return remaining_items
+            return home_items.get_items()
         print("\nEnter the items you currently have at home.")
-        remaining_items = self.__add_item(remaining_items)
+        self.__add_item(home_items)
         while True:
-            self.display_list("Fridge", remaining_items)
+            self.display_list("Fridge", home_items.get_items())
             user_choice = self.__ask_add_another()
 
             if user_choice == "1":
-                remaining_items = self.__add_item(remaining_items)
+                self.__add_item(home_items)
             elif user_choice == "2":
-                if not remaining_items:
+                if not home_items.get_items():
                     print("No items to edit or remove.")
                     continue
                 while True:
-                    self.display_list("Fridge", remaining_items)
-                    if self.__edit_list(remaining_items, remaining_items.remove):
+                    self.display_list("Fridge", home_items.get_items())
+                    if self.__edit_list(home_items.get_items(), home_items.remove_item):
                         break
             else:
-                return remaining_items
+                return home_items.get_items()
 
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
@@ -276,24 +180,11 @@ class IO_manager:
         consumed_items = []
         if not fridge.get_items():
             return consumed_items
-
-        # Add up the total of each item across all its batches
-        totals = {}
-        for item in fridge.get_items():
-            key = (item.name.lower(), item.unit)
-            if key in totals:
-                totals[key]["Quantity"] += Decimal(str(item.quantity))
-            else:
-                totals[key] = {"Item_Name": item.name, "Quantity": Decimal(str(item.quantity)), "Unit": item.unit}
         print("\nUpdate Consumption.")
         # Asked once for the whole consumption list
         date_range = IntRangePrompt("How many days has it been since you last used the app? ", 1, 365).ask()
-
         consumed_amounts = []
-        for key in totals:
-            name = totals[key]["Item_Name"]
-            total = totals[key]["Quantity"]
-            unit = totals[key]["Unit"]
+        for name, total, unit in fridge.get_totals():
             consumed = QuantityPrompt(f"How much {name} did you consume? (you have {total} {unit}): ",
                                       max_value=total, allow_zero=True, whole_number=(unit == "pcs"),
                                       normalize=normalize_quantity,
@@ -312,18 +203,15 @@ class IO_manager:
 
     # Collect the groceries the user plans to buy, until they say they are done.
     def enter_grocery_list(self, fridge, history):
-        other_known_items = (self.__name_unit_pairs(fridge.get_items())
-                             + [(record["Item_Name"], record["Unit"]) for record in history.to_dicts()])
+        unit_validator = UnitValidator(fridge, history)
         cart = Cart()
         print("\nEnter the groceries you are planning to buy.")
-
-        self.__add_to_cart(cart, other_known_items)
-
+        self.__add_to_cart(cart, unit_validator)
         while True:
             self.display_list("Grocery Cart", cart.get_items())
             user_choice = self.__ask_add_another()
             if user_choice == "1": # add items
-                self.__add_to_cart(cart, other_known_items)
+                self.__add_to_cart(cart, unit_validator)
             elif user_choice == "2": #edit cart
                 while True:
                     self.display_list("Grocery Cart", cart.get_items())
@@ -383,35 +271,12 @@ class IO_manager:
                 selected_item = items[number]
                 expiry_date = self.__ask_date(f"New expiry date for {selected_item.name} (YYYY-MM-DD): ",
                                               allow_past=True, purchase_date=selected_item.purchase_date)
-
-                matching_items = []
-                total_quantity = Decimal(str(selected_item.quantity))
-
-                for existing in items:
-                    if existing is selected_item:
-                        continue
-
-                    if (
-                        existing.name.lower() == selected_item.name.lower()
-                        and existing.unit == selected_item.unit
-                        and existing.purchase_date == selected_item.purchase_date
-                        and existing.expiry_date == expiry_date
-                        and existing.remarks == selected_item.remarks
-                    ):
-                        matching_items.append(existing)
-                        total_quantity += Decimal(str(existing.quantity))
-
-                if total_quantity > MAX_QUANTITY:
-                    print(f"Total quantity cannot exceed {MAX_QUANTITY:,}. Expiry date was not changed.")
+                try:
+                    merged = fridge.change_expiry(selected_item, expiry_date)
+                except ValueError as error:
+                    print(error)
                     continue
-
-                selected_item.edit_expiry_date(expiry_date)
-                selected_item.edit_quantity(normalize_quantity(total_quantity))
-
-                for existing in matching_items:
-                    fridge.remove_item(existing)
-
-                if matching_items:
+                if merged:
                     print(f"Updated and merged: {self.format_item(selected_item)}")
                 else:
                     print(f"Updated: {self.format_item(selected_item)}")
@@ -561,7 +426,6 @@ class IO_manager:
 # =====================================================================
 
 if __name__ == "__main__":
-    from core.Fridge import Fridge
     from core.ConsumptionHistory import ConsumptionHistory
     from core.AIRecData import AIRecData
 
