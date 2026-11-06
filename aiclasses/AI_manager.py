@@ -1,13 +1,17 @@
+from typing import Callable
+
 from dotenv import load_dotenv
 from datetime import date, timedelta
 from dotenv import load_dotenv
-
 from DB_manager import send_log
-
 from .AIProvider import AIProvider
 from .OpenRouterProvider import OpenRouterProvider
 from .PromptBuilder import PromptBuilder
 from .AIResponseValidator import AIResponseValidator
+from core.Household import Household
+from core.ConsumptionHistory import ConsumptionHistory  
+from core.Fridge import Fridge
+from core.Cart import Cart
 
 #region AI Recommendation Entry Point
 def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next):
@@ -21,12 +25,10 @@ class AIManager:
         self._provider = provider
         self._prompt_builder = PromptBuilder()
         self._validator = AIResponseValidator()
-
     def _prepare_data(self, household_info: dict, consumption_history: list, fridge_stock: list, grocery_list_input: list, remarks: str, current_date: date, next_purchase_date: date) -> dict:
         return {"household_info": household_info, "consumption_history": consumption_history, 
                 "fridge_stock": fridge_stock, "planned_grocery_list": grocery_list_input, 
                 "remarks": remarks, "current_date": current_date, "next_purchase_date": next_purchase_date}
-    
     def _get_next_purchase_date(self, current_date: date, days_until_next: int) -> date:
         try:
             next_purchase_date = current_date + timedelta(days=days_until_next)
@@ -34,8 +36,7 @@ class AIManager:
         except ValueError:
             raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
         
-    def get_ai_recommendations(self, household_info: dict, consumption_history: list, fridge_stock: list, purchase_stock: list, remarks: str, days_until_next: int) -> tuple:
-        # Check API connection
+    def get_ai_recommendations(self, household_info: Household, consumption_history: ConsumptionHistory, fridge_stock: Fridge, purchase_stock: Cart, remarks: str, days_until_next: int, notify: Callable[[str], None] | None = None) -> tuple:    
         send_log("Checking AI API connection...")
         connected, message = self._provider.check_connection()
         if not connected:
@@ -47,18 +48,26 @@ class AIManager:
         send_log("[AI STATUS] Preparing AI input...")
         current_date = date.today()
         next_purchase_date = self._get_next_purchase_date(current_date, days_until_next)
-        data = self._prepare_data(household_info, consumption_history, fridge_stock, purchase_stock, remarks, current_date, next_purchase_date)
-
+        # Exclude expired fridge items from AI calculations.
+        usable_fridge = [item.to_dict() for item in fridge_stock.get_items() if not item.is_expired()]
+        expired_count = len(fridge_stock.get_items()) - len(usable_fridge)
+        if expired_count > 0:
+            warning = (f"Warning: {expired_count} expired fridge batch(es) excluded from AI recommendations.\nPlease review or remove expired food.")
+            send_log(f"[AI STATUS] {warning}")
+            if notify:
+                notify(warning)
+        # Convert objects into dictionaries for the AI prompt.
+        data = self._prepare_data(household_info=household_info.to_dicts(),
+            consumption_history=consumption_history.to_dicts(), fridge_stock=usable_fridge,
+            grocery_list_input=[item.to_dict() for item in purchase_stock.get_items()],
+            remarks=remarks, current_date=current_date, next_purchase_date=next_purchase_date)
         # Build AI prompt
         send_log("[AI STATUS] Building AI prompt...")
         prompt = self._prompt_builder.build_ai_prompt(data)
-
         # Generate AI recommendations
         send_log("[AI STATUS] Sending prompt to AI...")
-        result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), purchase_stock, self._validator)
-
+        result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), data["planned_grocery_list"], self._validator)
         if error:
             send_log("[AI] AI request failed.")
             send_log(f"[AI] {error}")
         return result, error
-#endregion
