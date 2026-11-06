@@ -4,10 +4,10 @@ import pytest
 import math
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from AI_manager import AIManager, AIResponseValidator
-from core.AI_classes import AIProvider, OpenRouterProvider, MockAIProvider
-from AI_manager import AIManager, AIResponseValidator
-from core.AI_classes import AIProvider, OpenRouterProvider, MockAIProvider
+from aiclasses.AI_manager import AIManager, AIResponseValidator
+from aiclasses.AIProvider import AIProvider
+from aiclasses.OpenRouterProvider import OpenRouterProvider
+from aiclasses.MockAIProvider import MockAIProvider
 from datetime import date, timedelta
 import Logic_manager as logic
 

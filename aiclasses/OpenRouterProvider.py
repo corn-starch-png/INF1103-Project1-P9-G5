@@ -1,21 +1,10 @@
-from abc import ABC, abstractmethod
 import os
 import time
 import requests
-from openai import (OpenAI, APIConnectionError, AuthenticationError, 
-                    BadRequestError, NotFoundError, RateLimitError, APIStatusError)
+from openai import (OpenAI, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, RateLimitError, APIStatusError,)
 from DB_manager import send_log
+from .AIProvider import AIProvider
 
-#region Abstract AI Provider
-class AIProvider(ABC):
-    def check_connection(self) -> tuple:
-        return True, "AI provider ready."
-    @abstractmethod
-    def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
-        pass
-#endregion
-
-#region OpenRouter Provider
 class OpenRouterProvider(AIProvider):
     def check_connection(self) -> tuple:
         try:
@@ -176,17 +165,3 @@ class OpenRouterProvider(AIProvider):
 
     def _update_ai_status(self, message: str) -> None:
         send_log(f"[AI STATUS] {message}")
-#endregion
-
-#region Mock AI Provider
-class MockAIProvider(AIProvider):
-    def __init__(self, sample_response: str) -> None:
-        self._sample_response = sample_response
-    def generate(self, prompt: str, schema: dict, grocery_list: list, validator) -> tuple:
-        result, error = validator.process_ai_response(self._sample_response)
-        if error:
-            return None, error
-        if not validator.check_ai_output(result["Recommendations_List"], grocery_list):
-            return None, "AI recommendations do not match the original grocery list:\nitem names, planned quantities, units or order."
-        return result, None
-#endregion
