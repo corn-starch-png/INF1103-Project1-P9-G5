@@ -5,25 +5,42 @@ try:
     from DB_manager import (database_exists, load_database, save_database, update_household_info, log_exists,
                             add_to_fridge, remove_from_fridge, update_consumption_history, get_all_fridge_quantity,
                             merge_fridge_batches, send_log)
-    from IO_manager import (show_welcome, create_profile, show_profile, enter_home_items, display_list, show_welcome_back, 
-                            update_consumption, show_consumption, enter_grocery_list, ask_remarks, ask_days_until_next, 
-                            shopping_cart_conclusion, ask_menu_choice, update_fridge, send_message, 
-                            show_exit, output_recommendations)
+    from IO_manager import IO_manager
+    from core.Fridge import Fridge
+    from core.Household import Household
+    from core.ConsumptionHistory import ConsumptionHistory
+    from core.AIRecData import AIRecData
     from AI_manager import AIManager
     from core.AI_classes import OpenRouterProvider
     from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 
+ui = IO_manager()
+
+def load_objects(database):
+    household_info = Household()
+    history = ConsumptionHistory()
+    fridge = Fridge()
+    for error in household_info.load_dicts(database["household_info"]) + history.load_dicts(database["consumption_history"]) + fridge.load_dicts(database["fridge"]):
+        send_log(f"[MAIN] {error}")
+    return household_info, history, fridge
+
+def to_rows(records):
+    rows = []
+    for record in records:
+        row = record.to_dict()
+        row.pop("Record_Date", None)
+        rows.append(row)
+    return rows
+
 #here for integration testing
 #will remove once the refactored code is fully implemented and tested
-USING_REFACTORED_CODE = False 
+USING_REFACTORED_CODE = False
 if USING_REFACTORED_CODE:
     from DB_manager import (load_database_refactored, save_database_refactored)
-    from core.Fridge import Fridge
-    from core.Household import Household
-    from core.ConsumptionHistory import ConsumptionHistory
     errors, fridge, household_info, history = load_database_refactored("database")
+    database = {"consumption_history": history.to_dicts(), "household_info": household_info.to_dicts(), "fridge": fridge.to_dicts()}
 else:
     log_exists()
     database_exists()  # Ensure the database folder and file exist
@@ -31,68 +48,74 @@ else:
     database["fridge"][:] = merge_fridge_batches(database["fridge"])
     send_log(f"[MAIN] database: {database}")
     if db_success == False:
-        send_message(f"Database loading encountered issues, data may be missing")
-    household_info = database['household_info']
-    history = database['consumption_history']
-    fridge = database['fridge']
+        ui.send_message(f"Database loading encountered issues, data may be missing")
+household_info, history, fridge = load_objects(database)
 
 existing_fridge_items = []
 consumed_items = []
 #-------END OF DEPENDENCY LINE----------#
-#region user IO 
-show_welcome()
+#region user IO
+ui.show_welcome()
 #if new user, direct them to create a new profile then add items they have in thier fridge
-if household_info == []: 
-    household_info = create_profile()
-    show_profile(household_info)
-    existing_fridge_items = enter_home_items()
-    display_list("Fridge", existing_fridge_items)
-    database = update_household_info(database, household_info)
-    database = add_to_fridge(database, existing_fridge_items)
+if not household_info.get_members():
+    household_info = ui.create_profile()
+    ui.show_profile(household_info)
+    existing_fridge_items = ui.enter_home_items()
+    ui.display_list("Fridge", existing_fridge_items)
+    database = update_household_info(database, household_info.to_dicts())
+    database = add_to_fridge(database, [item.to_dict() for item in existing_fridge_items])
+    household_info, history, fridge = load_objects(database)
 else:
-    show_welcome_back(household_info)
+    ui.show_welcome_back(household_info)
     while True:
-        choice = ask_menu_choice()
+        choice = ui.ask_menu_choice()
         #update consumption history then break loop and continue
-        if choice == "1": 
-            consumed_items = update_consumption(fridge)
+        if choice == "1":
+            consumed_records = ui.update_consumption(fridge)
+            consumed_items = to_rows(consumed_records)
             database = remove_from_fridge(database, consumed_items)
             database = update_consumption_history(database, consumed_items)
-            show_consumption(consumed_items)
+            household_info, history, fridge = load_objects(database)
+            ui.show_consumption(consumed_records)
             break
         #give user option to edit AI estimated expiry dates or delete items(for example if expired)
-        elif choice == "2": 
-            fridge = update_fridge(fridge)
-            database["fridge"] = fridge
+        elif choice == "2":
+            ui.update_fridge(fridge)
+            database["fridge"] = fridge.to_dicts()
         #exit program
-        else: 
-            save_database(database, 'database')  # Save the database to the specified folder
-            show_exit()
+        else:
+            if USING_REFACTORED_CODE:
+                save_database_refactored(fridge, household_info, history, 'database')
+            else:
+                save_database(database, 'database')  # Save the database to the specified folder
+            ui.show_exit()
             sys.exit(1)
 
-days_until_next_visit = ask_days_until_next()
-grocery_list = enter_grocery_list(database)
-remarks = ask_remarks()
+days_until_next_visit = ui.ask_days_until_next()
+cart = ui.enter_grocery_list(fridge, history)
+remarks = ui.ask_remarks()
+grocery_list = [item.to_dict() for item in cart.get_items()]
 
 send_log(f"[MAIN] \n--- IO results ---")
-send_log(f"[MAIN] household_info = {household_info}")
-send_log(f"[MAIN] existing_items = {existing_fridge_items}")
+send_log(f"[MAIN] household_info = {household_info.to_dicts()}")
+send_log(f"[MAIN] existing_items = {[item.to_dict() for item in existing_fridge_items]}")
 send_log(f"[MAIN] consumed_items = {consumed_items}")
 send_log(f"[MAIN] grocery_list = {grocery_list}")
 send_log(f"[MAIN] remarks = {remarks}")
 send_log(f"[MAIN] days_until_next_visit = {days_until_next_visit}")
-#endregion 
+#endregion
 
 #region AI Recommendations
-send_message("Getting AI recommendations... This can take a while")
+ui.send_message("Getting AI recommendations... This can take a while")
 # retains expired items for review but excludes them from the AI's usable stock input.
-usable_fridge = [item for item in fridge if date.fromisoformat(item["Expiry_Date"]) >= date.today()]
-if len(usable_fridge) < len(fridge):
-    send_message(f"Warning: {len(fridge) - len(usable_fridge)} expired fridge batch(es) excluded from recommendations.\nReview/remove expired food.")
+fridge_rows = database['fridge']
+usable_fridge = [item for item in fridge_rows if date.fromisoformat(item["Expiry_Date"]) >= date.today()]
+if len(usable_fridge) < len(fridge_rows):
+    ui.send_message(f"Warning: {len(fridge_rows) - len(usable_fridge)} expired fridge batch(es) excluded from recommendations.\nReview/remove expired food.")
 # Initialize AI Manager with OpenRouter provider
 ai_manager = AIManager(OpenRouterProvider())
 # Generate AI recommendations
-ai_recommendations, error = ai_manager.get_ai_recommendations(household_info, history, usable_fridge, grocery_list, remarks, days_until_next_visit)
+ai_recommendations, error = ai_manager.get_ai_recommendations(household_info.to_dicts(), database['consumption_history'], usable_fridge, grocery_list, remarks, days_until_next_visit)
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 # Extract recommendation data
@@ -113,30 +136,36 @@ for item in recommendations:
     fridge_amt = get_all_fridge_quantity(database, item["Item_Name"], include_expired=False)
     total_amt = fridge_amt + item["Planned_Quantity"] #total amount of item in grocery list AND currently in fridge
 
-    expire_before_consume, expiry_message = risk_of_expiry(item, total_amt) 
+    expire_before_consume, expiry_message = risk_of_expiry(item, total_amt)
     if expiry_message is not None:
-        risk_of_expiry_messages.append(expiry_message) 
+        risk_of_expiry_messages.append(expiry_message)
 
     next_purchase_date = str(date.today() + timedelta(days=days_until_next_visit))
     if should_evaluate_underbuy(extra_calories, expire_before_consume):
-        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt) 
-        
+        need_to_buy_more, underbuy_message = under_buy(item, next_purchase_date, total_amt)
+
         if underbuy_message is not None:
-            underbuy_messages.append(underbuy_message) 
+            underbuy_messages.append(underbuy_message)
 
     item["Confidence_Score"] = calculate_confidence_score(item["Item_Name"], database, item["Recommended_Quantity"], fridge_amt, days_until_next_visit, remarks)
+
+for cart_item, item in zip(cart.get_items(), recommendations):
+    ai_data = AIRecData(item["Recommended_Quantity"], item.get("Consumption_Rate", 0), item["Estimated_Expiry_Date"])
+    ai_data.set_confidence_score(item["Confidence_Score"])
+    cart_item.set_ai_data(ai_data)
 #endregion
 
 #region user IO confirmation
-output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
+ui.output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
 
-final_checkout = shopping_cart_conclusion(recommendations, remarks)
+final_checkout = ui.shopping_cart_conclusion(cart, remarks)
 
-database = add_to_fridge(database, final_checkout)
+database = add_to_fridge(database, [item.to_dict() for item in final_checkout])
 
 if USING_REFACTORED_CODE:
-    save_database_refactored(database, 'database')  # Save the database to the specified folder
+    household_info, history, fridge = load_objects(database)
+    save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
 else:
-    save_database(fridge, household_info, history, 'database')  # Save the database to the specified folder
-show_exit()
+    save_database(database, 'database')  # Save the database to the specified folder
+ui.show_exit()
 #endregion

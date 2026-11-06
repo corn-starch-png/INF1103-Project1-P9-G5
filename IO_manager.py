@@ -1,798 +1,473 @@
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from DB_manager import (MAX_ITEM_NAME_LENGTH, MAX_PERSON_NAME_LENGTH, MAX_DIETARY_LENGTH, 
+from DB_manager import (MAX_ITEM_NAME_LENGTH, MAX_PERSON_NAME_LENGTH, MAX_DIETARY_LENGTH,
                         MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years)
-valid_units = ["kg", "g", "l", "ml", "pcs"]
-valid_genders = ["male", "female"]
+from ioclasses import (TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt,
+                       QuantityUnitPrompt, EditQuantityPrompt)
+from core.Person import Person
+from core.Household import Household
+from core.Fridge import Fridge
+from core.FridgeItem import FridgeItem
+from core.ConsumptionRecord import ConsumptionRecord
+from core.CartItem import CartItem
+from core.Cart import Cart
+from core.UnitValidator import UnitValidator
 
- 
-# Ask for one item's name, quantity and unit, validating bad input.
-# If the item already exists in existing_items, its unit is reused.
-def enter_item(existing_items=None):
-    if existing_items is None:
-        existing_items = []
-    item_name = enter_text("Item name: ", max_length=MAX_ITEM_NAME_LENGTH)
 
-    # Check if this item was entered before, and lock its unit
-    locked_unit = ""
-    for existing in existing_items:
-        if existing["Item_Name"].lower() == item_name.lower():
-            locked_unit = existing["Unit"]
-            print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
-            break
+class IO_manager:
+    def __init__(self):
+        self.__valid_units = ["kg", "g", "l", "ml", "pcs"]
+        self.__valid_genders = ["male", "female"]
+        self.__remarks_prompt = TextPrompt(
+            "\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ",
+            allow_blank=True, max_length=MAX_REMARKS_LENGTH)
+        self.__days_prompt = IntRangePrompt("\nIn how many days do you plan to shop next? (e.g. 7): ", 1, 365)
 
-    # Ask for quantity and unit together
-    while True:
+    def __ask_yes_no(self, question, error_message="Please answer yes or no."):
+        answer = ChoicePrompt(question + "(yes/no): ", ["yes", "y", "no", "n"], error_message).ask()
+        return answer in ["yes", "y"]
+
+    # Ask for a date in YYYY-MM-DD format and check it is a real date.
+    def __ask_date(self, question, allow_past=False, purchase_date=""):
+        today = date.today()
+        earliest = shift_calendar_years(today, -1) if allow_past else today
+        # maximum expiry date
+        latest = shift_calendar_years(today, 3)
+        return DatePrompt(question, earliest, latest, purchase_date).ask()
+
+    # Ask for one item's name, quantity and unit, validating bad input.
+    # If the item was entered before, its unit is reused.
+    def __enter_item(self, unit_validator, other_items=None):
+        item_name = TextPrompt("Item name: ", max_length=MAX_ITEM_NAME_LENGTH).ask()
+
+        # Check if this item was entered before, and lock its unit
+        locked_unit = unit_validator.find_unit(item_name, other_items)
         if locked_unit != "":
-            text = input(f"Quantity in {locked_unit} (e.g. 3): ").strip().lower()
-        else:
-            text = input(f"Quantity and unit (e.g. 6kg, 500 g, 3 pcs) - units: {', '.join(valid_units)}: ").strip().lower()
+            print(f"{item_name} was entered before in {locked_unit}, so please enter the quantity in {locked_unit}.")
 
-        # Split where the number ends and the unit begins
-        split_at = 0
-        while split_at < len(text) and (text[split_at].isdecimal() or text[split_at] == "."):
-            split_at += 1
-        number_part = text[:split_at]
-        unit = text[split_at:].strip()
+        # Ask for quantity and unit together
+        quantity, unit = QuantityUnitPrompt(item_name, self.__valid_units, locked_unit,
+                                            normalize_quantity, MAX_QUANTITY).ask()
+        return item_name, quantity, unit
 
-        if not number_part.replace(".", "", 1).isdecimal():
-            print("Please start with a valid number, e.g. 6kg.")
-        elif float(number_part) <= 0:
-            print("Quantity must be more than 0.")
-        elif unit == "" and locked_unit == "":
-            print(f"Please include a unit ({', '.join(valid_units)}), e.g. 6kg.")
-        elif unit != "" and unit not in valid_units:
-            print(f"'{unit}' is not a valid unit. Please use one of: {', '.join(valid_units)}.")
-        elif locked_unit != "" and unit != "" and unit != locked_unit:
-            print(f"{item_name} must be entered in {locked_unit}.")
-        else:
-            if (unit or locked_unit) == "pcs" and not number_part.isdigit():
-                print("Items in pcs must be a whole number.")
-            else:
-                try:
-                    quantity = normalize_quantity(number_part)
-                except ValueError:
-                    print(f"Quantity must be a valid number no greater than {MAX_QUANTITY:,}.")
-                    continue
-                if quantity == 0:
-                    print("Quantity is too small after rounding to 4 decimal places.")
-                    continue
-                if unit == "":
-                    unit = locked_unit
-                break
+    # Ask whether the user wants to add another item or edit/delete an item.
+    def __ask_add_another(self):
+        return ChoicePrompt("\n1. Add item\n2. Edit/Remove an item\n3. Confirm and submit items\n"
+                            "Choose your option (1,2 or 3): ", ["1", "2", "3"],
+                            "Please choose a valid option (1,2 or 3)").ask()
 
-    return {"Item_Name": item_name, "Quantity": quantity, "Unit": unit}
- 
+    # For new users: Collect the food items they already have at home, with expiry dates.
+    def __add_item(self, home_items):
+        item_name, quantity, unit = self.__enter_item(UnitValidator(home_items))
+        expiry_date = self.__ask_date("Expiry date (YYYY-MM-DD): ")
+        item_remarks = TextPrompt("Any remarks about this item? e.g. opened, for a party (leave blank if none): ",
+                                  allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
 
-# Double quote checks, reasks user to prevent JSON errors
-def enter_text(question, allow_blank=False, max_length=MAX_REMARKS_LENGTH):
-    while True:
-        text = input(question).strip()
-        if '"' in text or "\\" in text:
-            print('Please do not use double quotes or backslashes.')
-        elif not text and not allow_blank:
-            print("This can't be empty.")
-        elif len(text) > max_length:
-            print(f"Please enter no more than {max_length} characters.")
-        else:
-            return text
+        if item_remarks == "":
+            item_remarks = "none"
 
+        item = FridgeItem(item_name, quantity, unit, "", expiry_date, item_remarks)
 
-# Ask for a quantity until the user enters a number more than 0.
-def enter_quantity(question):
-    while True:
-        text = input(question).strip()
-        if not text.replace(".", "", 1).isdecimal():
-            print("Please enter a valid number.")
-        elif float(text) <= 0:
-            print("Quantity must be more than 0.")
-        else:
-            return float(text)
-
-
-# Ask whether the user wants to add another item or edit/delete an item.
-def ask_add_another():
-    while True:
-        print(f"\n1. Add item")
-        print(f"2. Edit/Remove an item")
-        print(f"3. Confirm and submit items")
-        option = input("Choose your option (1,2 or 3): ").strip().lower()
-        if option in ["1", "2", "3"]:
-            return option
-        print("Please choose a valid option (1,2 or 3)")
-
- 
-# Ask for a date in YYYY-MM-DD format and check it is a real date.
-def enter_date(question, allow_past=False, purchase_date=""):
-    today = date.today()
-    earliest = shift_calendar_years(today, -1) if allow_past else today
-    # maximum expiry date
-    latest = shift_calendar_years(today, 3)
-    while True:
-        text = input(question).strip()
-        if (
-            len(text) != 10
-            or text[4] != "-"
-            or text[7] != "-"
-            or not text[:4].isdigit()
-            or not text[5:7].isdigit()
-            or not text[8:].isdigit()
-        ):
-            print("Please enter a date in YYYY-MM-DD format.")
-            continue
+        # Check whether an identical item and expiry date already exist
         try:
-            entered_date = date.fromisoformat(text)
-        except ValueError:
-            print("Invalid calendar date. Please try again.")
-            continue
-        if entered_date < earliest:
-            print(f"Expiry date cannot be earlier than {earliest.isoformat()}.")
-            continue
-        if entered_date > latest:
-            print(f"Expiry date cannot be later than {latest.isoformat()}.")
-            continue
-        if purchase_date and entered_date < date.fromisoformat(purchase_date):
-            print("Expiry date cannot be earlier than the recorded purchase date.")
-            continue
-        if entered_date < today:
-            print("Warning: this item has already expired. Do not consume it.")
-        return text
-
-# Collect a new user's profile and their family members' details.
-# Returns a list in the database's household_info format (the user is Person_ID 1).
-def create_profile():
-    name = enter_text("Please enter your name: ",max_length=MAX_PERSON_NAME_LENGTH)
-    while True:
-        age = input("Please enter your age: ").strip()
-        if age.isdecimal() and 10 <= int(age) <= 120:
-            age = int(age)
-            break
-        print("Please enter a valid age (whole number between 10 and 120).")
- 
-    while True:
-        gender = input(f"Please enter your gender ({', '.join(valid_genders)}): ").strip().lower()
-        if gender in valid_genders:
-            break
-        print("Please enter male or female.")
-
-    dietary_restrictions = enter_text("Please enter your dietary restrictions (leave blank if none): ", allow_blank=True, max_length=MAX_DIETARY_LENGTH)
-    if dietary_restrictions == "":
-        dietary_restrictions = "none"
- 
-    while True:
-        family = input("Please enter your family size including yourself: ").strip()
-        if family.isdecimal() and 1 <= int(family) <= 20:
-            family = int(family)
-            break
-        print("Please enter a whole number between 1 and 20.")
- 
-    user_check = {
-        "name": name,
-        "age": age,
-        "gender": gender,
-        "dietary_restrictions": dietary_restrictions,
-        "family_size": family,
-        "family_members": {}
-    }
- 
-    for i in range(family - 1):
-        member_name = enter_text(f"Please enter the name of family member {i + 1}: ", max_length=MAX_PERSON_NAME_LENGTH)
-
-        while True:
-            member_age = input(f"Please enter the age of {member_name}: ").strip()
-            if member_age.isdecimal() and 1 <= int(member_age) <= 120:
-                member_age = int(member_age)
-                break
-            print("Please enter a valid age (whole number between 0 and 120).")
- 
-        while True:
-            member_gender = input(f"Please enter the gender of {member_name} ({', '.join(valid_genders)}): ").strip().lower()
-            if member_gender in valid_genders:
-                break
-            print("Please enter male or female.")
-
-        member_diet = enter_text(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ", allow_blank=True, max_length=MAX_DIETARY_LENGTH)
-        if member_diet == "":
-            member_diet = "none"
- 
-        user_check["family_members"][i + 1] = {
-            "name": member_name,
-            "age": member_age,
-            "gender": member_gender,
-            "dietary_restrictions": member_diet
-        }
- 
-    print(f"User {name} registered successfully!")
- 
-    # Convert into the database's household_info format
-    household_info = [{
-        "Person_ID": 1,
-        "Name": user_check["name"],
-        "Age": user_check["age"],
-        "Gender": user_check["gender"].capitalize(),
-        "Dietary_Restriction": user_check["dietary_restrictions"]
-    }]
- 
-    for number in user_check["family_members"]:
-        member = user_check["family_members"][number]
-        household_info.append({
-            "Person_ID": number + 1,
-            "Name": member["name"],
-            "Age": member["age"],
-            "Gender": member["gender"].capitalize(),
-            "Dietary_Restriction": member["dietary_restrictions"]
-        })
- 
-    return household_info
- 
- 
-# For new users: Collect the food items they already have at home, with expiry dates.
-# Returns a list in the database's fridge format
-def add_item(remaining_items):
-    item = enter_item(remaining_items)
-    expiry_date = enter_date("Expiry date (YYYY-MM-DD): ")
-    item_remarks = enter_text("Any remarks about this item? e.g. opened, for a party (leave blank if none): ", True)
-
-    if item_remarks == "" or item_remarks.lower == "none":
-        item_remarks = "none"
-
-    item["Purchase_Date"] = ""
-    item["Expiry_Date"] = expiry_date
-    item["Remarks"] = item_remarks
-
-    # Check whether an identical item and expiry date already exist
-    for existing in remaining_items:
-        if (
-            existing["Item_Name"].lower() == item["Item_Name"].lower()
-            and existing["Unit"] == item["Unit"]
-            and existing["Expiry_Date"] == item["Expiry_Date"]
-        ):
-            # Add quantities using Decimal
-            combined_quantity = (Decimal(str(existing["Quantity"])) + Decimal(str(item["Quantity"])))
-            if combined_quantity > MAX_QUANTITY:
-                print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
-                return remaining_items
-
-            # Merge remarks safely
-            new_remarks = existing["Remarks"]
-
-            if item["Remarks"] != "none" and item["Remarks"] != new_remarks:
-                if new_remarks == "none":
-                    new_remarks = item["Remarks"]
-                else:
-                    new_remarks += ", " + item["Remarks"]
-
-            if len(new_remarks) > MAX_REMARKS_LENGTH:
-                print(f"Combined remarks cannot exceed {MAX_REMARKS_LENGTH} characters.")
-                return remaining_items
-
-            # Update the existing item after validation
-            existing["Quantity"] = normalize_quantity(combined_quantity)
-            existing["Remarks"] = new_remarks
-
-            print(f"{existing['Item_Name']} is already in your home items.\nTotal is now {format_item(existing)}.")
-            return remaining_items
-
-    # No matching item found then will add a new item
-    remaining_items.append(item)
-
-    print(f"Added {format_item(item)} to your home items.")
-    return remaining_items
-
-# Collect home inventory during initial registration
-def enter_home_items():
-    while True:
-        has_items = input("\nDo you have any food items at home you want to add? (yes/no): ").strip().lower()
-        if has_items in ("yes", "y", "no", "n"): break
-        print("Please answer yes or no.")
-    remaining_items = []
-    if has_items in ("no", "n"): return remaining_items
-    print("\nEnter the items you currently have at home.")
-    remaining_items = add_item(remaining_items)
-    while True:
-        display_list("Fridge", remaining_items)
-        user_choice = ask_add_another()
-
-        if user_choice == "1":
-            remaining_items = add_item(remaining_items)
-        elif user_choice == "2":
-            if not remaining_items:
-                print("No items to edit or remove.")
-                continue
-            while True:
-                display_list("Fridge", remaining_items)
-                remaining_items, exit_code = edit_list(remaining_items)
-                if exit_code:
-                    break
+            merged, batch = home_items.add_or_merge(item)
+        except ValueError as error:
+            print(error)
+            return
+        if merged:
+            print(f"{batch.name} is already in your home items.\nTotal is now {self.format_item(batch)}.")
         else:
-            return remaining_items
+            print(f"Added {self.format_item(batch)} to your home items.")
 
-# For returning users: Ask how much of each item they consumed since last visit.
-# Batches of the same item are combined into one question.
-# Days since last use and remarks are asked once and applied to every item.
-# Returns a list in the database's format to remove
-def update_consumption(previous_inventory):
-    consumed_items = []
-    if not previous_inventory:
-        return consumed_items
- 
-    # Add up the total of each item across all its batches
-    totals = {}
-    for item in previous_inventory:
-        key = (item["Item_Name"].lower(), item["Unit"])
-        if key in totals:
-            totals[key]["Quantity"] += Decimal(str(item["Quantity"]))
+    def __add_to_cart(self, cart, unit_validator):
+        item_name, quantity, unit = self.__enter_item(unit_validator, cart.get_items())
+
+        # If the same item with the same unit was already entered, add to it
+        try:
+            merged, cart_item = cart.add_or_merge(CartItem(item_name, quantity, unit))
+        except ValueError as error:
+            print(error)
+            return
+        if merged:
+            print(f"{cart_item.name} is already in your list.\nTotal is now {self.format_item(cart_item)}.")
         else:
-            totals[key] = {"Item_Name": item["Item_Name"], "Quantity": Decimal(str(item["Quantity"])), "Unit": item["Unit"]} 
-    print("\nUpdate Consumption.")
-    # Asked once for the whole consumption list
-    while True:
-        text = input("How many days has it been since you last used the app? ").strip()
-        if text.isdecimal() and 1 <= int(text) <= 365:
-            date_range = int(text)
-            break
-        print("Please enter a whole number between 1 and 365.")
- 
-    for key in totals:
-        name = totals[key]["Item_Name"]
-        total = totals[key]["Quantity"]
-        unit = totals[key]["Unit"]
-        while True:
-            text = input(f"How much {name} did you consume? (you have {total} {unit}): ").strip()
-            if not text.replace(".", "", 1).isdecimal():
-                print("Please enter a valid number.")
-            # Ensure pcs quantities are whole numbers
-            elif unit == "pcs" and not text.isdecimal():
-                print("Quantity in pcs must be a whole number.")
-            else:
-                raw_consumed = Decimal(text)
-                if raw_consumed > Decimal(str(total)):
-                    print(f"That's more than you have ({total} {unit}). Please try again.")
-                    continue
-                try:
-                    consumed = normalize_quantity(text)
-                except ValueError:
-                    print("Invalid or excessively large quantity.")
-                    continue
-                if raw_consumed > 0 and consumed == 0:
-                    print("Quantity is too small after rounding to 4 decimal places.")
-                    continue
-                break
- 
-        consumed_items.append({
-            "Date_Range": date_range,
-            "Item_Name": name,
-            "Quantity": consumed,
-            "Unit": unit
-        })
- 
-    # Asked once, then added to every item
-    remarks = enter_text("Any remarks about your consumption since last time? (leave blank if none): ", True)
-    if remarks == "" or remarks.lower() == "none":
-        remarks = "none"
-    for record in consumed_items:
-        record["Remarks"] = remarks
- 
-    return consumed_items
+            print(f"Added {self.format_item(cart_item)}.")
 
- 
-#can be used to edit grocery list or recommendation list
-def edit_list(item_list):
-    def edit_item(item_list, item_index):
+    def __edit_item(self, item, remove_item):
+        new_qty = EditQuantityPrompt(f"Selected {item.name}, Current Quantity: {item.quantity}\n"
+                                     "Enter new amount (enter 0 to delete item): ",
+                                     item.unit == 'pcs', normalize_quantity, MAX_QUANTITY).ask()
+        if new_qty == 0:
+            remove_item(item)
+        else:
+            item.edit_quantity(new_qty)
+
+    #can be used to edit grocery list or recommendation list
+    def __edit_list(self, item_list, remove_item):
         while True:
-            #deal with mismatch between grocery_list and recommendation key
-            if "Planned_Quantity" in item_list[item_index]:
-                print(f"Selected {item_list[item_index]['Item_Name']}, Current Quantity: {item_list[item_index]['Planned_Quantity']}")
-            else:
-                print(f"Selected {item_list[item_index]['Item_Name']}, Current Quantity: {item_list[item_index]['Quantity']}")
-            
-            edited_quantity = input("Enter new amount (enter 0 to delete item): ").strip()
-            if edited_quantity.replace(".", "", 1).isdecimal():
-                if float(edited_quantity) == 0:
-                    del item_list[item_index]
+            item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
+            if item_index == "exit":
+                return True
+            elif item_index.isdecimal():
+                if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
+                    self.__edit_item(item_list[int(item_index) - 1], remove_item)
+                    return False
                 else:
-                    if item_list[item_index]['Unit'] == 'pcs' and not edited_quantity.isdigit():
-                        print("quantity must be a whole number for unit pcs")
-                        continue
-                    try:
-                        new_qty = normalize_quantity(edited_quantity)
-                    except ValueError:
-                        print(f"Quantity cannot exceed {MAX_QUANTITY:,}.")
-                        continue
-
-                    if new_qty == 0:
-                        if Decimal(edited_quantity) != 0:
-                            print("Quantity is too small after rounding to 4 decimal places.")
-                            continue
-                        del item_list[item_index]
-                    else:
-                        if "Planned_Quantity" in item_list[item_index]:
-                            item_list[item_index]["Planned_Quantity"] = new_qty
-                        else:
-                            item_list[item_index]["Quantity"] = new_qty
-                return item_list
-            else:
-                print("Invalid input. Enter a positive number")
-
-
-    while True:
-        item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
-        if item_index == "exit":
-            return item_list, True
-        elif item_index.isdecimal():
-            if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
-                item_index = int(item_index) - 1
-                return edit_item(item_list, item_index), False
+                    print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
             else:
                 print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
-        else:
-            print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
 
+    # Collect a new user's profile and their family members' details.
+    def create_profile(self):
+        genders = ", ".join(self.__valid_genders)
+        household = Household()
+        name = TextPrompt("Please enter your name: ", max_length=MAX_PERSON_NAME_LENGTH).ask()
+        age = IntRangePrompt("Please enter your age: ", 10, 120,"Please enter a valid age (whole number between 10 and 120).").ask()
+        gender = ChoicePrompt(f"Please enter your gender ({genders}): ", self.__valid_genders,
+                              "Please enter male or female.").ask()
+        dietary_restrictions = TextPrompt("Please enter your dietary restrictions (leave blank if none): ",
+                                          allow_blank=True, max_length=MAX_DIETARY_LENGTH).ask()
+        if dietary_restrictions == "":
+            dietary_restrictions = "none"
+        family = IntRangePrompt("Please enter your family size including yourself: ", 1, 20).ask()
 
-# Collect the groceries the user plans to buy, until they say they are done.
-# Returns a list of {"Item_Name", "Quantity", "Unit"}.
-def enter_grocery_list(database):
-    def validate_and_add_item(item, grocery_list):
-        # If the same item with the same unit was already entered, add to it
-        found = False
-        for existing in grocery_list:
-            if (existing["Item_Name"].lower() == item["Item_Name"].lower() and existing["Unit"] == item["Unit"]):
-                combined_quantity = (Decimal(str(existing["Quantity"])) + Decimal(str(item["Quantity"])))
-                if combined_quantity > MAX_QUANTITY:
-                    print(f"Total quantity cannot exceed {MAX_QUANTITY:,}.")
-                    return grocery_list
-                # To normalize to prevent e.g 0.30000000004 values
-                existing["Quantity"] = normalize_quantity(combined_quantity)
-                found = True
-                print(f"{existing['Item_Name']} is already in your list.\nTotal is now {format_item(existing)}.")
-                return grocery_list
-        if not found:
-            grocery_list.append(item)
-            print(f"Added {format_item(item)}.")
-        return grocery_list
-    
-    fridge_items = database["fridge"]
-    consumed_items = database["consumption_history"]
-    if fridge_items is None:
-        fridge_items = []
-    grocery_list = []
-    print("\nEnter the groceries you are planning to buy.")
+        household.add_member(Person(1, name, age, gender.capitalize(), dietary_restrictions))
 
-    item = enter_item(grocery_list + fridge_items + consumed_items)
-    grocery_list = validate_and_add_item(item, grocery_list)
+        for i in range(family - 1):
+            member_name = TextPrompt(f"Please enter the name of family member {i + 1}: ",
+                                     max_length=MAX_PERSON_NAME_LENGTH).ask()
+            member_age = IntRangePrompt(f"Please enter the age of {member_name}: ", 1, 120,
+                                        "Please enter a valid age (whole number between 0 and 120).").ask()
+            member_gender = ChoicePrompt(f"Please enter the gender of {member_name} ({genders}): ",
+                                         self.__valid_genders, "Please enter male or female.").ask()
+            member_diet = TextPrompt(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ",
+                                     allow_blank=True, max_length=MAX_DIETARY_LENGTH).ask()
+            if member_diet == "":
+                member_diet = "none"
+            household.add_member(Person(i + 2, member_name, member_age, member_gender.capitalize(), member_diet))
 
-    while True:
-        display_list("Grocery Cart", grocery_list)
-        user_choice = ask_add_another()
-        if user_choice == "1": # add items
-            item = enter_item(grocery_list + fridge_items + consumed_items)
-            grocery_list = validate_and_add_item(item, grocery_list)
-        elif user_choice == "2": #edit cart
-            while True:
-                display_list("Grocery Cart", grocery_list)
-                grocery_list, exit_code = edit_list(grocery_list)
-                if exit_code == True:
-                    break
-        else: # exit CRUD of cart 
-            if len(grocery_list) == 0:
-                print(f"grocery list cannot be empty! please enter at least 1 item")
-            else:
-                break
- 
-    send_log(f"[IO MANAGER] grocery_list = {grocery_list}") #log grocery list for verification
-    return grocery_list
- 
- 
-# Ask for optional remarks about this week (e.g. events).
-def ask_remarks():
-    remarks = enter_text("\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ", True)
-    if remarks == "" or remarks.lower() == "none":
-        remarks = "none"
-    return remarks
- 
- 
-# Ask how many days until the user's next planned shop.
-def ask_days_until_next():
-    while True:
-        text = input("\nIn how many days do you plan to shop next? (e.g. 7): ").strip()
-        if text.isdecimal() and 1 <= int(text) <= 365:
-            return int(text)
-        print("Please enter a whole number between 1 and 365.")
+        print(f"User {name} registered successfully!")
+        return household
 
-
-# Show the returning user's menu and return their choice ("1" or "2").
-def ask_menu_choice():
-    while True:
-        print("\nWhat would you like to do?")
-        print("  1. Update consumption and plan groceries")
-        print("  2. Edit expiry dates or delete items from your fridge")
-        print("  3. Save database and exit the program")
-        choice = input("Enter 1, 2 or 3: ").strip()
-        if choice in ["1", "2", "3"]:
-            return choice
-        print("Please enter 1, 2 or 3.")
-
-
-# Let the user edit expiry dates or delete items from their fridge until they are done.
-# Returns the updated fridge list.
-def update_fridge(fridge):
-    while True:
-        display_list("Fridge", fridge)
-        if not fridge:
-            return fridge
-
-        print("\nWhat would you like to do with your fridge?")
-        print("  1. Edit an expiry date")
-        print("  2. Delete an item")
-        print("  3. Done")
-        action = input("Enter 1, 2 or 3: ").strip()
-        if action == "3":
-
-            return fridge
-        elif action not in ["1", "2"]:
-            print("Please enter 1, 2 or 3.")
-            continue
-
+    # Collect home inventory during initial registration
+    def enter_home_items(self):
+        home_items = Fridge()
+        if not self.__ask_yes_no("\nDo you have any food items at home you want to add? "):
+            return home_items.get_items()
+        print("\nEnter the items you currently have at home.")
+        self.__add_item(home_items)
         while True:
-            text = input(f"Enter the item number (1-{len(fridge)}): ").strip()
-            if text.isdecimal() and 1 <= int(text) <= len(fridge):
-                number = int(text) - 1
-                break
-            print(f"Please enter a number between 1 and {len(fridge)}.")
+            self.display_list("Fridge", home_items.get_items())
+            user_choice = self.__ask_add_another()
 
-        if action == "1":
-            selected_item = fridge[number]
-            expiry_date = enter_date(f"New expiry date for {selected_item['Item_Name']} (YYYY-MM-DD): ",
-                allow_past=True, purchase_date=selected_item.get("Purchase_Date", ""))
-
-            matching_indices = []
-            total_quantity = Decimal(str(selected_item["Quantity"]))
-
-            for index, existing in enumerate(fridge):
-                if index == number:
+            if user_choice == "1":
+                self.__add_item(home_items)
+            elif user_choice == "2":
+                if not home_items.get_items():
+                    print("No items to edit or remove.")
                     continue
+                while True:
+                    self.display_list("Fridge", home_items.get_items())
+                    if self.__edit_list(home_items.get_items(), home_items.remove_item):
+                        break
+            else:
+                return home_items.get_items()
 
-                if (
-                    existing["Item_Name"].lower() == selected_item["Item_Name"].lower()
-                    and existing["Unit"] == selected_item["Unit"]
-                    and existing.get("Purchase_Date", "") == selected_item.get("Purchase_Date", "")
-                    and existing["Expiry_Date"] == expiry_date
-                    and existing.get("Remarks", "none") == selected_item.get("Remarks", "none")
-                ):
-                    matching_indices.append(index)
-                    total_quantity += Decimal(str(existing["Quantity"]))
+    # For returning users: Ask how much of each item they consumed since last visit.
+    # Batches of the same item are combined into one question.
+    # Days since last use and remarks are asked once and applied to every item.
+    def update_consumption(self, fridge):
+        consumed_items = []
+        if not fridge.get_items():
+            return consumed_items
+        print("\nUpdate Consumption.")
+        # Asked once for the whole consumption list
+        date_range = IntRangePrompt("How many days has it been since you last used the app? ", 1, 365).ask()
+        consumed_amounts = []
+        for name, total, unit in fridge.get_totals():
+            consumed = QuantityPrompt(f"How much {name} did you consume? (you have {total} {unit}): ",
+                                      max_value=total, allow_zero=True, whole_number=(unit == "pcs"),
+                                      normalize=normalize_quantity,
+                                      max_message=f"That's more than you have ({total} {unit}). Please try again.").ask()
+            consumed_amounts.append((name, consumed, unit))
 
-            if total_quantity > MAX_QUANTITY:
-                print(f"Total quantity cannot exceed {MAX_QUANTITY:,}. Expiry date was not changed.")
+        # Asked once, then added to every item
+        remarks = TextPrompt("Any remarks about your consumption since last time? (leave blank if none): ",
+                             allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
+        if remarks == "" or remarks.lower() == "none":
+            remarks = "none"
+        for name, consumed, unit in consumed_amounts:
+            consumed_items.append(ConsumptionRecord(name, consumed, unit, date_range, remarks))
+
+        return consumed_items
+
+    # Collect the groceries the user plans to buy, until they say they are done.
+    def enter_grocery_list(self, fridge, history):
+        unit_validator = UnitValidator(fridge, history)
+        cart = Cart()
+        print("\nEnter the groceries you are planning to buy.")
+        self.__add_to_cart(cart, unit_validator)
+        while True:
+            self.display_list("Grocery Cart", cart.get_items())
+            user_choice = self.__ask_add_another()
+            if user_choice == "1": # add items
+                self.__add_to_cart(cart, unit_validator)
+            elif user_choice == "2": #edit cart
+                while True:
+                    self.display_list("Grocery Cart", cart.get_items())
+                    if self.__edit_list(cart.get_items(), cart.remove_item):
+                        break
+            else: # exit CRUD of cart
+                if len(cart.get_items()) == 0:
+                    print(f"grocery list cannot be empty! please enter at least 1 item")
+                else:
+                    break
+
+        send_log(f"[IO MANAGER] grocery_list = {[item.to_dict() for item in cart.get_items()]}") #log grocery list for verification
+        return cart
+
+    # Ask for optional remarks about this week (e.g. events).
+    def ask_remarks(self):
+        remarks = self.__remarks_prompt.ask()
+        if remarks == "" or remarks.lower() == "none":
+            remarks = "none"
+        return remarks
+
+    # Ask how many days until the user's next planned shop.
+    def ask_days_until_next(self):
+        return self.__days_prompt.ask()
+
+    # Show the returning user's menu and return their choice ("1" or "2").
+    def ask_menu_choice(self):
+        return ChoicePrompt("\nWhat would you like to do?\n"
+                            "  1. Update consumption and plan groceries\n"
+                            "  2. Edit expiry dates or delete items from your fridge\n"
+                            "  3. Save database and exit the program\n"
+                            "Enter 1, 2 or 3: ", ["1", "2", "3"], "Please enter 1, 2 or 3.").ask()
+
+    # Let the user edit expiry dates or delete items from their fridge until they are done.
+    def update_fridge(self, fridge):
+        while True:
+            items = fridge.get_items()
+            self.display_list("Fridge", items)
+            if not items:
+                return
+
+            print("\nWhat would you like to do with your fridge?")
+            print("  1. Edit an expiry date")
+            print("  2. Delete an item")
+            print("  3. Done")
+            action = input("Enter 1, 2 or 3: ").strip()
+            if action == "3":
+                return
+            elif action not in ["1", "2"]:
+                print("Please enter 1, 2 or 3.")
                 continue
 
-            selected_item["Expiry_Date"] = expiry_date
-            selected_item["Quantity"] = normalize_quantity(total_quantity)
+            number = IntRangePrompt(f"Enter the item number (1-{len(items)}): ", 1, len(items),
+                                    f"Please enter a number between 1 and {len(items)}.").ask() - 1
 
-            for index in reversed(matching_indices):
-                fridge.pop(index)
-
-            if matching_indices:
-                print(f"Updated and merged: {format_item(selected_item)}")
+            if action == "1":
+                selected_item = items[number]
+                expiry_date = self.__ask_date(f"New expiry date for {selected_item.name} (YYYY-MM-DD): ",
+                                              allow_past=True, purchase_date=selected_item.purchase_date)
+                try:
+                    merged = fridge.change_expiry(selected_item, expiry_date)
+                except ValueError as error:
+                    print(error)
+                    continue
+                if merged:
+                    print(f"Updated and merged: {self.format_item(selected_item)}")
+                else:
+                    print(f"Updated: {self.format_item(selected_item)}")
             else:
-                print(f"Updated: {format_item(selected_item)}")
-        else:
-            removed = fridge.pop(number)
-            print(f"{format_item(removed)} has been removed from your fridge.")
+                removed = items[number]
+                fridge.remove_item(removed)
+                print(f"{self.format_item(removed)} has been removed from your fridge.")
 
-
-#displays recommendations made by business logic
-def output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations):
-    print(f"\n--------------------------------recommendations---------------------------------")
-    print(f"\n{calories_message}")
-    print(f"\n--------------------------------------------------------------------------------")
-    if len(risk_of_expiry_messages) != 0:
-        print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able" 
-              f"\n to finish the following items before your next grocery trip:")
-        for i in range(len(risk_of_expiry_messages)):
-            print(f"  {i+1}. {risk_of_expiry_messages[i]}") 
+    #displays recommendations made by business logic
+    def output_recommendations(self, calories_message, risk_of_expiry_messages, underbuy_messages, recommendations):
+        print(f"\n--------------------------------recommendations---------------------------------")
+        print(f"\n{calories_message}")
         print(f"\n--------------------------------------------------------------------------------")
-    if len(underbuy_messages) != 0:
-        print(f"You are forcasted to finish the following items before your next indicated grocery trip:")
-        for i in range(len(underbuy_messages)):
-            print(f"  {i+1}. {underbuy_messages[i]}") 
-        print(f"\n--------------------------------------------------------------------------------")
+        if len(risk_of_expiry_messages) != 0:
+            print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able"
+                  f"\n to finish the following items before your next grocery trip:")
+            for i in range(len(risk_of_expiry_messages)):
+                print(f"  {i+1}. {risk_of_expiry_messages[i]}")
+            print(f"\n--------------------------------------------------------------------------------")
+        if len(underbuy_messages) != 0:
+            print(f"You are forcasted to finish the following items before your next indicated grocery trip:")
+            for i in range(len(underbuy_messages)):
+                print(f"  {i+1}. {underbuy_messages[i]}")
+            print(f"\n--------------------------------------------------------------------------------")
 
-
-#handles IO for after AI and logic processes
-def shopping_cart_conclusion(item_list, remarks):
-    #converts recommendation list into format that can be saved in DB
-    def convert_cart_to_db_list(recommendations_list, remarks):
-        final_list=[]
-        for i in range(len(recommendations_list)):
-            db_item = {}
-            db_item["Item_Name"] = recommendations_list[i]["Item_Name"]
-            db_item["Quantity"] = recommendations_list[i]["Planned_Quantity"]
-            db_item["Unit"] = recommendations_list[i]["Unit"]
-            db_item["Purchase_Date"] = date.today().isoformat()
-            db_item["Expiry_Date"] = recommendations_list[i]["Estimated_Expiry_Date"]
-            db_item["Remarks"] = remarks
-            final_list.append(db_item)
-        return final_list
-
-    
-    display_list("Recommendations List", item_list)
-    while True:
-        decision = input("\nWould you like to change the quantity of items in your grocery cart? (yes/no): ").strip().lower()
-        if decision in ["no", "n"]:
-            print("\nYour grocery cart has been concluded.")
-            return convert_cart_to_db_list(item_list, remarks)
-        
-        elif decision in ["yes", "y"]:
+    #handles IO for after AI and logic processes
+    def shopping_cart_conclusion(self, cart, remarks):
+        self.display_list("Recommendations List", cart.get_items())
+        if self.__ask_yes_no("\nWould you like to change the quantity of items in your grocery cart? ",
+                             "Invalid input. Please enter 'yes' or 'no'."):
             while True:
-                display_list("Recommendations List", item_list)
-                item_list, exit_code = edit_list(item_list)
-                if exit_code == True:
+                self.display_list("Recommendations List", cart.get_items())
+                if self.__edit_list(cart.get_items(), cart.remove_item):
                     break
-
-            return convert_cart_to_db_list(item_list, remarks)
-
         else:
-            print("Invalid input. Please enter 'yes' or 'no'.")
+            print("\nYour grocery cart has been concluded.")
+        return [item.to_fridge_item(remarks) for item in cart.get_items()]
 
-# Formatting----------- 
-def format_item(item):
-    text = f"{item['Quantity']:g} {item['Unit']} of {item['Item_Name']}"
-    details = []
-    if item.get("Expiry_Date", "") != "":
-        details.append(f"expires {item['Expiry_Date']}")
-    if item.get("Remarks", "none") != "none":
-        details.append(item["Remarks"])
-    if details:
-        text += f" ({', '.join(details)})"
-    return text
+    # Formatting-----------
+    def format_item(self, item):
+        text = f"{item.quantity:g} {item.unit} of {item.name}"
+        details = []
+        if getattr(item, "expiry_date", "") != "":
+            details.append(f"expires {item.expiry_date}")
+        if getattr(item, "remarks", "none") != "none":
+            details.append(item.remarks)
+        if details:
+            text += f" ({', '.join(details)})"
+        return text
 
-# Display four dp correctly
-def format_display_quantity(value):
-    text = format(Decimal(str(value)), "f")
-    if "." in text: text = text.rstrip("0").rstrip(".")
-    return text
-#display either the fridge, grocery cart or recommendations list in a numbered list format
-#list_name can ONLY be "Fridge" or "Grocery Cart" or "Recommendations List"
-def display_list(list_name, item_list):
-    if not item_list:
-            print(f"\n{list_name}\n  (empty! add some items to see something)")
-            return
-    
-    name_width = max(len("Item name"), max(len(item["Item_Name"]) for item in item_list)) + 2 #align table according to how big item_name is
-    if list_name == "Fridge":
-        remarks_width = max(len("Remarks"), max(len(item["Remarks"]) for item in item_list)) + 2 #align table according to how big item_name is
+    # Display four dp correctly
+    def format_display_quantity(self, value):
+        text = format(Decimal(str(value)), "f")
+        if "." in text: text = text.rstrip("0").rstrip(".")
+        return text
 
-    # Construct and print headers
-    header = f"\n{list_name}\n{'No.':<4}| {'Item name':<{name_width}}| {'Current amt':<12}| "
-    if list_name == "Grocery Cart": #pre AI grocery list
-        pass
+    #display either the fridge, grocery cart or recommendations list in a numbered list format
+    #list_name can ONLY be "Fridge" or "Grocery Cart" or "Recommendations List"
+    def display_list(self, list_name, item_list):
+        if not item_list:
+                print(f"\n{list_name}\n  (empty! add some items to see something)")
+                return
 
-    elif list_name == "Recommendations List":
-        header += f"{'Recommended amt':<16}| {'CS*':<6}| "
-        
-    elif list_name == "Fridge":
-        header += f"{'Purchase date':<14}| {'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
-    print(header)
+        name_width = max(len("Item name"), max(len(item.name) for item in item_list)) + 2 #align table according to how big item_name is
+        if list_name == "Fridge":
+            remarks_width = max(len("Remarks"), max(len(item.remarks) for item in item_list)) + 2 #align table according to how big item_name is
 
-
-    # Construct and print rows
-    for i in range(0,len(item_list)):
-        message = f"{i+1:<4}| {item_list[i]['Item_Name']:<{name_width}}| "
+        # Construct and print headers
+        header = f"\n{list_name}\n{'No.':<4}| {'Item name':<{name_width}}| {'Current amt':<12}| "
         if list_name == "Grocery Cart": #pre AI grocery list
-            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
-            message += f"{cur_amt_formatted:<12}| "
+            pass
 
         elif list_name == "Recommendations List":
-            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Planned_Quantity'])} {item_list[i]['Unit']}"
-            recommened_amt_formatted = f"{format_display_quantity(item_list[i]['Recommended_Quantity'])} {item_list[i]['Unit']}"
-            if item_list[i]['Confidence_Score'] == 0:
-                confidence_score_formatted = f"NA"
-            else:
-                confidence_score_formatted = f"{round(item_list[i]['Confidence_Score'], 1)}%"
-            message += f"{cur_amt_formatted:<12}| {recommened_amt_formatted:<16}| {confidence_score_formatted:<6}| "
+            header += f"{'Recommended amt':<16}| {'CS*':<6}| "
 
         elif list_name == "Fridge":
-            cur_amt_formatted = f"{format_display_quantity(item_list[i]['Quantity'])} {item_list[i]['Unit']}"
-            if item_list[i]['Purchase_Date'] == "": 
-                purchase_date_formatted = f"NA"
-            else:
-                purchase_date_formatted = f"{item_list[i]['Purchase_Date']}"
-            message += f"{cur_amt_formatted:<12}| {purchase_date_formatted:<14}| {item_list[i]['Expiry_Date']:<12}| {item_list[i]['Remarks']:<{remarks_width}}| "
-        print(message)
-
-    if list_name == "Recommendations List":
-        print(f"* CS --> Confidence score: how accurate the AI estimation is")
-        print(f"if CS is NA there is not enough past data to provide score")
- 
- 
-# Print a summary of everyone in the household.
-def show_profile(household_info):
-    print("\nHousehold summary:")
-    for person in household_info:
-        print(f"  {person['Person_ID']}. {person['Name']}, {person['Age']}, {person['Gender']}, "
-              f"diet: {person['Dietary_Restriction']}")
- 
- 
-# Print a summary of what was recorded as consumed.
-def show_consumption(consumed_items):
-    print("\nConsumption recorded:")
-    if not consumed_items:
-        print("  (none)")
-        return
-    print(f"  Over the last {consumed_items[0]['Date_Range']} day(s), remarks: {consumed_items[0]['Remarks']}")
-    for i in range(len(consumed_items)):
-        record = consumed_items[i]
-        print(f"  {i + 1}. {record['Quantity']:g} {record['Unit']} of {record['Item_Name']}")
- 
- 
-# Print the start-up welcome message.
-def show_welcome():
-    print("Welcome to the Waste Management System!")
- 
- 
-# Print the welcome-back message for a returning user (Person_ID 1 is the user).
-def show_welcome_back(household_info):
-    print(f"Welcome back, {household_info[0]['Name']}!")
+            header += f"{'Purchase date':<14}| {'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
+        print(header)
 
 
-# Print exit message
-def show_exit():
-    print(f"Your data has been recorded into the system")
-    print(f"Thank you for using the Waste Management System!")
+        # Construct and print rows
+        for i in range(0,len(item_list)):
+            item = item_list[i]
+            message = f"{i+1:<4}| {item.name:<{name_width}}| "
+            cur_amt_formatted = f"{self.format_display_quantity(item.quantity)} {item.unit}"
+            if list_name == "Grocery Cart": #pre AI grocery list
+                message += f"{cur_amt_formatted:<12}| "
+
+            elif list_name == "Recommendations List":
+                recommened_amt_formatted = f"{self.format_display_quantity(item.ai_data.recommended_qty)} {item.unit}"
+                if item.ai_data.confidence_score == 0:
+                    confidence_score_formatted = f"NA"
+                else:
+                    confidence_score_formatted = f"{round(item.ai_data.confidence_score, 1)}%"
+                message += f"{cur_amt_formatted:<12}| {recommened_amt_formatted:<16}| {confidence_score_formatted:<6}| "
+
+            elif list_name == "Fridge":
+                if item.purchase_date == "":
+                    purchase_date_formatted = f"NA"
+                else:
+                    purchase_date_formatted = f"{item.purchase_date}"
+                message += f"{cur_amt_formatted:<12}| {purchase_date_formatted:<14}| {item.expiry_date:<12}| {item.remarks:<{remarks_width}}| "
+            print(message)
+
+        if list_name == "Recommendations List":
+            print(f"* CS --> Confidence score: how accurate the AI estimation is")
+            print(f"if CS is NA there is not enough past data to provide score")
+
+    # Print a summary of everyone in the household.
+    def show_profile(self, household_info):
+        print("\nHousehold summary:")
+        for member in household_info.get_members():
+            person = member.to_dict()
+            print(f"  {person['Person_ID']}. {person['Name']}, {person['Age']}, {person['Gender']}, "
+                  f"diet: {person['Dietary_Restriction']}")
+
+    # Print a summary of what was recorded as consumed.
+    def show_consumption(self, consumed_items):
+        print("\nConsumption recorded:")
+        if not consumed_items:
+            print("  (none)")
+            return
+        print(f"  Over the last {consumed_items[0].date_range} day(s), remarks: {consumed_items[0].to_dict()['Remarks']}")
+        for i in range(len(consumed_items)):
+            record = consumed_items[i]
+            print(f"  {i + 1}. {record.quantity:g} {record.unit} of {record.name}")
+
+    # Print the start-up welcome message.
+    def show_welcome(self):
+        print("Welcome to the Waste Management System!")
+
+    # Print the welcome-back message for a returning user (Person_ID 1 is the user).
+    def show_welcome_back(self, household_info):
+        print(f"Welcome back, {household_info.get_members()[0].to_dict()['Name']}!")
+
+    # Print exit message
+    def show_exit(self):
+        print(f"Your data has been recorded into the system")
+        print(f"Thank you for using the Waste Management System!")
+
+    def send_message(self, message):
+        print(f"{message}")
 
 
-def send_message(message):
-    print(f"{message}")
-
-
- 
 # =====================================================================
 # Testing
 # =====================================================================
- 
+
 if __name__ == "__main__":
-    household_info = []      # change to [{"Person_ID": 1, "Name": "Test", "Age": 20, "Gender": "Male", "Dietary_Restriction": "None"}] to test a returning user
-    previous_inventory = []  # e.g. [{"Item_Name": "Milk", "Quantity": 2, "Unit": "l", "Purchase_Date": "2026-09-21", "Expiry_Date": "2026-10-05", "Remarks": "None"}]
+    from core.ConsumptionHistory import ConsumptionHistory
+    from core.AIRecData import AIRecData
+
+    ui = IO_manager()
+    household_info = Household()      # add Person(1, "Test", 20, "Male", "none") to test a returning user
+    fridge = Fridge()                 # e.g. fridge.add_item(FridgeItem("Milk", 2, "l", "2026-09-21", "2026-12-05", "none"))
+    history = ConsumptionHistory()
     remaining_items = []
     consumed_items = []
-    database = {'consumption_history': [], 'household_info': [], 'fridge': []}
- 
-    show_welcome()
- 
-    if household_info == []:
-        household_info = create_profile()
-        show_profile(household_info)
-        remaining_items = enter_home_items()
-        display_list("Fridge", remaining_items)
+
+    ui.show_welcome()
+
+    if not household_info.get_members():
+        household_info = ui.create_profile()
+        ui.show_profile(household_info)
+        remaining_items = ui.enter_home_items()
+        ui.display_list("Fridge", remaining_items)
     else:
-        show_welcome_back(household_info)
+        ui.show_welcome_back(household_info)
         while True:
-            choice = ask_menu_choice()
+            choice = ui.ask_menu_choice()
             if choice == "1":
-                consumed_items = update_consumption(previous_inventory)
-                show_consumption(consumed_items)
+                consumed_items = ui.update_consumption(fridge)
+                ui.show_consumption(consumed_items)
                 break
             else:
-                previous_inventory = update_fridge(previous_inventory)
- 
-    grocery_list = enter_grocery_list(database)
- 
-    remarks = ask_remarks()
-    days_until_next = ask_days_until_next()
-    recommendations = []
-    for item in grocery_list:
-        recommendations.append({"Item_Name": item["Item_Name"], "Planned_Quantity": item["Quantity"],
-                                "Recommended_Quantity": item["Quantity"], "Unit": item["Unit"],
-                                "Estimated_Expiry_Date": ""})
-    final_checkout = shopping_cart_conclusion(recommendations, remarks)
- 
+                ui.update_fridge(fridge)
+
+    cart = ui.enter_grocery_list(fridge, history)
+
+    remarks = ui.ask_remarks()
+    days_until_next = ui.ask_days_until_next()
+    for item in cart.get_items():
+        item.set_ai_data(AIRecData(item.quantity, 0, ""))
+    final_checkout = ui.shopping_cart_conclusion(cart, remarks)
+
     print("\n--- Test results ---")
-    print("household_info =", household_info)
-    print("previous_inventory =", previous_inventory)
-    print("remaining_items =", remaining_items)
-    print("consumed_items =", consumed_items)
-    print("grocery_list =", grocery_list)
+    print("household_info =", household_info.to_dicts())
+    print("fridge =", fridge.to_dicts())
+    print("remaining_items =", [item.to_dict() for item in remaining_items])
+    print("consumed_items =", [record.to_dict() for record in consumed_items])
+    print("grocery_list =", [item.to_dict() for item in cart.get_items()])
     print("remarks =", remarks)
     print("days_until_next =", days_until_next)
-    print("final_checkout =", final_checkout)
+    print("final_checkout =", [item.to_dict() for item in final_checkout])

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from core.ListFunctions import ListFunctions
 from core.CartItem import CartItem
 from core.Fridge import Fridge
@@ -16,6 +18,22 @@ class Cart(ListFunctions):
         if not item.validate():
             raise ValueError("Cannot add an invalid item to the cart.")
         self.__items.append(item)
+
+    def add_or_merge(self, item: CartItem) -> tuple:
+        """
+        Add the item, or merge it with an item that has the same name and unit.
+        Raises ValueError if the total is over MAX_QUANTITY.
+        """
+        # If the same item with the same unit was already entered, add to it
+        for existing in self.__items:
+            if existing.name.lower() == item.name.lower() and existing.unit == item.unit:
+                combined_quantity = Decimal(str(existing.quantity)) + Decimal(str(item.quantity))
+                if combined_quantity > CartItem.MAX_QUANTITY:
+                    raise ValueError(f"Total quantity cannot exceed {CartItem.MAX_QUANTITY:,}.")
+                existing.edit_quantity(combined_quantity)
+                return True, existing
+        self.add_item(item)
+        return False, item
 
     def remove_item(self, item: CartItem) -> None:
         if item not in self.__items:

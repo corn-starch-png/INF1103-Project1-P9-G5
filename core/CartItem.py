@@ -13,6 +13,15 @@ class CartItem(ItemRecord, ItemFunctions):
         super().__init__(name, quantity, unit)
         self.__ai_data = ""
 
+    @property
+    def ai_data(self) -> AIRecData:
+        return self.__ai_data
+
+    def set_confidence_score(self, score: float) -> None:
+        if self.__ai_data == "":
+            raise NotImplementedError("Cannot set Confidence score without AI data")
+        self.__ai_data.set_confidence_score(score)
+
     def set_ai_data(self, ai_data: AIRecData) -> None:
         self.__ai_data = ai_data
         
@@ -26,6 +35,11 @@ class CartItem(ItemRecord, ItemFunctions):
             "Unit": self._unit,
         }
 
+    @property
+    def get_ai_data(self) -> AIRecData:
+      """Returns the AI recommendation data associated with this item."""
+      return self.__ai_data  
+    
     @classmethod
     def from_dict(cls, data: dict) -> "CartItem":
         return cls(data["Item_Name"], data["Quantity"], data["Unit"])
@@ -39,6 +53,11 @@ class CartItem(ItemRecord, ItemFunctions):
             quantity=self._quantity,
             unit=self._unit,
             purchase_date=date.today().isoformat(),
-            expiry_date=self.__ai_data.est_expiry_date(),
+            expiry_date=self.__ai_data.est_expiry_date,
             remarks=remarks,
         )
+
+    def is_enhanced(self) -> bool:
+        if self.__ai_data == "":
+            return False
+        return True
