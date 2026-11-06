@@ -68,13 +68,4 @@ total_planned_calories = ai_recommendations["Total_Planned_Estimated_Calories"]
 total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]
 #endregion
 
-#region Attach AI Recommendations
-if len(recommendations) != len(cart.get_items()):
-    raise ValueError("AI recommendation count does not match the grocery cart.")
-
-for cart_item, recommendation in zip(cart.get_items(), recommendations):
-    ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"])
-    cart_item.set_ai_data(ai_data)
-#endregion
-
 #save_database_refactored(fridge, household_info, history)

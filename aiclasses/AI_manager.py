@@ -12,6 +12,7 @@ from core.Household import Household
 from core.ConsumptionHistory import ConsumptionHistory  
 from core.Fridge import Fridge
 from core.Cart import Cart
+from core.AIRecData import AIRecData
 
 #region AI Recommendation Entry Point
 def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next):
@@ -35,7 +36,17 @@ class AIManager:
             return next_purchase_date
         except ValueError:
             raise ValueError(f"Invalid date format: {current_date}. Expected format: YYYY-MM-DD.")
-        
+
+    def _attach_ai_recommendations(self, cart: Cart, recommendations: list[dict]) -> None:
+        cart_items = cart.get_items()
+        if len(recommendations) != len(cart_items):
+            raise ValueError("AI recommendation count does not match the grocery cart.")
+        for cart_item, recommendation in zip(cart_items, recommendations):
+            if (cart_item.name != recommendation["Item_Name"] or cart_item.quantity != recommendation["Planned_Quantity"] or cart_item.unit != recommendation["Unit"] ): 
+                raise ValueError( f"AI recommendation does not match cart item: {cart_item.name}" )
+            ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"] )
+            cart_item.set_ai_data(ai_data)
+    
     def get_ai_recommendations(self, household_info: Household, consumption_history: ConsumptionHistory, fridge_stock: Fridge, purchase_stock: Cart, remarks: str, days_until_next: int, notify: Callable[[str], None] | None = None) -> tuple:    
         send_log("Checking AI API connection...")
         connected, message = self._provider.check_connection()
@@ -67,7 +78,11 @@ class AIManager:
         # Generate AI recommendations
         send_log("[AI STATUS] Sending prompt to AI...")
         result, error = self._provider.generate(prompt, self._validator.get_recommendation_schema(), data["planned_grocery_list"], self._validator)
-        if error:
+        if error or result is None:
             send_log("[AI] AI request failed.")
             send_log(f"[AI] {error}")
+            return None, error or "No AI response returned."
+        # Attach validated AI recommendations to CartItem objects.
+        self._attach_ai_recommendations(purchase_stock, result["Recommendations_List"])
+
         return result, error
