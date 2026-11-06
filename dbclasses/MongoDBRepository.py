@@ -1,5 +1,5 @@
+
 import os
-from urllib.parse import quote_plus
 
 from pymongo import MongoClient
 
@@ -16,31 +16,30 @@ class MongoDBRepository(RepositoryFunctions):
         fridge: Fridge,
         household: Household,
         history: ConsumptionHistory,
-        database_name: str = "food_waste"
+        database_name=None
     ):
-        # Get MongoDB credentials from environment variables
-        username = os.getenv("MONGO_ROOT_USERNAME")
-        password = os.getenv("MONGO_ROOT_PASSWORD")
+        # Get MongoDB Atlas connection details
+        uri = os.getenv("MONGODB_URI")
+        database_name = database_name or os.getenv("MONGODB_DATABASE")
 
-        if not username or not password:
-            raise ValueError("MongoDB credentials are missing")
+        if not uri:
+            raise ValueError("MONGODB_URI is missing")
 
-        # Construct MongoDB connection URI
-        uri = (
-            f"mongodb://{quote_plus(username)}:"
-            f"{quote_plus(password)}"
-            "@mongo:27017/?authSource=admin"
-        )
+        if not database_name:
+            raise ValueError("MONGODB_DATABASE is missing")
 
-        # Connect to MongoDB
+        # Connect to MongoDB Atlas
         self.__client = MongoClient(
             uri,
-            serverSelectionTimeoutMS=5000
+            serverSelectionTimeoutMS=10000
         )
+
+        # Verify the connection
+        self.__client.admin.command("ping")
 
         self.__database = self.__client[database_name]
 
-        # Same injected objects as JsonRepository
+        # Map MongoDB collections to existing objects
         self.__stores = {
             "fridge": fridge,
             "household": household,
@@ -48,14 +47,16 @@ class MongoDBRepository(RepositoryFunctions):
         }
 
     def load(self) -> list:
-        """Load data from MongoDB into the existing objects."""
+        """Load data from MongoDB Atlas into existing objects."""
         errors = []
 
         for collection_name, store in self.__stores.items():
             try:
                 collection = self.__database[collection_name]
 
-                rows = list(collection.find({}, {"_id": 0}))
+                rows = list(
+                    collection.find({}, {"_id": 0})
+                )
 
                 errors.extend(store.load_dicts(rows))
 
@@ -67,14 +68,14 @@ class MongoDBRepository(RepositoryFunctions):
         return errors
 
     def save(self) -> None:
-        """Save the existing objects into MongoDB."""
+        """Save existing objects into MongoDB Atlas."""
 
         for collection_name, store in self.__stores.items():
             collection = self.__database[collection_name]
 
             rows = store.to_dicts()
 
-            # Replace existing records with current data
+            # WARNING: This replaces all documents in the collection.
             collection.delete_many({})
 
             if rows:
