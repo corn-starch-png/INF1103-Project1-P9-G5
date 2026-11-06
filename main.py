@@ -56,26 +56,12 @@ days_until_next_visit = ui.ask_days_until_next()
 cart = ui.enter_grocery_list(fridge, history)
 remarks = ui.ask_remarks()
 
-
-
-
 #region AI Recommendations
 ui.send_message("Getting AI recommendations... This can take a while.")
-
-# Exclude expired fridge items from AI calculations.
-usable_fridge = [item.to_dict() for item in fridge.get_items() if not item.is_expired()]
-expired_count = len(fridge.get_items()) - len(usable_fridge)
-if expired_count > 0:
-    ui.send_message(f"Warning: {expired_count} expired fridge batch(es) excluded from AI recommendations.\nPlease review or remove expired food.")
 # Initialize AI Manager with the OpenRouter provider.
 ai_manager = AIManager(OpenRouterProvider())
 # Generate recommendations.
-ai_recommendations, error = ai_manager.get_ai_recommendations(household_info=household_data, 
-                                                              consumption_history=consumption_data, 
-                                                              fridge_stock=usable_fridge, 
-                                                              purchase_stock=grocery_list, 
-                                                              remarks=remarks, 
-                                                              days_until_next=days_until_next_visit)
+ai_recommendations, error = ai_manager.get_ai_recommendations(household_info=household_info, consumption_history=history, fridge_stock=fridge, purchase_stock=cart, remarks=remarks, days_until_next=days_until_next_visit,notify=ui.send_message)
 # Handle unsuccessful AI requests.
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
@@ -83,15 +69,6 @@ if error or ai_recommendations is None:
 recommendations = ai_recommendations["Recommendations_List"]
 total_planned_calories = ai_recommendations["Total_Planned_Estimated_Calories"]
 total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]
-#endregion
-
-#region Attach AI Recommendations
-if len(recommendations) != len(cart.get_items()):
-    raise ValueError("AI recommendation count does not match the grocery cart.")
-
-for cart_item, recommendation in zip(cart.get_items(), recommendations):
-    ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"])
-    cart_item.set_ai_data(ai_data)
 #endregion
 
 #create context object for logic calculations
