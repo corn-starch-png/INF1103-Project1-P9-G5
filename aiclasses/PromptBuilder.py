@@ -30,6 +30,23 @@ class PromptBuilder:
         PLANNED NEXT PURCHASE DATE:
         {data["next_purchase_date"]}
 
+        DIETARY AND RELIGIOUS CONSTRAINTS:
+        1. Account for any dietary constraints given in the household details while making estimates about the food intake and grocery quantities suggested.
+        2. Understand the common terms for diet along with their religious dietary constraints.
+        3. In case "Muslim", "Islam", or "Halal" is mentioned:
+        - Take into account Halal dietary constraints.
+        - Avoid Pork and products containing pork.
+        - Avoid alcohol and forbidden ingredients.
+        - Don’t assume the meat to be Halal without sufficient information.
+        4. In case "Kosher" is mentioned:
+        - Take into account Kosher dietary constraints.
+        - Don’t assume the meat or processed foods to be Kosher without sufficient information.
+        5. When it comes to identities having differing diets, don’t enforce the restrictions without being explicitly mentioned by the user.
+        6. In case of food suitability cannot be determined based on the available information, don’t assume it to be suitable.
+        7. In case of households having different dietary constraints, consider who among the household members can have each grocery item.
+        8. Don’t assume religion or dietary constraints based on the name, age, gender, ethnicity, or nationality.
+        9. Maintain the original list of groceries, quantities, units, and their ordering in the AI’s response except the
+
         ASSESSMENT CRITERIA:
         For every item consider:
         1. Historical consumption
