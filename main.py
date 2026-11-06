@@ -53,6 +53,8 @@ else:
             sys.exit(0)
 
 days_until_next_visit = ui.ask_days_until_next()
+#TODO display recommended cart
+#TODO let user choose start new cart or use recommened cart
 cart = ui.enter_grocery_list(fridge, history)
 remarks = ui.ask_remarks()
 
