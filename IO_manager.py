@@ -150,7 +150,8 @@ class IO_manager:
         return household
 
     # Collect home inventory during initial registration
-    def enter_home_items(self):
+    def create_fridge(self) -> Fridge:
+        #new fridge for new user
         home_items = Fridge()
         if not self.__ask_yes_no("\nDo you have any food items at home you want to add? "):
             return home_items.get_items()
@@ -171,7 +172,7 @@ class IO_manager:
                     if self.__edit_list(home_items.get_items(), home_items.remove_item):
                         break
             else:
-                return home_items.get_items()
+                return home_items
 
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
