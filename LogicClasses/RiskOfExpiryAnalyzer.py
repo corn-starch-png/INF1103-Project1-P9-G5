@@ -44,7 +44,7 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
         else:
             # estimated_consumption_rate <= 0:
             send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
-            Finding(
+            return Finding(
                 analyzer_name= self.ANALYZER_NAME,
                 result=False,
                 message=None
