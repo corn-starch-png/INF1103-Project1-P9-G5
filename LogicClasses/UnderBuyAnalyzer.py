@@ -24,7 +24,7 @@ class UnderBuyAnalyzer(ItemAnalyzer):
             if estimated_consumption_rate > 0: 
                 daily_consumption_rate = estimated_consumption_rate / 7
                 quantity_needed = daily_consumption_rate * ctx.next_purchase_date
-                amount_to_topup = round (quantity_needed - ctx.total_item, 2)
+                amount_to_topup = round (quantity_needed - ctx.get_total_items(item_name), 2)
         
                 if amount_to_topup > 0:
                     result = True

@@ -43,6 +43,12 @@ class Cart(ListFunctions):
     def get_items(self) -> list:
         return list(self.__items)
 
+    def search_item(self, item_name: str) -> CartItem:
+        for item in self.__items:
+            if item.name == item_name:
+                return item
+        raise ValueError("Error, item does not exist in cart")
+
     def set_remarks(self, remarks: str) -> None:
         self.__remarks = remarks
 

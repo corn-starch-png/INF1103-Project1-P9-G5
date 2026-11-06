@@ -5,6 +5,8 @@ try:
     import sys
     from DB_manager import (load_database_refactored, save_database_refactored)
     from IO_manager import IO_manager
+    from LogicClasses.LogicManager import LogicManager
+    from LogicClasses.AnalysisContext import AnalysisContext
     from core.Fridge import Fridge
     from core.Household import Household
     from core.ConsumptionHistory import ConsumptionHistory
@@ -17,6 +19,7 @@ except ImportError as e :
 # Load environment variables once
 load_dotenv()
 ui = IO_manager()
+logicmgr = LogicManager()
 
 errors, fridge, household_info, history = load_database_refactored("database")
 #-------END OF DEPENDENCY LINE----------#
@@ -57,38 +60,61 @@ remarks = ui.ask_remarks()
 
 
 #region AI Recommendations
-# ui.send_message("Getting AI recommendations... This can take a while.")
-# # Convert the grocery cart into the dictionary format expected by AIManager.
-# grocery_list = [item.to_dict() for item in cart.get_items()]
-# # Convert the refactored database objects into AI-compatible dictionaries.
-# household_data = household_info.to_dicts()
-# consumption_data = history.to_dicts()
+ui.send_message("Getting AI recommendations... This can take a while.")
 
-# # Exclude expired fridge items from AI calculations.
-# usable_fridge = [item.to_dict() for item in fridge.get_items() if not item.is_expired()]
-# expired_count = len(fridge.get_items()) - len(usable_fridge)
-# if expired_count > 0:
-#     ui.send_message(f"Warning: {expired_count} expired fridge batch(es) excluded from AI recommendations.\nPlease review or remove expired food.")
-# # Initialize AI Manager with the OpenRouter provider.
-# ai_manager = AIManager(OpenRouterProvider())
-# # Generate recommendations.
-# ai_recommendations, error = ai_manager.get_ai_recommendations(household_info=household_data, consumption_history=consumption_data, fridge_stock=usable_fridge, purchase_stock=grocery_list, remarks=remarks, days_until_next=days_until_next_visit)
-# # Handle unsuccessful AI requests.
-# if error or ai_recommendations is None:
-#     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
-# # Extract validated AI results.
-# recommendations = ai_recommendations["Recommendations_List"]
-# total_planned_calories = ai_recommendations["Total_Planned_Estimated_Calories"]
-# total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]
+# Exclude expired fridge items from AI calculations.
+usable_fridge = [item.to_dict() for item in fridge.get_items() if not item.is_expired()]
+expired_count = len(fridge.get_items()) - len(usable_fridge)
+if expired_count > 0:
+    ui.send_message(f"Warning: {expired_count} expired fridge batch(es) excluded from AI recommendations.\nPlease review or remove expired food.")
+# Initialize AI Manager with the OpenRouter provider.
+ai_manager = AIManager(OpenRouterProvider())
+# Generate recommendations.
+ai_recommendations, error = ai_manager.get_ai_recommendations(household_info=household_data, 
+                                                              consumption_history=consumption_data, 
+                                                              fridge_stock=usable_fridge, 
+                                                              purchase_stock=grocery_list, 
+                                                              remarks=remarks, 
+                                                              days_until_next=days_until_next_visit)
+# Handle unsuccessful AI requests.
+if error or ai_recommendations is None:
+    raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
+# Extract validated AI results.
+recommendations = ai_recommendations["Recommendations_List"]
+total_planned_calories = ai_recommendations["Total_Planned_Estimated_Calories"]
+total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]
 #endregion
 
 #region Attach AI Recommendations
-# if len(recommendations) != len(cart.get_items()):
-#     raise ValueError("AI recommendation count does not match the grocery cart.")
+if len(recommendations) != len(cart.get_items()):
+    raise ValueError("AI recommendation count does not match the grocery cart.")
 
-# for cart_item, recommendation in zip(cart.get_items(), recommendations):
-#     ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"])
-#     cart_item.set_ai_data(ai_data)
+for cart_item, recommendation in zip(cart.get_items(), recommendations):
+    ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"])
+    cart_item.set_ai_data(ai_data)
 #endregion
+
+#create context object for logic calculations
+context = AnalysisContext(cart= cart,
+                          household= household_info,
+                          fridge= fridge,
+                          history= history,
+                          total_est_calories= total_planned_calories,
+                          next_purchase_date= days_until_next_visit,
+                          remarks= remarks)
+
+findings = logicmgr.process_recommendations(ctx= context)
+findings_message = logicmgr.structure_recommedations(findings)
+cart = logicmgr.add_confidence_score(ctx=context)
+
+
+#region user IO confirmation
+#TODO sync with logic side output
+ui.output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
+
+final_checkout = ui.shopping_cart_conclusion(cart, remarks) #output is list of fridge_items
+#TODO save final checkout items to fridge obj
+
+save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
 
 #save_database_refactored(fridge, household_info, history)

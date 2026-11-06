@@ -23,7 +23,7 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
             # daily_consumption_rate = round(estimated_consumption_rate/7 , 2)
     
             # days taken to finish consuming the item
-            estimated_days_to_consume = round(ctx.total_item / daily_consumption_rate)
+            estimated_days_to_consume = round(ctx.get_total_items(item_name) / daily_consumption_rate)
                         
             item_expiry_date = datetime.strptime(estimated_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
             #if the days taken to consume an item is greater than days to expire
