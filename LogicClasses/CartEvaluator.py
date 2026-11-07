@@ -1,9 +1,9 @@
 from core.CartItem import CartItem
-from LogicClasses.Finding import Finding
-from LogicClasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
-from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
-from LogicClasses.UnderBuyAnalyzer import UnderBuyAnalyzer
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.Finding import Finding
+from logicclasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from logicclasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from logicclasses.UnderBuyAnalyzer import UnderBuyAnalyzer
+from logicclasses.AnalysisContext import AnalysisContext
 
 class CartEvaluator():
     def __init__(self):

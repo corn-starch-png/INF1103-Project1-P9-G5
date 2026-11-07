@@ -1,5 +1,5 @@
-from LogicClasses.ItemAnalyzer import ItemAnalyzer
-from LogicClasses.Finding import Finding
+from logicclasses.ItemAnalyzer import ItemAnalyzer
+from logicclasses.Finding import Finding
 from core.CartItem import CartItem
 from datetime import datetime,date,timedelta
 from DB_manager import send_log

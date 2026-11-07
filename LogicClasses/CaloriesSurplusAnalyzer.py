@@ -1,7 +1,7 @@
 from DB_manager import send_log
-from LogicClasses.CartAnalyzer import CartAnalyzer
-from LogicClasses.Finding import Finding
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.CartAnalyzer import CartAnalyzer
+from logicclasses.Finding import Finding
+from logicclasses.AnalysisContext import AnalysisContext
 from core.Household import Household
 
 class CaloriesSurplusAnalyzer(CartAnalyzer):
@@ -19,7 +19,7 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
     
     
     # get each calorie from each family member
-    def __calculate_family_kcal(self, days_until_next_visit, family:Household):
+    def __calculate_family_kcal(self, days_until_next_visit: int, family:Household):
         daily_total = 0
         for person in family.get_members():
             age = self.__get_age_from_KCAL(person.get_age())
@@ -28,7 +28,7 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
         return daily_total * days_until_next_visit
     
     # calculating calories surplus
-    def analyze(self, ctx):   
+    def analyze(self, ctx: AnalysisContext):   
         #extract name, gender from household info from Household.py
         family_calorie_until_next_visit = self.__calculate_family_kcal(ctx.next_purchase_date, ctx.household)
 

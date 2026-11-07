@@ -18,16 +18,16 @@ from core.Fridge import Fridge
 from core.FridgeItem import FridgeItem
 from core.Household import Household
 from core.Person import Person
-from LogicClasses.AnalysisContext import AnalysisContext
-from LogicClasses.BonusCalculator import BonusCalculator
-from LogicClasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
-from LogicClasses.CartEvaluator import CartEvaluator
-from LogicClasses.ConfidenceCalculator import ConfidenceCalculator
-from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
-from LogicClasses.Finding import Finding
-from LogicClasses.LogicManager import LogicManager
-from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
-from LogicClasses.UnderBuyAnalyzer import UnderBuyAnalyzer
+from logicclasses.AnalysisContext import AnalysisContext
+from logicclasses.BonusCalculator import BonusCalculator
+from logicclasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from logicclasses.CartEvaluator import CartEvaluator
+from logicclasses.ConfidenceCalculator import ConfidenceCalculator
+from logicclasses.ConfidenceMetrics import ConfidenceMetrics
+from logicclasses.Finding import Finding
+from Logic_manager import Logic_manager
+from logicclasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from logicclasses.UnderBuyAnalyzer import UnderBuyAnalyzer
 
 #region Hardcoded data
 # Household information
@@ -506,7 +506,7 @@ class TestLogicManagerIntegration:
             Finding("UnderBuy", True, "rice may run out"),
             Finding("UnderBuy", False, None)
         ]
-        output = LogicManager().structure_recommedations(findings)
+        output = Logic_manager().structure_recommedations(findings)
         assert "QUANTIFRESH ANALYSIS" in output
         assert "Below calorie requirement" in output
         assert "milk may expire" in output
@@ -517,7 +517,7 @@ class TestLogicManagerIntegration:
     # confidence score between 0 and 100.
     def test_manager_adds_confidence_to_cart(self, make_context):
         item, ctx = make_context(quantity=6, fridge_quantity=1)
-        result = LogicManager().add_confidence_score(ctx)
+        result = Logic_manager().add_confidence_score(ctx)
         assert result is ctx.cart
         assert 0 < item.ai_data.confidence_score <= 100
 #endregion

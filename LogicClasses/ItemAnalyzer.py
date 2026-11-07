@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from core.CartItem import CartItem
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.AnalysisContext import AnalysisContext
 
 class ItemAnalyzer(ABC):
     @abstractmethod    

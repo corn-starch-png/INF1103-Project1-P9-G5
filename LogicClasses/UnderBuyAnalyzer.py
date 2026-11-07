@@ -1,8 +1,8 @@
-from LogicClasses.ItemAnalyzer import ItemAnalyzer
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.ItemAnalyzer import ItemAnalyzer
+from logicclasses.AnalysisContext import AnalysisContext
 from core.CartItem import CartItem
 from DB_manager import send_log
-from LogicClasses.Finding import Finding
+from logicclasses.Finding import Finding
 
 class UnderBuyAnalyzer(ItemAnalyzer):        
     ANALYZER_NAME = "UnderBuy"

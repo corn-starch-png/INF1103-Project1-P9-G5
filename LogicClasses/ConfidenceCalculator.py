@@ -1,8 +1,8 @@
 from core.CartItem import CartItem
 from core.Fridge import Fridge
-from LogicClasses.AnalysisContext import AnalysisContext
-from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
-from LogicClasses.BonusCalculator import BonusCalculator
+from logicclasses.AnalysisContext import AnalysisContext
+from logicclasses.ConfidenceMetrics import ConfidenceMetrics
+from logicclasses.BonusCalculator import BonusCalculator
 from DB_manager import send_log
 
 class ConfidenceCalculator:

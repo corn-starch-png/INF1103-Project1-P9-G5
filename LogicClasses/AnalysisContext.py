@@ -4,7 +4,7 @@ from core.Cart import Cart
 from core.Household import Household
 from core.Fridge import Fridge
 from core.ConsumptionHistory import ConsumptionHistory
-from LogicClasses.Finding import Finding
+from logicclasses.Finding import Finding
 
 
 class AnalysisContext():

@@ -3,25 +3,24 @@ try:
     from dotenv import load_dotenv
     from datetime import date, timedelta
     import sys
-    from DB_manager import (load_database_refactored, save_database_refactored)
+    from DB_manager import DB_manager
     from IO_manager import IO_manager
-    from LogicClasses.LogicManager import LogicManager
-    from LogicClasses.AnalysisContext import AnalysisContext
+    from Logic_manager import Logic_manager
+    from logicclasses.AnalysisContext import AnalysisContext
     from core.Fridge import Fridge
     from core.Household import Household
     from core.ConsumptionHistory import ConsumptionHistory
     from core.AIRecData import AIRecData
     from aiclasses.AI_manager import AIManager
     from aiclasses.OpenRouterProvider import OpenRouterProvider
-    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 # Load environment variables once
 load_dotenv()
 ui = IO_manager()
-logicmgr = LogicManager()
+logicmgr = Logic_manager()
 
-errors, fridge, household_info, history = load_database_refactored("database")
+errors, fridge, household_info, history = DB_manager().load_database_refactored("database")
 #-------END OF DEPENDENCY LINE----------#
 #region user IO
 ui.show_welcome()
@@ -48,7 +47,7 @@ else:
             ui.update_fridge(fridge)
         #exit program
         else:
-            save_database_refactored(fridge, household_info, history, 'database')
+            DB_manager().save_database_refactored(fridge, household_info, history, 'database')
             ui.show_exit()
             sys.exit(0)
 
@@ -94,6 +93,6 @@ ui.output_recommendations(calories_message, risk_of_expiry_messages, underbuy_me
 final_checkout = ui.shopping_cart_conclusion(cart, remarks) #output is list of fridge_items
 #TODO save final checkout items to fridge obj
 
-save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
+DB_manager().save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
 
 #save_database_refactored(fridge, household_info, history)
