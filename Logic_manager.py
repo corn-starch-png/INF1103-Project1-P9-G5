@@ -14,10 +14,10 @@ class Logic_manager():
         result = self.__cartevaluator.evaluate(ctx)
         self.__findings = result
 
-    def get_recommedations(self, analyzer_name: str) -> str:
+    def get_recommedations(self, analyzer_name: str, result = bool) -> str:
         msgs = []
         for finding in self.__findings:
-            if finding.analyzer_name == analyzer_name and finding.result == True:
+            if finding.analyzer_name == analyzer_name and finding.result == result:
                 msgs.append((finding.message))
         return msgs
 

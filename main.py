@@ -110,9 +110,11 @@ cart = logicmgr.add_confidence_score(ctx=context)
 
 findings = logicmgr.process_recommendations(ctx= context)
 
-calorie_msg = logicmgr.get_recommedations("CaloriesSurplus")
-roe_msgs = logicmgr.get_recommedations("RiskOfExpiry")
-underbuy_msgs = logicmgr.get_recommedations("UnderBuy")
+calorie_msg = logicmgr.get_recommedations("CaloriesSurplus", False) #calorie msg is special where we will return a message regardless of the finding state
+if not calorie_msg:
+    calorie_msg = logicmgr.get_recommedations("CaloriesSurplus", True)
+roe_msgs = logicmgr.get_recommedations("RiskOfExpiry", True)
+underbuy_msgs = logicmgr.get_recommedations("UnderBuy", True)
 
 
 #region user IO confirmation

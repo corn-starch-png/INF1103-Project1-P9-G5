@@ -175,7 +175,8 @@ class Fridge(ListFunctions, CanBeStored):
                     amount -= item.quantity
                     self.__items.pop(i)  # Remove item and let index stay in place for the shifted element
                 else:
-                    item.quantity -= amount
+                    amt_after = item.quantity - amount
+                    item.set_quantity(amt_after)
                     amount = 0
                     i += 1  # Move to the next item since this one still has remaining quantity
             else:

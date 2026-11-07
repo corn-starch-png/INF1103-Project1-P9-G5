@@ -285,9 +285,8 @@ class IO_manager:
     #displays recommendations made by business logic
     def output_recommendations(self, calories_message, risk_of_expiry_messages, underbuy_messages):
         print(f"\n--------------------------------Recommendations---------------------------------")
-        if len(risk_of_expiry_messages) != 0:
-            print(f"\n{calories_message[0]}")
-            print(f"\n--------------------------------------------------------------------------------")
+        print(f"\n{calories_message}")
+        print(f"\n--------------------------------------------------------------------------------")
         if len(risk_of_expiry_messages) != 0:
             print(f"\nBased on your consumption history, the following items "
                   f"\nare likely to expire before your next trip:")
