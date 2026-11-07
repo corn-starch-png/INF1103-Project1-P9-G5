@@ -22,8 +22,8 @@ class CartItem(ItemRecord, ItemFunctions):
             raise NotImplementedError("Cannot set Confidence score without AI data")
         self.__ai_data.set_confidence_score(score)
 
-    def set_ai_data(self, ai_data: AIRecData) -> None:
-        self.__ai_data = ai_data
+    def set_ai_data(self, recommended_qty: float, consumption_rate: float, est_expiry_date: str) -> None:
+        self.__ai_data = AIRecData(recommended_qty, consumption_rate, est_expiry_date)
         
     def validate(self) -> bool:
         return self._validate_item_fields()

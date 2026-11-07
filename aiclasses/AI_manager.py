@@ -44,8 +44,7 @@ class AIManager:
         for cart_item, recommendation in zip(cart_items, recommendations):
             if (cart_item.name != recommendation["Item_Name"] or cart_item.quantity != recommendation["Planned_Quantity"] or cart_item.unit != recommendation["Unit"] ): 
                 raise ValueError( f"AI recommendation does not match cart item: {cart_item.name}" )
-            ai_data = AIRecData(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"] )
-            cart_item.set_ai_data(ai_data)
+            cart_item.set_ai_data(recommended_qty=recommendation["Recommended_Quantity"], consumption_rate=recommendation["Estimated_Consumption_Rate"], est_expiry_date=recommendation["Estimated_Expiry_Date"])
     
     def get_ai_recommendations(self, household_info: Household, consumption_history: ConsumptionHistory, fridge_stock: Fridge, purchase_stock: Cart, remarks: str, days_until_next: int, notify: Callable[[str], None] | None = None) -> tuple:    
         send_log("Checking AI API connection...")

@@ -19,9 +19,10 @@ except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 # Load environment variables once
 load_dotenv()
+REPOSITORY = JsonRepository(folder="database")
 ui = IO_manager()
 logicmgr = Logic_manager()
-REPOSITORY = JsonRepository(folder="database")
+
 
 errors, data_bundle = DB_manager().load_database(REPOSITORY)
 fridge = data_bundle["fridge"]
@@ -32,8 +33,10 @@ history = data_bundle["consumption_history"]
 ui.show_welcome()
 #if new user, direct them to create a new profile then add items they have in thier fridge
 if not household_info.get_members():
+    #TODO this will not change the actual household being used, but will instead point household_info to another household
     household_info = ui.create_profile()
     ui.show_profile(household_info)
+    #TODO same logic as above
     fridge = ui.create_fridge()
     ui.display_list("Fridge", fridge.get_items())
 else:
