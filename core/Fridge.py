@@ -104,17 +104,21 @@ class Fridge(ListFunctions, CanBeStored):
 
     def get_item_totals(self) -> list:
         """
-        Add up each item across all its batches and return a list of name, total, unit
+        Add up each item across all its batches and return a list of dictionaries 
+        with keys 'item_name', 'quantity', and 'units'.
         """
-        # Add up the total of each item across all its batches
         totals = {}
         for item in self.__items:
             key = (item.name.lower(), item.unit)
             if key in totals:
-                totals[key][1] += Decimal(str(item.quantity))
+                totals[key]["quantity"] += Decimal(str(item.quantity))
             else:
-                totals[key] = [item.name, Decimal(str(item.quantity)), item.unit]
-        return [tuple(total) for total in totals.values()]
+                totals[key] = {
+                    "item_name": item.name,
+                    "quantity": Decimal(str(item.quantity)),
+                    "units": item.unit
+                }
+        return list(totals.values())
 
     def remove_item(self, item: FridgeItem) -> None:
         if item not in self.__items:

@@ -43,9 +43,9 @@ else:
             print(total_items)
             total_records = []
             #TODO clean up get_item_totals() should not return tuple
-            for item in total_items:
-                consumed_amount = ui.get_consumption(item[0], item[1], item[2]) # list of consumption records
-                record = fridge.consume(item[0], consumed_amount, item[2], last_used_days, consumption_remarks)
+            for combined_item in total_items:
+                consumed_amount = ui.get_consumption(combined_item['item_name'], combined_item['quantity'], combined_item['units']) # list of consumption records
+                record = fridge.consume(combined_item['item_name'], consumed_amount, combined_item['units'], last_used_days, consumption_remarks)
                 history.add_record(record)
                 total_records.append(record)
 
