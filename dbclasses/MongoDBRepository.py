@@ -11,13 +11,7 @@ from core.ConsumptionHistory import ConsumptionHistory
 
 class MongoDBRepository(RepositoryFunctions):
 
-    def __init__(
-        self,
-        fridge: Fridge,
-        household: Household,
-        history: ConsumptionHistory,
-        database_name=None
-    ):
+    def __init__(self, database_name=None):
         # Get MongoDB Atlas connection details
         uri = os.getenv("MONGODB_URI")
         database_name = database_name or os.getenv("MONGODB_DATABASE")
@@ -39,11 +33,11 @@ class MongoDBRepository(RepositoryFunctions):
 
         self.__database = self.__client[database_name]
 
-        # Map MongoDB collections to existing objects
+        # Map MongoDB collections to existing classes
         self.__stores = {
-            "fridge": fridge,
-            "household": household,
-            "consumption_history": history,
+            "fridge": Fridge(),
+            "household": Household(),
+            "consumption_history": ConsumptionHistory(),
         }
 
     def load(self) -> list:
@@ -65,7 +59,7 @@ class MongoDBRepository(RepositoryFunctions):
                     f"Could not load {collection_name}: {e}"
                 )
 
-        return errors
+        return errors, self.__stores
 
     def save(self) -> None:
         """Save existing objects into MongoDB Atlas."""

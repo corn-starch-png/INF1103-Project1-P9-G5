@@ -6,11 +6,13 @@ try:
     from DB_manager import DB_manager
     from IO_manager import IO_manager
     from Logic_manager import Logic_manager
-    from logicclasses.AnalysisContext import AnalysisContext
     from core.Fridge import Fridge
     from core.Household import Household
     from core.ConsumptionHistory import ConsumptionHistory
     from core.AIRecData import AIRecData
+    from logicclasses.AnalysisContext import AnalysisContext
+    from dbclasses.JsonRepository import JsonRepository
+    from dbclasses.MongoDBRepository import MongoDBRepository
     from aiclasses.AI_manager import AIManager
     from aiclasses.OpenRouterProvider import OpenRouterProvider
 except ImportError as e :
@@ -19,8 +21,12 @@ except ImportError as e :
 load_dotenv()
 ui = IO_manager()
 logicmgr = Logic_manager()
+REPOSITORY = JsonRepository(folder="database")
 
-errors, fridge, household_info, history = DB_manager().load_database_refactored()
+errors, data_bundle = DB_manager().load_database(REPOSITORY)
+fridge = data_bundle["fridge"]
+household_info = data_bundle["household"]
+history = data_bundle["consumption_history"]
 #-------END OF DEPENDENCY LINE----------#
 #region user IO
 ui.show_welcome()
@@ -56,7 +62,7 @@ else:
             ui.update_fridge(fridge)
         #exit program
         else:
-            DB_manager().save_database_refactored(fridge, household_info, history, 'database')
+            DB_manager().save_database(REPOSITORY)
             ui.show_exit()
             sys.exit(0)
 
@@ -114,6 +120,5 @@ ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)
 ui.shopping_cart_conclusion(cart) #output is list of fridge_items
 cart.checkout(fridge)
 
-DB_manager().save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
-
-#save_database_refactored(fridge, household_info, history)
+DB_manager().save_database(REPOSITORY)  # Save the database to the specified folder
+ui.show_exit()

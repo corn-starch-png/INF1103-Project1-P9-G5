@@ -14,26 +14,14 @@ from core.Household import Household
 from core.ConsumptionHistory import ConsumptionHistory
 
 class DB_manager():
-    def load_database_refactored(folder='database'):
-        errors = []
-        fridge = Fridge()
-        household = Household()
-        consumption_history = ConsumptionHistory()
-        try:
-            mongo_repo = MongoDBRepository(fridge, household, consumption_history)
-            errors = mongo_repo.load()
-        except:
-            json_repo = JsonRepository(fridge, household, consumption_history)
-            errors = json_repo.load()
-        return errors, fridge, household, consumption_history
-
-    def save_database_refactored(fridge, household, consumption_history, folder='database'):
-        try:
-            mongo_repo = MongoDBRepository(fridge, household, consumption_history)
-            mongo_repo.save()
-        except:
-            json_repo = JsonRepository(fridge, household, consumption_history)
-            json_repo.save()
+    @staticmethod
+    def load_database(repository):
+        errors, data_bundle = repository.load()
+        return errors, data_bundle
+    
+    @staticmethod
+    def save_database(repository):
+        repository.save()
 
 #endregion: refactor: DB_manager.py
 

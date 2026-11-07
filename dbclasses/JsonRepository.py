@@ -8,13 +8,12 @@ from core.ConsumptionHistory import ConsumptionHistory
 
 
 class JsonRepository(RepositoryFunctions):
-    def __init__(self, fridge: Fridge, household: Household, history: ConsumptionHistory, folder="database"):
+    def __init__(self, folder="database"):
         self.__folder = folder
-        # aggregation: the three objects are created outside and injected
         self.__stores = {
-            "fridge.json": fridge,
-            "household.json": household,
-            "consumption_history.json": history,
+            "fridge": Fridge(),
+            "household": Household(),
+            "consumption_history": ConsumptionHistory(),
         }
 
     def load(self) -> list:
@@ -22,7 +21,7 @@ class JsonRepository(RepositoryFunctions):
         os.makedirs(self.__folder, exist_ok=True)
         errors = []
         for filename, store in self.__stores.items():
-            path = os.path.join(self.__folder, filename)
+            path = os.path.join(self.__folder, filename + ".json")
             if not os.path.exists(path):
                 continue                                  # first run
             try:
@@ -35,12 +34,12 @@ class JsonRepository(RepositoryFunctions):
                 errors.append(f"{filename} must contain a list")
                 continue
             errors.extend(store.load_dicts(rows))
-        return errors
+        return errors, self.__stores
 
     def save(self) -> None:
         os.makedirs(self.__folder, exist_ok=True)
         for filename, store in self.__stores.items():
-            self.__write_atomic(os.path.join(self.__folder, filename), store.to_dicts())
+            self.__write_atomic(os.path.join(self.__folder, filename + ".json"), store.to_dicts())
 
     @staticmethod
     def __write_atomic(path, data):
