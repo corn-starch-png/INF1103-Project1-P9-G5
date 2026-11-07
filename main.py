@@ -90,14 +90,18 @@ context = AnalysisContext(cart= cart,
                           next_purchase_date= days_until_next_visit
                           )
 
-findings = logicmgr.process_recommendations(ctx= context)
-findings_message = logicmgr.structure_recommedations(findings)
 cart = logicmgr.add_confidence_score(ctx=context)
+
+findings = logicmgr.process_recommendations(ctx= context)
+
+calorie_msg = logicmgr.get_recommedations("CaloriesSurplus")
+roe_msgs = logicmgr.get_recommedations("RiskOfExpiry")
+underbuy_msgs = logicmgr.get_recommedations("UnderBuy")
 
 
 #region user IO confirmation
 #TODO sync with logic side output
-ui.output_recommendations(calories_message, risk_of_expiry_messages, underbuy_messages, recommendations)
+ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)
 
 final_checkout = ui.shopping_cart_conclusion(cart, remarks) #output is list of fridge_items
 #TODO save final checkout items to fridge obj

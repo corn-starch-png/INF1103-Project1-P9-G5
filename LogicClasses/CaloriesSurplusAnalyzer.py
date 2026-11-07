@@ -42,6 +42,8 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
             message = (f"Grocery cart exceeds recommended calories values for {ctx.next_purchase_date} days by {exceed_calorie}kcal")
             
         else:
+            # We will no longer print the message if calorie surplus is false as it is not useful for the user
+            # we will however keep it for now in case we decide to reimplement it
             send_log(f"[LOGIC] Calories surplus is: False")
             result = False
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {ctx.next_purchase_date} days")

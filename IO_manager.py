@@ -287,18 +287,19 @@ class IO_manager:
                 print(f"{self.format_item(removed)} has been removed from your fridge.")
 
     #displays recommendations made by business logic
-    def output_recommendations(self, calories_message, risk_of_expiry_messages, underbuy_messages, recommendations):
-        print(f"\n--------------------------------recommendations---------------------------------")
-        print(f"\n{calories_message}")
-        print(f"\n--------------------------------------------------------------------------------")
+    def output_recommendations(self, calories_message, risk_of_expiry_messages, underbuy_messages):
+        print(f"\n--------------------------------Recommendations---------------------------------")
         if len(risk_of_expiry_messages) != 0:
-            print(f"\nBased on estimated consumption rate and estimated expiry date, you will not able"
-                  f"\n to finish the following items before your next grocery trip:")
+            print(f"\n{calories_message[0]}")
+            print(f"\n--------------------------------------------------------------------------------")
+        if len(risk_of_expiry_messages) != 0:
+            print(f"\nBased on your consumption history, the following items "
+                  f"\nare likely to expire before your next trip:")
             for i in range(len(risk_of_expiry_messages)):
                 print(f"  {i+1}. {risk_of_expiry_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
         if len(underbuy_messages) != 0:
-            print(f"You are forcasted to finish the following items before your next indicated grocery trip:")
+            print(f"Based on your consumption history, you may run out of the following items and want to buy more:")
             for i in range(len(underbuy_messages)):
                 print(f"  {i+1}. {underbuy_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
