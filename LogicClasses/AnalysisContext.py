@@ -15,7 +15,6 @@ class AnalysisContext():
                  history: ConsumptionHistory,
                  total_est_calories: int,
                  next_purchase_date: int,
-                 remarks: str,
                 ):
         self.cart = cart 
         self.household = household
@@ -23,7 +22,6 @@ class AnalysisContext():
         self.history = history
         self.total_est_calories = total_est_calories
         self.next_purchase_date = next_purchase_date
-        self.remarks = remarks
         self.findings = []
 
     def update_findings(self, new_findings: list) -> None:

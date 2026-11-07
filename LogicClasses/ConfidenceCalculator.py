@@ -31,7 +31,7 @@ class ConfidenceCalculator:
             + 0.4 * agreement_score
         ) * 100
 
-        bonus_score = self.__bonusMetrics.bonus(ctx.remarks)
+        bonus_score = self.__bonusMetrics.bonus(ctx.cart.get_remarks())
         
         send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item.name}---")
         send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")

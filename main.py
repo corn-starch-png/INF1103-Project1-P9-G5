@@ -56,13 +56,22 @@ days_until_next_visit = ui.ask_days_until_next()
 #TODO let user choose start new cart or use recommened cart
 cart = ui.enter_grocery_list(fridge, history)
 remarks = ui.ask_remarks()
+cart.set_remarks(remarks)
 
 #region AI Recommendations
 ui.send_message("Getting AI recommendations... This can take a while.")
 # Initialize AI Manager with the OpenRouter provider.
 ai_manager = AIManager(OpenRouterProvider())
 # Generate recommendations.
-ai_recommendations, error = ai_manager.get_ai_recommendations(household_info=household_info, consumption_history=history, fridge_stock=fridge, purchase_stock=cart, remarks=remarks, days_until_next=days_until_next_visit,notify=ui.send_message)
+ai_recommendations, error = ai_manager.get_ai_recommendations(
+    household_info=household_info, 
+    consumption_history=history, 
+    fridge_stock=fridge, 
+    purchase_stock=cart, 
+    remarks=cart.get_remarks(), 
+    days_until_next=days_until_next_visit,
+    notify=ui.send_message
+    )
 # Handle unsuccessful AI requests.
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
@@ -78,8 +87,8 @@ context = AnalysisContext(cart= cart,
                           fridge= fridge,
                           history= history,
                           total_est_calories= total_planned_calories,
-                          next_purchase_date= days_until_next_visit,
-                          remarks= remarks)
+                          next_purchase_date= days_until_next_visit
+                          )
 
 findings = logicmgr.process_recommendations(ctx= context)
 findings_message = logicmgr.structure_recommedations(findings)

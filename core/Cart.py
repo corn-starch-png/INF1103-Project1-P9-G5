@@ -52,6 +52,9 @@ class Cart(ListFunctions):
     def set_remarks(self, remarks: str) -> None:
         self.__remarks = remarks
 
+    def get_remarks(self) -> str:
+        return self.__remarks
+
     def checkout(self, fridge: Fridge) -> None:
         """
         Move all items from the cart to the fridge, converting them to FridgeItem.
