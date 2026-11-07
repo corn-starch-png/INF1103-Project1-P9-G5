@@ -8,22 +8,32 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 #region: refactor: DB_manager.py
 
 from dbclasses.JsonRepository import JsonRepository
+from dbclasses.MongoDBRepository import MongoDBRepository
 from core.Fridge import Fridge
 from core.Household import Household
 from core.ConsumptionHistory import ConsumptionHistory
 
-def load_database_refactored(folder='database'):
-    errors = []
-    fridge = Fridge()
-    household = Household()
-    consumption_history = ConsumptionHistory()
-    json_repo = JsonRepository(fridge, household, consumption_history)
-    errors = json_repo.load()
-    return errors, fridge, household, consumption_history
+class DB_manager():
+    def load_database_refactored(folder='database'):
+        errors = []
+        fridge = Fridge()
+        household = Household()
+        consumption_history = ConsumptionHistory()
+        try:
+            mongo_repo = MongoDBRepository(fridge, household, consumption_history)
+            errors = mongo_repo.load()
+        except:
+            json_repo = JsonRepository(fridge, household, consumption_history)
+            errors = json_repo.load()
+        return errors, fridge, household, consumption_history
 
-def save_database_refactored(fridge, household, consumption_history, folder='database'):
-    json_repo = JsonRepository(fridge, household, consumption_history)
-    json_repo.save()
+    def save_database_refactored(fridge, household, consumption_history, folder='database'):
+        try:
+            mongo_repo = MongoDBRepository(fridge, household, consumption_history)
+            mongo_repo.save()
+        except:
+            json_repo = JsonRepository(fridge, household, consumption_history)
+            json_repo.save()
 
 #endregion: refactor: DB_manager.py
 
