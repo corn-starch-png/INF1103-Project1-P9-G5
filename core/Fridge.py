@@ -125,34 +125,40 @@ class Fridge(ListFunctions, CanBeStored):
         return list(self.__items)
     
     def consume(self, item_name: str, amount: float, units: str, date_range: int, consumption_remarks: str) -> ConsumptionRecord:
-        #TODO bug where removing items will cause 
-        # the for loop to go past the amount of items and start removing quantity from the wrong items
         """
         Consume a certain amount of an item in the fridge FIFO, reducing its quantity.
         If the quantity reaches zero, remove the item from the fridge.
-        return a ConsumptionRecord of the consumption.
+        Return a ConsumptionRecord of the consumption.
         """
-        total_quantity = self.get_total_quantity(item_name, include_expired=False)
-        #validation start (not validating units, assumed to be correct)
-        if item_name.strip() == "" or item_name not in [item.name for item in self.__items]:
+        
+        # Validation
+        if item_name.strip() == "" or item_name.casefold() not in [item.name.strip().casefold() for item in self.__items]:
             raise ValueError("Item does not exist in the fridge.")
-        if type(amount) not in (int, float):
+        if type(amount) not in (int, float) or amount <= 0:
             raise ValueError(f"Invalid consumption quantity for {item_name}.")
+
+        total_quantity = self.get_total_quantity(item_name, include_expired=False)
         if amount > total_quantity:
             raise ValueError(f"Cannot consume {amount}{units} of {item_name};\nonly {total_quantity} available.")
-        #validation end
         
-        for item in self.__items:
+        # Save the requested amount for the record before we mutate it
+        requested_amount = amount
+        
+        i = 0
+        while amount > 0 and i < len(self.__items):
+            item = self.__items[i]
             if item.name.strip().casefold() == item_name.strip().casefold():
-                if item.quantity < amount:
+                if item.quantity <= amount:
                     amount -= item.quantity
-                    self.__items.remove(item)
+                    self.__items.pop(i)  # Remove item and let index stay in place for the shifted element
                 else:
                     item.quantity -= amount
-
-                if item.quantity == 0:
-                    self.__items.remove(item)
-        return ConsumptionRecord(item_name, amount, units, date_range, consumption_remarks)
+                    amount = 0
+                    i += 1  # Move to the next item since this one still has remaining quantity
+            else:
+                i += 1
+                
+        return ConsumptionRecord(item_name, requested_amount, units, date_range, consumption_remarks)
 
     def remove_duplicates(self):
         """
