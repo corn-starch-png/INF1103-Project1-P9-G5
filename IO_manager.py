@@ -176,31 +176,25 @@ class IO_manager:
 
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
-    # Days since last use and remarks are asked once and applied to every item.
-    def update_consumption(self, fridge):
-        consumed_items = []
-        if not fridge.get_items():
-            return consumed_items
-        print("\nUpdate Consumption.")
-        # Asked once for the whole consumption list
-        date_range = IntRangePrompt("How many days has it been since you last used the app? ", 1, 365).ask()
-        consumed_amounts = []
-        for name, total, unit in fridge.get_totals():
-            consumed = QuantityPrompt(f"How much {name} did you consume? (you have {total} {unit}): ",
-                                      max_value=total, allow_zero=True, whole_number=(unit == "pcs"),
-                                      normalize=normalize_quantity,
-                                      max_message=f"That's more than you have ({total} {unit}). Please try again.").ask()
-            consumed_amounts.append((name, consumed, unit))
-
-        # Asked once, then added to every item
+    # Asked once, then added to every item
+    def get_consumption_remarks(self) -> str:
         remarks = TextPrompt("Any remarks about your consumption since last time? (leave blank if none): ",
-                             allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
+                                allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
         if remarks == "" or remarks.lower() == "none":
             remarks = "none"
-        for name, consumed, unit in consumed_amounts:
-            consumed_items.append(ConsumptionRecord(name, consumed, unit, date_range, remarks))
+        return remarks
 
-        return consumed_items
+    def ask_last_use_days(self):
+        return IntRangePrompt("How many days has it been since you last used the app? ", 1, 365).ask()
+    
+    # Days since last use and remarks are asked once and applied to every item.
+    def get_consumption(self, item_name, total, unit) -> int:
+        consumed = QuantityPrompt(f"How much {item_name} did you consume? (you have {total} {unit}): ",
+                                    max_value=total, allow_zero=True, whole_number=(unit == "pcs"),
+                                    normalize=normalize_quantity,
+                                    max_message=f"That's more than you have ({total} {unit}). Please try again.").ask()
+        return consumed
+
 
     # Collect the groceries the user plans to buy, until they say they are done.
     def enter_grocery_list(self, fridge, history):
@@ -305,7 +299,7 @@ class IO_manager:
             print(f"\n--------------------------------------------------------------------------------")
 
     #handles IO for after AI and logic processes
-    def shopping_cart_conclusion(self, cart: Cart):
+    def shopping_cart_conclusion(self, cart: Cart) -> list[FridgeItem]:
         self.display_list("Recommendations List", cart.get_items())
         if self.__ask_yes_no("\nWould you like to change the quantity of items in your grocery cart? ",
                              "Invalid input. Please enter 'yes' or 'no'."):

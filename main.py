@@ -20,7 +20,7 @@ load_dotenv()
 ui = IO_manager()
 logicmgr = Logic_manager()
 
-errors, fridge, household_info, history = DB_manager().load_database_refactored("database")
+errors, fridge, household_info, history = DB_manager().load_database_refactored()
 #-------END OF DEPENDENCY LINE----------#
 #region user IO
 ui.show_welcome()
@@ -28,7 +28,6 @@ ui.show_welcome()
 if not household_info.get_members():
     household_info = ui.create_profile()
     ui.show_profile(household_info)
-    #TODO cleanup 
     fridge = ui.create_fridge()
     ui.display_list("Fridge", fridge.get_items())
 else:
@@ -37,10 +36,20 @@ else:
         choice = ui.ask_menu_choice()
         #update consumption history then break loop and continue
         if choice == "1":
-            #TODO move for loop inside update_consumption out here
-            consumed_records = ui.update_consumption(fridge) # list of consumption records
+            last_used_days = ui.ask_last_use_days()
+            consumption_remarks = ui.get_consumption_remarks()
 
-            ui.show_consumption(consumed_records)
+            total_items = fridge.get_item_totals()
+            print(total_items)
+            total_records = []
+            #TODO clean up get_item_totals() should not return tuple
+            for item in total_items:
+                consumed_amount = ui.get_consumption(item[0], item[1], item[2]) # list of consumption records
+                record = fridge.consume(item[0], consumed_amount, item[2], last_used_days, consumption_remarks)
+                history.add_record(record)
+                total_records.append(record)
+
+            ui.show_consumption(total_records)
             break
         #give user option to edit AI estimated expiry dates or delete items(for example if expired)
         elif choice == "2":
@@ -100,11 +109,10 @@ underbuy_msgs = logicmgr.get_recommedations("UnderBuy")
 
 
 #region user IO confirmation
-#TODO sync with logic side output
 ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)
 
-final_checkout = ui.shopping_cart_conclusion(cart) #output is list of fridge_items
-#TODO save final checkout items to fridge obj
+ui.shopping_cart_conclusion(cart) #output is list of fridge_items
+cart.checkout(fridge)
 
 DB_manager().save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder
 

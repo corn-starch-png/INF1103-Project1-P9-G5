@@ -102,7 +102,7 @@ class Fridge(ListFunctions, CanBeStored):
             self.remove_item(existing)
         return len(matching_items) > 0
 
-    def get_totals(self) -> list:
+    def get_item_totals(self) -> list:
         """
         Add up each item across all its batches and return a list of name, total, unit
         """
@@ -123,8 +123,10 @@ class Fridge(ListFunctions, CanBeStored):
 
     def get_items(self) -> list:
         return list(self.__items)
-
+    
     def consume(self, item_name: str, amount: float, units: str, date_range: int, consumption_remarks: str) -> ConsumptionRecord:
+        #TODO bug where removing items will cause 
+        # the for loop to go past the amount of items and start removing quantity from the wrong items
         """
         Consume a certain amount of an item in the fridge FIFO, reducing its quantity.
         If the quantity reaches zero, remove the item from the fridge.

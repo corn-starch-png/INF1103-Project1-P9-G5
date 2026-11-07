@@ -61,6 +61,6 @@ class Cart(ListFunctions):
         The cart is cleared after checkout.
         """
         for item in self.__items:
-            fridge_item = item.to_fridge_item()
+            fridge_item = item.to_fridge_item(self.__remarks)
             fridge.add_item(fridge_item)
         self.__items.clear()
