@@ -103,7 +103,7 @@ underbuy_msgs = logicmgr.get_recommedations("UnderBuy")
 #TODO sync with logic side output
 ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)
 
-final_checkout = ui.shopping_cart_conclusion(cart, remarks) #output is list of fridge_items
+final_checkout = ui.shopping_cart_conclusion(cart) #output is list of fridge_items
 #TODO save final checkout items to fridge obj
 
 DB_manager().save_database_refactored(fridge, household_info, history, 'database')  # Save the database to the specified folder

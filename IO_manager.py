@@ -305,7 +305,7 @@ class IO_manager:
             print(f"\n--------------------------------------------------------------------------------")
 
     #handles IO for after AI and logic processes
-    def shopping_cart_conclusion(self, cart, remarks):
+    def shopping_cart_conclusion(self, cart: Cart):
         self.display_list("Recommendations List", cart.get_items())
         if self.__ask_yes_no("\nWould you like to change the quantity of items in your grocery cart? ",
                              "Invalid input. Please enter 'yes' or 'no'."):
@@ -315,7 +315,7 @@ class IO_manager:
                     break
         else:
             print("\nYour grocery cart has been concluded.")
-        return [item.to_fridge_item(remarks) for item in cart.get_items()]
+        return [item.to_fridge_item(cart.get_remarks()) for item in cart.get_items()]
 
     # Formatting-----------
     def format_item(self, item):
