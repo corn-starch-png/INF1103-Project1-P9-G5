@@ -101,7 +101,7 @@ class IO_manager:
         if new_qty == 0:
             remove_item(item)
         else:
-            item.edit_quantity(new_qty)
+            item.set_quantity(new_qty)
 
     #can be used to edit grocery list or recommendation list
     # FLAG setting item data to an item derived from get_items() function

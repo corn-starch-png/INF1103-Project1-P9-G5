@@ -76,7 +76,7 @@ class FridgeItem(ItemRecord, ItemFunctions):
         )
     
 
-    def edit_quantity(self, amount: float) -> None:
+    def set_quantity(self, amount: float) -> None:
         self._set_quantity(amount)
 
     def edit_expiry_date(self, new_expiry_date: str) -> None:

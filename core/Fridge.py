@@ -65,7 +65,7 @@ class Fridge(ListFunctions, CanBeStored):
             raise ValueError(f"Total quantity cannot exceed {FridgeItem.MAX_QUANTITY:,}. Expiry date was not changed.")
 
         item.edit_expiry_date(new_expiry_date)
-        item.edit_quantity(total_quantity)
+        item.set_quantity(total_quantity)
 
         for existing in matching_items:
             self.remove_item(existing)

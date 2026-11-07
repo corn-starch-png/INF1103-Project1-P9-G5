@@ -25,7 +25,7 @@ class Cart(ListFunctions):
                 combined_quantity = Decimal(str(existing.quantity)) + Decimal(str(item.quantity))
                 if combined_quantity > CartItem.MAX_QUANTITY:
                     raise ValueError(f"Total quantity cannot exceed {CartItem.MAX_QUANTITY:,}.")
-                existing.edit_quantity(combined_quantity)
+                existing.set_quantity(combined_quantity)
                 merging = True
                     
         self.__items.append(item)

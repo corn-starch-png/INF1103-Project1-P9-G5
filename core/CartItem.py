@@ -44,7 +44,7 @@ class CartItem(ItemRecord, ItemFunctions):
     def from_dict(cls, data: dict) -> "CartItem":
         return cls(data["Item_Name"], data["Quantity"], data["Unit"])
 
-    def edit_quantity(self, amount: float) -> None:
+    def set_quantity(self, amount: float) -> None:
         self._set_quantity(amount)
 
     def to_fridge_item(self, remarks: str = "") -> "FridgeItem":
