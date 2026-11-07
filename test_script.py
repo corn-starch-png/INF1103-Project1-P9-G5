@@ -9,7 +9,25 @@ from aiclasses.AIProvider import AIProvider
 from aiclasses.OpenRouterProvider import OpenRouterProvider
 from aiclasses.MockAIProvider import MockAIProvider
 from datetime import date, timedelta
-import Logic_manager as logic
+from core.AIRecData import AIRecData
+from core.Cart import Cart
+from core.CartItem import CartItem
+from core.ConsumptionHistory import ConsumptionHistory
+from core.ConsumptionRecord import ConsumptionRecord
+from core.Fridge import Fridge
+from core.FridgeItem import FridgeItem
+from core.Household import Household
+from core.Person import Person
+from LogicClasses.AnalysisContext import AnalysisContext
+from LogicClasses.BonusCalculator import BonusCalculator
+from LogicClasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from LogicClasses.CartEvaluator import CartEvaluator
+from LogicClasses.ConfidenceCalculator import ConfidenceCalculator
+from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
+from LogicClasses.Finding import Finding
+from LogicClasses.LogicManager import LogicManager
+from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from LogicClasses.UnderBuyAnalyzer import UnderBuyAnalyzer
 
 #region Hardcoded data
 # Household information
@@ -206,180 +224,302 @@ class TestAIProvider:
 # =========================================================
 #region AI Manager Integration
 class TestAIManager:
-    # Test 15 - Generate recommendations using a mock provider
-    # Expected result: Returns valid recommendations, preserves grocery-list integrity and produces correct calorie totals.
+# Test 15 - Generate recommendations using a mock provider
+# Expected result: Returns valid recommendations, preserves
+# grocery-list integrity, attaches AI data to CartItem objects
+# and produces correct calorie totals.
     def test_ai_manager_mock_recommendations(self):
         provider = MockAIProvider(json.dumps(RAW_AI_RESPONSE))
         manager = AIManager(provider)
-        result, error = manager.get_ai_recommendations(household_info, history, fridge, grocery_list, "none", 7)
+        # Convert raw dict structures into classes
+        household_obj = Household()
+        assert household_obj.load_dicts(household_info) == []
+        history_obj = ConsumptionHistory()
+        assert history_obj.load_dicts(history) == []
+        fridge_obj = Fridge()
+        assert fridge_obj.load_dicts(fridge) == []
+        cart_obj = Cart()
+        for row in grocery_list:
+            cart_obj.add_item(CartItem.from_dict(row))
+        # Generate recommendations using the mock provider
+        result, error = manager.get_ai_recommendations(household_info=household_obj, consumption_history=history_obj, fridge_stock=fridge_obj, purchase_stock=cart_obj, remarks="none", days_until_next=7)
         assert error is None
         assert result is not None
+        # Verify recommendation count
         assert len(result["Recommendations_List"]) == len(grocery_list)
+        # Verify recommendation identity, quantity, unit and order
         validator = AIResponseValidator()
         assert validator.check_ai_output(result["Recommendations_List"], grocery_list) is True
-        assert result["Total_Planned_Estimated_Calories"] == RAW_AI_RESPONSE["Total_Planned_Estimated_Calories"]
-        assert result["Total_Estimated_Calories"] == RAW_AI_RESPONSE["Total_Estimated_Calories"]
+        # Verify calorie totals
+        assert (result["Total_Planned_Estimated_Calories"] == RAW_AI_RESPONSE["Total_Planned_Estimated_Calories"])
+        assert (result["Total_Estimated_Calories"] == RAW_AI_RESPONSE["Total_Estimated_Calories"])
+        # Verify recommendation fields
         expected_fields = {
             "Item_Name", "Planned_Quantity", "Unit", "Recommended_Quantity",
-            "Estimated_Consumption_Rate", "Planned_Estimated_Calories",
-            "Estimated_Calories", "Estimated_Expiration_Days",
-            "Estimated_Expiry_Date", "Expiry_Date_Is_Default"
+            "Estimated_Consumption_Rate", "Planned_Estimated_Calories", "Estimated_Calories",
+            "Estimated_Expiration_Days", "Estimated_Expiry_Date", "Expiry_Date_Is_Default"
         }
-        for item in result["Recommendations_List"]:
-            assert set(item) == expected_fields
+        for recommendation in result["Recommendations_List"]:
+            assert set(recommendation) == expected_fields
+        # Verify AI recommendations are attached to CartItem objects
+        cart_items = cart_obj.get_items()
+        for cart_item, recommendation in zip(cart_items, result["Recommendations_List"]):
+            assert cart_item.is_enhanced() is True
+            assert (cart_item.ai_data.recommended_qty == recommendation["Recommended_Quantity"])
+            assert (cart_item.ai_data.consumption_rate == recommendation["Estimated_Consumption_Rate"])
+            assert (cart_item.ai_data.est_expiry_date == recommendation["Estimated_Expiry_Date"])
 #endregion
 
 # =========================================================
 # 4. LOGIC MANAGER TESTS
-# Input: Household information, calorie requirements,
-# AI recommendations, consumption history and fridge stock.
-# Expected: Verify age mapping, calorie calculations,
-# expiry risk, under-buy decisions and confidence scores.
+# Input: Household, cart, fridge, consumption history,
+# AI recommendation data and analysis context.
+# Expected: Verify the new object-oriented logic classes,
+# calorie calculations, expiry risk, under-buy decisions,
+# confidence scores and recommendation integration.
 # =========================================================
-#region Logic Manager Tests
-class TestLogicManager:
-    # Test 16 - Verify age category mapping
-    # Expected result: Each age maps to the correct calorie-table age category.
-    def test_age_mapping(self):
-        cases = [(0, 0), (18, 18), (19, 19), (30, 30), (31, 30), (59, 30), (60, 60), (100, 60)]
-        for age, expected in cases:
-            assert logic.get_age_from_KCAL(age) == expected
-    # Test 17 - Calculate family weekly calorie requirements
-    # Expected result: A male aged 20 and female aged 35 require 29,400 calories over 7 days.
-    def test_family_weekly_calories(self):
-        family = [{"Age": 20, "Gender": "Male"}, {"Age": 35, "Gender": "Female"},]
-        kcal_table = {19: {"Male": 2000, "Female": 1800}, 30: {"Male": 2500, "Female": 2200}, 60: {"Male": 2000, "Female": 1800},}
-        result = logic.calculate_family_kcal(family, 7, kcal_table)
-        assert result == 29400
-    # Helper method - Simulate calorie surplus calculation
-    # Expected result: Returns whether the supplied calories exceed the mocked family calorie requirement.
-    def run_calorie_test(self, calories, weekly_need):
-        database = {"household_info": []}
-        with patch.object(logic, "calculate_family_kcal", return_value=weekly_need):
-            result, message = logic.calories_surplus(database, calories, 7)
-        return result
-    # Test 18 - Detect calories above weekly requirement
-    # Expected result: Returns True when 14,001 calories exceed the weekly requirement of 14,000.
-    def test_calories_above_weekly_need(self):
-        assert self.run_calorie_test(14001, 14000) is True
-    # Test 19 - Detect calories equal to weekly requirement
-    # Expected result: Returns False when 14,000 calories exactly meet the weekly requirement.
-    def test_calories_equal_weekly_need(self):
-        assert self.run_calorie_test(14000, 14000) is False
-    # Test 20 - Detect calories below weekly requirement
-    # Expected result: Returns False when 13,999 calories are below the weekly requirement of 14,000.
-    def test_calories_below_weekly_need(self):
-        assert self.run_calorie_test(13999, 14000) is False
-    # Test 21 - Detect food expiry risk
-    # Expected result: Returns True when estimated consumption cannot finish before the expiry date.
-    @patch.object(logic, "date")
-    def test_expiry_risk_true(self, mock_date):
-        mock_date.today.return_value = CAPTURE_DATE
-        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-        item["Estimated_Consumption_Rate"] = 0.5
-        result = logic.risk_of_expiry(item, 3)
-        assert result[0] is True
-        assert result[1] is not None
-        assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
-    # Test 22 - Verify no food expiry risk
-    # Expected result: Returns False and None when the food can be consumed before expiry.
-    @patch.object(logic, "date")
-    def test_expiry_risk_false(self, mock_date):
-        mock_date.today.return_value = CAPTURE_DATE
-        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-        item["Estimated_Consumption_Rate"] = 7
-        result = logic.risk_of_expiry(item, 1)
-        assert result == (False, None)
-    # Test 23 - Handle zero consumption rate
-    # Expected result: Returns False and None when estimated consumption is zero.
-    def test_zero_consumption_rate(self):
-        for item in AI_RECOMMENDATIONS:
-            assert item["Estimated_Consumption_Rate"] == 0
-            assert logic.risk_of_expiry(item, item["Planned_Quantity"]) == (False, None)
-    # Test 24 - Handle negative consumption rate
-    # Expected result: Returns False and None for an invalid negative consumption rate.
-    def test_negative_consumption_rate(self):
-        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-        item["Estimated_Consumption_Rate"] = -1
-        assert logic.risk_of_expiry(item, 3) == (False, None)
-    # Test 25 - Allow under-buy evaluation without calorie surplus or expiry risk
-    # Expected result: Returns True when both conditions are False.
-    def test_no_surplus_no_expiry_allows_underbuy(self):
-        assert logic.should_evaluate_underbuy(False, False) is True
-    # Test 26 - Skip under-buy evaluation when calorie surplus exists
-    # Expected result: Returns False when calorie surplus is True and expiry risk is False.
-    def test_surplus_only_skips_underbuy(self):
-        assert logic.should_evaluate_underbuy(True, False) is False
-    # Test 27 - Skip under-buy evaluation when expiry risk exists
-    # Expected result: Returns False when calorie surplus is False and expiry risk is True.
-    def test_expiry_only_skips_underbuy(self):
-        assert logic.should_evaluate_underbuy(False, True) is False
-    # Test 28 - Skip under-buy evaluation when both risks exist
-    # Expected result: Returns False when calorie surplus and expiry risk are both True.
-    def test_surplus_and_expiry_skip_underbuy(self):
-        assert logic.should_evaluate_underbuy(True, True) is False
-    # Test 29 - Calculate additional quantity needed
-    # Expected result: Returns True and recommends buying more milk when existing quantity is insufficient.
-    @patch.object(logic, "date")
-    def test_under_buy_calculates_top_up(self, mock_date):
-        mock_date.today.return_value = CAPTURE_DATE
-        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-        item["Estimated_Consumption_Rate"] = 7
-        result = logic.under_buy(item, "2026-10-20", 3)
-        assert result[0] is True
-        assert "milk" in result[1]
-        assert "recommended to buy more" in result[1]
-        assert AI_RECOMMENDATIONS[0]["Estimated_Consumption_Rate"] == 0
-    # Test 30 - Verify sufficient existing stock
-    # Expected result: Returns False and None when the household already has enough stock.
-    @patch.object(logic, "date")
-    def test_under_buy_sufficient_stock(self, mock_date):
-        mock_date.today.return_value = CAPTURE_DATE
-        item = copy.deepcopy(AI_RECOMMENDATIONS[0])
-        item["Estimated_Consumption_Rate"] = 7
-        result = logic.under_buy(item, "2026-10-20", 10)
-        assert result == (False, None)
-    # Test 31 - Handle zero consumption in under-buy calculation
-    # Expected result: Returns False and None when no additional quantity is required.
-    def test_under_buy_handles_zero_consumption(self):
-        for item in AI_RECOMMENDATIONS:
-            result = logic.under_buy(item, "2026-10-20", item["Planned_Quantity"])
-            assert result == (False, None)
-    # Test 32 - Calculate confidence score without history
-    # Expected result: Returns 0.0 when no consumption history exists.
-    def test_confidence_score_no_history(self):
-        database = {"consumption_history": [], "fridge": []}
-        result = logic.calculate_confidence_score("yogurt", database, 4, 0, 7, "none")
+#region Logic Manager Test Fixtures
+@pytest.fixture
+def make_context():
+    # Helper fixture - Create a reusable analysis context
+    # Expected: Provide valid core objects without API calls.
+    def factory(quantity=3.0, weekly_rate=7.0, fridge_quantity=1.0, expiry_days=20, days_until_next=7, 
+                total_calories=0, remarks="none", history_quantities=(7.0, 7.0)):
+        # Household
+        household = Household()
+        household.add_member(Person(1, "TestUser", 20, "Male", "none"))
+        household.add_member(Person(2, "Alice", 35, "Female", "none"))
+        # Grocery cart with AI recommendation data
+        cart = Cart()
+        item = CartItem("milk", quantity, "l")
+        item.set_ai_data(AIRecData(recommended_qty=quantity, consumption_rate=weekly_rate, 
+                                   est_expiry_date=( date.today() + timedelta(days=expiry_days) ).isoformat()))
+        cart.add_item(item)
+        # Fridge stock
+        fridge_obj = Fridge()
+        if fridge_quantity > 0:
+            fridge_obj.add_item(FridgeItem( "milk", fridge_quantity, "l", (date.today() - timedelta(days=1)).isoformat(), 
+                                           (date.today() + timedelta(days=30)).isoformat(), "none"))
+        # Consumption history
+        consumption_history = ConsumptionHistory()
+        for amount in history_quantities:
+            consumption_history.add_record(ConsumptionRecord( "milk", amount, "l", 7, "none"))
+        # Analysis context
+        ctx = AnalysisContext(cart, household, fridge_obj, consumption_history, total_calories, days_until_next, remarks)
+        return item, ctx
+    return factory
+#endregion
+
+#region Analysis Context Tests
+class TestAnalysisContext:
+    # Test 16 - Verify total item quantity
+    # Expected: Total includes quantities from both cart and fridge.
+    def test_total_items_includes_fridge_and_cart(self, make_context):
+        _, ctx = make_context(quantity=3, fridge_quantity=2)
+        assert ctx.get_total_items("milk") == pytest.approx(5)
+    # Test 17 - Add valid findings
+    # Expected: Valid Finding objects are added to the context.
+    def test_update_findings_appends_valid_findings(self, make_context):
+        _, ctx = make_context()
+        finding = Finding("CaloriesSurplus", False, "No surplus")
+        ctx.update_findings([finding])
+        assert ctx.findings == [finding]
+    # Test 18 - Reject invalid findings
+    # Expected: Raise TypeError for invalid input types.
+    @pytest.mark.parametrize("invalid", [None, {}, [True], ["text"]])
+    def test_update_findings_rejects_invalid_values(self, make_context, invalid):
+        _, ctx = make_context()
+        with pytest.raises(TypeError): ctx.update_findings(invalid)
+#endregion
+
+#region Calories Surplus Analyzer Tests
+class TestCaloriesSurplusAnalyzer:
+    # Test 19 - Verify age category mapping
+    # Expected: Ages map to the correct calorie-table categories.
+    @pytest.mark.parametrize("age, expected", [ (1, 1), (18, 18), (19, 19), (29, 19), (30, 30), (59, 30), (60, 60), (100, 60)])
+    def test_age_brackets(self, age, expected):
+        analyzer = CaloriesSurplusAnalyzer()
+        result = analyzer._CaloriesSurplusAnalyzer__get_age_from_KCAL(age)
+        assert result == expected
+    # Test 20 - Calculate family weekly calories
+    # Expected: Male aged 20 and female aged 35 require
+    # 33145 kcal over seven days.
+    def test_family_calories_for_seven_days(self, make_context):
+        _, ctx = make_context()
+        analyzer = CaloriesSurplusAnalyzer()
+        result = (analyzer._CaloriesSurplusAnalyzer__calculate_family_kcal( 7, ctx.household))
+        assert result == 33145
+    # Test 21 - Detect calorie surplus boundaries
+    # Expected:
+    # Above requirement = True
+    # Equal requirement = False
+    # Below requirement = False
+    @pytest.mark.parametrize("calories, expected", [ (33146, True), (33145, False), (33144, False)])
+    def test_surplus_boundary(self, make_context, calories, expected):
+        _, ctx = make_context(total_calories=calories)
+        finding = CaloriesSurplusAnalyzer().analyze(ctx)
+        assert isinstance(finding, Finding)
+        assert finding.analyzer_name == "CaloriesSurplus"
+        assert finding.result is expected
+        assert "kcal" in finding.message
+#endregion
+
+#region Risk Of Expiry Analyzer Tests
+class TestRiskOfExpiryAnalyzer:
+    # Test 22 - Detect food expiry risk
+    # Expected: True when stock cannot be consumed before expiry.
+    def test_risk_when_stock_outlasts_expiry(self, make_context):
+        item, ctx = make_context(quantity=3, fridge_quantity=1, weekly_rate=1, expiry_days=3)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert finding.analyzer_name == "RiskOfExpiry"
+        assert finding.result is True
+        assert "milk" in finding.message
+    # Test 23 - Verify no expiry risk
+    # Expected: False when stock can be consumed before expiry.
+    def test_no_risk_when_stock_consumed_before_expiry(self, make_context):
+        item, ctx = make_context(quantity=3, fridge_quantity=1, weekly_rate=7, expiry_days=20)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert finding.result is False
+        assert finding.message is None
+    # Test 24 - Handle zero or negative consumption rate
+    # Expected: Return a Finding with result False.
+    # Known issue: Current analyzer does not return the Finding
+    # when the consumption rate is zero or negative.
+    @pytest.mark.parametrize("rate", [0, -1])
+    def test_nonpositive_rate_returns_false_finding(self, make_context, rate):
+        item, ctx = make_context(weekly_rate=rate)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert isinstance(finding, Finding)
+        assert finding.result is False
+        assert finding.message is None
+#endregion
+
+#region Under Buy Analyzer Tests
+class TestUnderBuyAnalyzer:
+    # Test 25 - Verify under-buy evaluation conditions
+    # Expected:
+    # No calorie surplus and no expiry risk = Evaluate
+    # Calorie surplus or expiry risk = Skip
+    @pytest.mark.parametrize("surplus, expiry_risk, should_buy", [ (False, False, True), (True, False, False), (False, True, False), (True, True, False)])
+    def test_analysis_gate(self, make_context, surplus, expiry_risk, should_buy):
+        item, ctx = make_context(quantity=1, fridge_quantity=1, weekly_rate=7)
+        ctx.update_findings([Finding( "CaloriesSurplus", surplus, "test" )])
+        if expiry_risk:
+            ctx.update_findings([Finding( "RiskOfExpiry", True, "milk will expire")])
+        finding = UnderBuyAnalyzer().analyze(item, ctx)
+        assert finding.analyzer_name == "UnderBuy"
+        assert finding.result is should_buy
+    # Test 26 - Verify sufficient existing stock
+    # Expected: No additional quantity is recommended.
+    def test_no_top_up_when_stock_is_sufficient(self, make_context):
+        item, ctx = make_context(quantity=3, fridge_quantity=10, weekly_rate=7)
+        ctx.update_findings([Finding("CaloriesSurplus", False, "test")])
+        finding = UnderBuyAnalyzer().analyze(item, ctx)
+        assert finding.result is False
+        assert finding.message is None
+    # Test 27 - Handle zero consumption
+    # Expected: No additional quantity is recommended.
+    def test_zero_consumption_never_requests_more(self, make_context):
+        item, ctx = make_context(weekly_rate=0)
+        ctx.update_findings([Finding("CaloriesSurplus", False, "test")])
+        finding = UnderBuyAnalyzer().analyze(item, ctx)
+        assert finding.result is False
+#endregion
+
+#region Confidence Calculator Tests
+class TestConfidenceCalculator:
+    # Test 28 - Calculate confidence without consumption history
+    # Expected: Return 0.0 when no historical records exist.
+    def test_no_history_returns_zero(self, make_context):
+        item, ctx = make_context(history_quantities=())
+        result = ConfidenceCalculator().calculate_confidence_score(item, ctx)
         assert result == 0.0
-    # Test 33 - Calculate confidence score using consumption history
-    # Expected result: Returns a confidence score greater than 0 and not exceeding 100.
-    def test_confidence_score_using_existing_history(self):
-        database = {"consumption_history": history, "fridge": fridge}
-        result = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
-        assert 0 < result <= 100
-    # Test 34 - Handle zero-mean consumption history
-    # Expected result: Returns 49.5 without causing a division-by-zero error.
-    def test_confidence_score_zero_mean_should_not_crash(self):
-        zero_history = [{"Date_Range": 7, "Item_Name": "milk", "Quantity": 0, "Unit": "l", "Remarks": "none"}]
-        score = logic.calculate_confidence_score("milk", {"consumption_history": zero_history, "fridge": []}, 0, 0, 7, "none")
-        assert score == 49.5
-    # Test 35 - Verify remarks bonus
-    # Expected result: Actionable remarks increase the confidence score by 5 without exceeding 100.
-    def test_confidence_score_remarks_bonus(self):
-        database = {"consumption_history": history, "fridge": fridge}
-        qty = AI_RECOMMENDATIONS[0]["Recommended_Quantity"]
-        without_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "none")
-        with_bonus = logic.calculate_confidence_score("milk", database, qty, 1.0, 7, "hosting guests")
-        assert with_bonus == min(100, round(without_bonus + 5, 1))
-    # Test 36 - Verify confidence score agreement
-    # Expected result: A quantity closer to the calculated household requirement produces a higher confidence score.
-    def test_confidence_score_agreement(self):
-        database = {"consumption_history": history, "fridge": fridge}
-        # Historical milk consumption averages 1.65l per week.
-        # With 1.0l of existing stock, the calculated purchase requirement is 0.65l.
-        agreement = logic.calculate_confidence_score("milk", database, 0.65, 1.0, 7, "none")
-        captured_ai = logic.calculate_confidence_score("milk", database, AI_RECOMMENDATIONS[0]["Recommended_Quantity"], 1.0, 7, "none")
-        assert agreement > captured_ai
+    # Test 29 - Reject items without AI data
+    # Expected: Raise NotImplementedError.
+    def test_item_without_ai_data_is_rejected(self, make_context):
+        _, ctx = make_context()
+        item = CartItem("milk", 2, "l")
+        with pytest.raises(NotImplementedError):
+            ConfidenceCalculator().calculate_confidence_score(item, ctx)
+    # Test 30 - Handle zero-mean consumption history
+    # Expected: Return 49.5 without division-by-zero errors.
+    def test_zero_history_does_not_divide_by_zero(self, make_context):
+        item, ctx = make_context(quantity=1, fridge_quantity=0, history_quantities=(0,))
+        item.set_ai_data(AIRecData( 0, 0, item.ai_data.est_expiry_date))
+        result = ConfidenceCalculator().calculate_confidence_score(item, ctx)
+        assert result == 49.5
+    # Test 31 - Verify AI recommendation agreement
+    # Expected: A recommendation closer to historical
+    # consumption requirements produces higher confidence.
+    def test_agreement_improves_confidence(self, make_context):
+        item, ctx = make_context(quantity=3, fridge_quantity=1, history_quantities=(7, 7) )
+        calculator = ConfidenceCalculator()
+        first_score = calculator.calculate_confidence_score(item, ctx)
+        # Historical requirement:
+        # 7l consumed per week - 1l existing stock = 6l needed.
+        item.set_ai_data(AIRecData( 6, 7, item.ai_data.est_expiry_date))
+        second_score = calculator.calculate_confidence_score(item, ctx)
+        assert second_score > first_score
+    # Test 32 - Verify actionable remarks bonus
+    # Expected: Relevant remarks increase confidence by 5
+    # without exceeding the maximum score of 100.
+    def test_actionable_remarks_bonus(self, make_context):
+        item, ctx = make_context(remarks="none")
+        calculator = ConfidenceCalculator()
+        baseline = calculator.calculate_confidence_score(item, ctx)
+        ctx.remarks = "hosting guests"
+        with_bonus = calculator.calculate_confidence_score(item, ctx)
+        assert with_bonus == min(100, round(baseline + 5, 1))
+    # Test 33 - Verify bonus keyword categories
+    # Expected:
+    # Full bonus = 5
+    # Partial bonus = 2.5
+    # No actionable remarks = 0
+    @pytest.mark.parametrize("remarks, expected", [ ("none", 0), ("", 0), ("hosting guests", 5), ("eating out", 2.5), ("ordinary note", 0)])
+    def test_bonus_keywords(self, remarks, expected):
+        result = BonusCalculator().bonus(remarks)
+        assert result == expected
+    # Test 34 - Handle zero-mean consistency calculation
+    # Expected: Return 0.0 without division-by-zero errors.
+    def test_zero_mean_consistency(self):
+        result = ConfidenceMetrics().consistency_score([0.0, 0.0])
+        assert result == 0.0
+#endregion
+
+#region Logic Manager Integration Tests
+class TestLogicManagerIntegration:
+    # Test 35 - Verify CartEvaluator integration
+    # Expected: Generate calorie surplus, expiry risk and
+    # under-buy findings for each cart item.
+    def test_cart_evaluator_produces_three_findings_per_item(self, make_context):
+        _, ctx = make_context(quantity=3, fridge_quantity=1, weekly_rate=7, expiry_days=20)
+        findings = CartEvaluator().evaluate(ctx)
+        expected = ["CaloriesSurplus", "RiskOfExpiry", "UnderBuy"]
+        assert [f.analyzer_name for f in findings] == expected
+        assert ctx.findings == findings
+    # Test 36 - Verify recommendation output formatting
+    # Expected: Display valid findings and exclude false findings.
+    def test_manager_formats_findings(self):
+        findings = [
+            Finding("CaloriesSurplus", False, "Below calorie requirement"),
+            Finding("RiskOfExpiry", True, "milk may expire"),
+            Finding("UnderBuy", True, "rice may run out"),
+            Finding("UnderBuy", False, None)
+        ]
+        output = LogicManager().structure_recommedations(findings)
+        assert "QUANTIFRESH ANALYSIS" in output
+        assert "Below calorie requirement" in output
+        assert "milk may expire" in output
+        assert "rice may run out" in output
+        assert "None" not in output
+    # Test 37 - Verify confidence scores are attached to cart items
+    # Expected: Each AI-enhanced cart item receives a valid
+    # confidence score between 0 and 100.
+    def test_manager_adds_confidence_to_cart(self, make_context):
+        item, ctx = make_context(quantity=6, fridge_quantity=1)
+        result = LogicManager().add_confidence_score(ctx)
+        assert result is ctx.cart
+        assert 0 < item.ai_data.confidence_score <= 100
 #endregion
 
 # =========================================================
@@ -390,12 +530,12 @@ class TestLogicManager:
 # =========================================================
 #region AI Output Snapshot Tests
 class TestAIOutputSnapshot:
-    # Test 37 - Verify final calorie totals
+    # Test 38 - Verify final calorie totals
     # Expected result: Both calorie totals equal the sums of their respective item-level values.
     def test_final_calorie_totals_match_individual_items(self):
         assert SAMPLE_AI_RESPONSE["Total_Planned_Estimated_Calories"] == sum(item["Planned_Estimated_Calories"] for item in AI_RECOMMENDATIONS)
         assert SAMPLE_AI_RESPONSE["Total_Estimated_Calories"] == sum(item["Estimated_Calories"] for item in AI_RECOMMENDATIONS)
-    # Test 38 - Verify estimated expiry dates
+    # Test 39 - Verify estimated expiry dates
     # Expected result: Each expiry date matches the captured date plus its estimated expiration days.
     def test_final_expiry_dates_match_capture_date(self):
         for item in AI_RECOMMENDATIONS:
@@ -405,7 +545,7 @@ class TestAIOutputSnapshot:
             assert item["Expiry_Date_Is_Default"] is (days is None)
             expected = CAPTURE_DATE + timedelta(days=365 if days is None else days)
             assert item["Estimated_Expiry_Date"] == expected.isoformat()
-    # Test 39 - Verify calorie consistency per unit
+    # Test 40 - Verify calorie consistency per unit
     # Expected result: Planned and recommended calorie estimates use approximately the same calories per unit.
     def test_snapshot_calories_per_unit_are_consistent(self):
         for item in AI_RECOMMENDATIONS:
@@ -415,7 +555,7 @@ class TestAIOutputSnapshot:
                 planned_kcal = item["Planned_Estimated_Calories"] / planned
                 recommended_kcal = item["Estimated_Calories"] / recommended
                 assert math.isclose(planned_kcal, recommended_kcal, rel_tol=0.05, abs_tol=1)
-    # Test 40 - Verify JSON serialization
+    # Test 41 - Verify JSON serialization
     # Expected result: Converting the response into JSON and back preserves all original data.
     def test_snapshot_json_round_trip(self):
         assert json.loads(json.dumps(SAMPLE_AI_RESPONSE)) == SAMPLE_AI_RESPONSE
