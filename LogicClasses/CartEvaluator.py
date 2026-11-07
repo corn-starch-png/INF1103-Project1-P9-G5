@@ -18,7 +18,6 @@ class CartEvaluator():
         for analyzer in self.__cart_analyzers:
             result = analyzer.analyze(ctx)
             findings.append(result)
-        print(f"fingier{findings}")
         ctx.update_findings(findings)
         
         
@@ -31,6 +30,5 @@ class CartEvaluator():
         for analyzer in self.__item_analyzers:
                     result = analyzer.analyze(item, ctx)
                     findings.append(result)
-                    print(f"fgfdgdf{result}")
                     ctx.update_findings([result])
         return findings

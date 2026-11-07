@@ -30,7 +30,7 @@ class AnalysisContext():
             self.findings.extend(new_findings)
 
     def get_total_items(self, item_name: str) -> int:
-        fridge_amt = self.fridge.get_total_quantity(item_name, include_expired=True)
+        fridge_amt = self.fridge.get_item_total(item_name, include_expired=False)
         cart_item = self.cart.search_item(item_name)
         if cart_item == None:
              cart_amt = 0

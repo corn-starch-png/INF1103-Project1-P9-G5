@@ -24,5 +24,6 @@ class Logic_manager():
     def add_confidence_score(self, ctx: AnalysisContext) -> Cart:
         for item in ctx.cart.get_items():
             score = self.__confidencecalculator.calculate_confidence_score(item, ctx)
+            # FLAG setting item data to an item derived from get_items() function
             item.set_confidence_score(score)
         return ctx.cart     

@@ -57,7 +57,7 @@ class CartRecommender:
             return False  # No consumption records found
 
         average_consumption = sum(normalized_records) / len(normalized_records)
-        fridge_quantity = self.__fridge.get_total_quantity(name, False)
+        fridge_quantity = self.__fridge.get_item_total(name, include_expired=False)
         
         item_records = self.__history.search_records(name)
         average_days_between_trips = sum(record.date_range for record in item_records)/len(item_records)

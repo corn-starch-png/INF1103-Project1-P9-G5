@@ -70,21 +70,22 @@ class IO_manager:
 
         # Check whether an identical item and expiry date already exist
         try:
-            merged, batch = home_items.add_or_merge(item)
+            merged = home_items.add_item(item)
         except ValueError as error:
             print(error)
             return
         if merged:
-            print(f"{batch.name} is already in your home items.\nTotal is now {self.format_item(batch)}.")
+            print(f"{item.name} is already in your home items.\nTotal is now {self.format_item(item)}.")
         else:
-            print(f"Added {self.format_item(batch)} to your home items.")
+            print(f"Added {self.format_item(item)} to your home items.")
 
     def __add_to_cart(self, cart, unit_validator):
         item_name, quantity, unit = self.__enter_item(unit_validator, cart.get_items())
 
         # If the same item with the same unit was already entered, add to it
         try:
-            merged, cart_item = cart.add_or_merge(CartItem(item_name, quantity, unit))
+            cart_item = CartItem(item_name, quantity, unit)
+            merged = cart.add_item(cart_item)
         except ValueError as error:
             print(error)
             return
@@ -103,6 +104,7 @@ class IO_manager:
             item.edit_quantity(new_qty)
 
     #can be used to edit grocery list or recommendation list
+    # FLAG setting item data to an item derived from get_items() function
     def __edit_list(self, item_list, remove_item):
         while True:
             item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
@@ -309,6 +311,7 @@ class IO_manager:
                     break
         else:
             print("\nYour grocery cart has been concluded.")
+        # FLAG setting item data to an item derived from get_items() function
         return [item.to_fridge_item(cart.get_remarks()) for item in cart.get_items()]
 
     # Formatting-----------

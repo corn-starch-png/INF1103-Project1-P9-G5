@@ -48,10 +48,8 @@ else:
             last_used_days = ui.ask_last_use_days()
             consumption_remarks = ui.get_consumption_remarks()
 
-            total_items = fridge.get_item_totals()
-            print(total_items)
+            total_items = fridge.get_fridge_totals()
             total_records = []
-            #TODO clean up get_item_totals() should not return tuple
             for combined_item in total_items:
                 consumed_amount = ui.get_consumption(combined_item['item_name'], combined_item['quantity'], combined_item['units']) # list of consumption records
                 record = fridge.consume(combined_item['item_name'], consumed_amount, combined_item['units'], last_used_days, consumption_remarks)
