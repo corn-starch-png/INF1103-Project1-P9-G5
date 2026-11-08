@@ -50,18 +50,18 @@ jobs: #gitub required status checks are expecting job names to pass!
     - name: Log Advisory rules violations with ruff 
       uses: astral-sh/ruff-action@v4.1.0
       with:
-        args: check --config ./.github/pyproject.toml --exit-zero --output-format=github .
+        args: check --config .\.github\pyproject.toml --exit-zero --output-format=github .
 
     - name: Log enforced rules violations with ruff
       uses: astral-sh/ruff-action@v4.1.0
       with:
-        args: check --config ./.github/pyproject.toml --output-format=github --exit-zero --ignore B904,B905,B007,E712,E501,E701,I001,F401,F541,F841,SIM102,RUF059,FURB157,PLC0206 .
+        args: check --config .\.github\pyproject.toml --output-format=github --exit-zero --ignore B904,B905,B007,E712,E501,E701,I001,F401,F541,F841,SIM102,RUF059,FURB157,PLC0206 .
 
     - name: Check formatting with Ruff
       uses: astral-sh/ruff-action@v4.1.0
       continue-on-error: true 
       with:
-        args: format --check --config ./.github/pyproject.toml --diff  .
+        args: format --check --config .\.github\pyproject.toml --diff  .
 
   CustomPytestScript: #name of  job
       name: Running PytestScript 
