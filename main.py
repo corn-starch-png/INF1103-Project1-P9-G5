@@ -72,6 +72,16 @@ def mirror_to_json(backup=False):
     except Exception as e:
         print(f"Warning: could not update the local JSON backup: {e}")
 
+def save_everything():
+    try:
+        DB_manager().save_database(REPOSITORY)
+    except Exception as e:
+        print(f"Warning: could not save to the database: {e}")
+    mirror_to_json()                             # always keep the local copy current
+    if isinstance(REPOSITORY, JsonRepository):   # saved offline: remember it
+        os.makedirs("database", exist_ok=True)
+        open(OFFLINE_MARKER, "w").close()
+
 #-------END OF DEPENDENCY LINE----------#
 
 # old code
