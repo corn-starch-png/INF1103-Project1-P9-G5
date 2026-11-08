@@ -55,4 +55,23 @@ class MongoDBRepository(RepositoryFunctions):
             errors.extend(store.load_dicts(rows))
 
         return errors, self.__stores
+    
+    def save(self) -> None:
+        """Save existing objects into MongoDB Atlas."""
 
+        for collection_name, store in self.__stores.items():
+            collection = self.__database[collection_name]
+
+            rows = store.to_dicts()
+
+            # WARNING: This replaces all documents in the collection,
+            # so avoid editing at the same time as a teammate.
+            collection.delete_many({})
+
+            if rows:
+                # Insert copies so PyMongo doesn't add "_id" to your own dicts
+                collection.insert_many([dict(r) for r in rows])
+
+    def close(self) -> None:
+        """Close the MongoDB connection."""
+        self.__client.close()
