@@ -82,6 +82,24 @@ def save_everything():
         os.makedirs("database", exist_ok=True)
         open(OFFLINE_MARKER, "w").close()
 
+# ---------- startup: handle changes made while offline ----------
+if not isinstance(REPOSITORY, JsonRepository) and os.path.exists(OFFLINE_MARKER):
+    answer = input("You made changes while offline. Upload them to the shared database? "
+                   "This REPLACES the cloud data (y/n): ").strip().lower()
+    if answer == "y":
+        _, local_stores = JsonRepository(folder="database").load()
+        data_bundle.update(local_stores)         # swap the cloud-loaded objects for the local ones
+        fridge = data_bundle["fridge"]
+        household_info = data_bundle["household"]
+        history = data_bundle["consumption_history"]
+        DB_manager().save_database(REPOSITORY)
+        print("Offline changes uploaded to the shared database.")
+    else:
+        print("Offline changes discarded. Using the shared database data.")
+    os.remove(OFFLINE_MARKER)
+
+mirror_to_json(backup=True)     # back up the old local files, then refresh them from the cloud
+
 #-------END OF DEPENDENCY LINE----------#
 
 # old code
