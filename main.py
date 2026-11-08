@@ -52,6 +52,8 @@ else:
             total_records = []
             for combined_item in total_items:
                 consumed_amount = ui.get_consumption(combined_item['item_name'], combined_item['quantity'], combined_item['units']) # list of consumption records
+                if consumed_amount == 0:
+                    continue
                 record = fridge.consume(combined_item['item_name'], consumed_amount, combined_item['units'], last_used_days, consumption_remarks)
                 history.add_record(record)
                 total_records.append(record)

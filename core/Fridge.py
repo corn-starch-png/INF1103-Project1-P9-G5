@@ -80,6 +80,10 @@ class Fridge(ListFunctions, CanBeStored):
     def get_items(self) -> list:
         return list(self.__items)
 
+    def get_item_at(self, index: int) -> FridgeItem:
+        # Safely get the item from the private list by index
+        return self.__items[index]
+    
     def remove_duplicates(self) -> bool:
         """
         should run after every addition or removal of items to ensure the fridge is valid.

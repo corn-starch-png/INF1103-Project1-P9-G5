@@ -4,6 +4,8 @@ from DB_manager import send_log
 from ioclasses import (TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt,
                        QuantityUnitPrompt, EditQuantityPrompt)
 from core.ItemRecord import ItemRecord
+from core.ListFunctions import ListFunctions
+from core.ItemFunctions import ItemFunctions
 from core.Person import Person
 from core.Household import Household
 from core.Fridge import Fridge
@@ -106,25 +108,28 @@ class IO_manager:
         else:
             print(f"Added {self.format_item(cart_item)}.")
 
-    def __edit_item(self, item, remove_item):
+    def __edit_item(self, item: ItemFunctions):
         new_qty = EditQuantityPrompt(f"Selected {item.name}, Current Quantity: {item.quantity}\n"
                                      "Enter new amount (enter 0 to delete item): ",
                                      item.unit == 'pcs', normalize_quantity, ItemRecord.MAX_QUANTITY).ask()
         if new_qty == 0:
-            remove_item(item)
+            return True
         else:
             item.set_quantity(new_qty)
+            return False
 
-    #can be used to edit grocery list or recommendation list
-    # FLAG setting item data to an item derived from get_items() function
-    def __edit_list(self, item_list, remove_item):
+    #can be used edit Fridge or Cart
+    def __edit_list(self, item_list: ListFunctions):
         while True:
             item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
             if item_index == "exit":
                 return True
             elif item_index.isdecimal():
-                if int(item_index) in range(1, len(item_list) + 1): # check if option is in the list
-                    self.__edit_item(item_list[int(item_index) - 1], remove_item)
+                if int(item_index) in range(1, len(item_list.get_items()) + 1): # check if option is in the list
+                    item = item_list.get_item_at(int(item_index) - 1)
+                    delete_item = self.__edit_item(item)
+                    if delete_item == True:
+                        item_list.remove_item(item)
                     return False
                 else:
                     print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
@@ -183,7 +188,7 @@ class IO_manager:
                     continue
                 while True:
                     self.display_list("Fridge", home_items.get_items())
-                    if self.__edit_list(home_items.get_items(), home_items.remove_item):
+                    if self.__edit_list(home_items):
                         break
             else:
                 return home_items
@@ -224,7 +229,7 @@ class IO_manager:
             elif user_choice == "2": #edit cart
                 while True:
                     self.display_list("Grocery Cart", cart.get_items())
-                    if self.__edit_list(cart.get_items(), cart.remove_item):
+                    if self.__edit_list(cart):
                         break
             else: # exit CRUD of cart
                 if len(cart.get_items()) == 0:
@@ -312,18 +317,16 @@ class IO_manager:
             print(f"\n--------------------------------------------------------------------------------")
 
     #handles IO for after AI and logic processes
-    def shopping_cart_conclusion(self, cart: Cart) -> list[FridgeItem]:
+    def shopping_cart_conclusion(self, cart: Cart) -> None:
         self.display_list("Recommendations List", cart.get_items())
         if self.__ask_yes_no("\nWould you like to change the quantity of items in your grocery cart? ",
                              "Invalid input. Please enter 'yes' or 'no'."):
             while True:
                 self.display_list("Recommendations List", cart.get_items())
-                if self.__edit_list(cart.get_items(), cart.remove_item):
+                if self.__edit_list(cart):
                     break
         else:
             print("\nYour grocery cart has been concluded.")
-        # FLAG setting item data to an item derived from get_items() function
-        return [item.to_fridge_item(cart.get_remarks()) for item in cart.get_items()]
 
     # Formatting-----------
     def format_item(self, item):

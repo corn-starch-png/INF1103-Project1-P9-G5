@@ -45,6 +45,10 @@ class Cart(ListFunctions):
                 return item
         raise ValueError("Error, item does not exist in cart")
 
+    def get_item_at(self, index: int) -> CartItem:
+    # Safely get the item from the private list by index
+        return self.__items[index]
+
     def set_remarks(self, remarks: str) -> None:
         self.__remarks = remarks
 
