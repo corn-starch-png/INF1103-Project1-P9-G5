@@ -1,14 +1,20 @@
 from datetime import date
 from ioclasses.Prompt import Prompt
+from core.ItemRecord import ItemRecord
 
 
 # Asks for an expiry date in YYYY-MM-DD format between min_date and max_date (inclusive),
 # and not before purchase_date if one is given. Warns the user if the date has already passed.
 class DatePrompt(Prompt):
-    def __init__(self, question, min_date, max_date, purchase_date=""):
+    def __init__(self, question, allow_past=False, purchase_date=""):
         super().__init__(question)
-        self.__min_date = min_date
-        self.__max_date = max_date
+
+        today = date.today()
+        earliest = ItemRecord.shift_calendar_years(today, -1) if allow_past else today
+        latest = ItemRecord.shift_calendar_years(today, 3)
+
+        self.__min_date = earliest
+        self.__max_date = latest
         self.__purchase_date = purchase_date
 
     def _validate(self, text):

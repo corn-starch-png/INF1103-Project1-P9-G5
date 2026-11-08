@@ -11,6 +11,13 @@ class Cart(ListFunctions):
     def __init__(self, remarks: str = ""):
         self.__items = []
         self.__remarks = remarks
+        self.__ai_enhanced = False
+
+    def set_ai_enhanced(self, value: bool) -> None:
+        self.__ai_enhanced = value
+
+    def get_ai_enhanced(self) -> bool:
+        return self.__ai_enhanced
 
     def add_item(self, item: CartItem) -> None:
         if not isinstance(item, CartItem):

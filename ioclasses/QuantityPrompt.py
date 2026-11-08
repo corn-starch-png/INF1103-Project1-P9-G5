@@ -6,7 +6,7 @@ from ioclasses.Prompt import Prompt
 
 class QuantityPrompt(Prompt):
     def __init__(self, question, max_value=None, allow_zero=False, whole_number=False,
-                 normalize=None, max_message=None):
+                 normalize=False, max_message=None):
         super().__init__(question)
         self.__max = max_value
         self.__allow_zero = allow_zero
@@ -27,9 +27,9 @@ class QuantityPrompt(Prompt):
             if self.__max_message is not None:
                 return self.__max_message
             return f"Quantity cannot be more than {self.__max}."
-        if self.__normalize is not None:
+        if self.__normalize is True:
             try:
-                rounded = self.__normalize(text)
+                rounded = self.normalize_quantity(text)
             except ValueError:
                 return "Invalid or excessively large quantity."
             if rounded == 0:
@@ -37,6 +37,6 @@ class QuantityPrompt(Prompt):
         return ""
 
     def _convert(self, text):
-        if self.__normalize is not None:
-            return self.__normalize(text)
+        if self.__normalize is True:
+            return self.normalize_quantity(text)
         return float(text)

@@ -6,6 +6,7 @@ try:
     from DB_manager import DB_manager
     from IO_manager import IO_manager
     from Logic_manager import Logic_manager
+    from core.Cart import Cart
     from core.Fridge import Fridge
     from core.Household import Household
     from core.ConsumptionHistory import ConsumptionHistory
@@ -23,7 +24,6 @@ REPOSITORY = JsonRepository(folder="database")
 ui = IO_manager()
 logicmgr = Logic_manager()
 
-
 errors, data_bundle = DB_manager().load_database(REPOSITORY)
 fridge = data_bundle["fridge"]
 household_info = data_bundle["household"]
@@ -33,32 +33,19 @@ history = data_bundle["consumption_history"]
 ui.show_welcome()
 #if new user, direct them to create a new profile then add items they have in thier fridge
 if not household_info.get_members():
-    #TODO this will not change the actual household being used, but will instead point household_info to another household
     ui.initialize_household(household_info)
     ui.show_profile(household_info)
-    #TODO same logic as above
-    ui.add_to_fridge(fridge)
-    ui.display_list("Fridge", fridge.get_items())
+    ui.initialize_fridge(fridge)
+    ui.display_fridge(fridge)
 else:
     ui.show_welcome_back(household_info)
     while True:
-        choice = ui.ask_menu_choice()
+        choice = ui.ask_main_menu_choice()
         #update consumption history then break loop and continue
         if choice == "1":
             last_used_days = ui.ask_last_use_days()
             consumption_remarks = ui.get_consumption_remarks()
-
-            total_items = fridge.get_fridge_totals()
-            total_records = []
-            for combined_item in total_items:
-                consumed_amount = ui.get_consumption(combined_item['item_name'], combined_item['quantity'], combined_item['units']) # list of consumption records
-                if consumed_amount == 0:
-                    continue
-                record = fridge.consume(combined_item['item_name'], consumed_amount, combined_item['units'], last_used_days, consumption_remarks)
-                history.add_record(record)
-                total_records.append(record)
-
-            ui.show_consumption(total_records)
+            ui.get_consumption(fridge, history, last_used_days, consumption_remarks)
             break
         #give user option to edit AI estimated expiry dates or delete items(for example if expired)
         elif choice == "2":
@@ -70,10 +57,11 @@ else:
             sys.exit(0)
 
 days_until_next_visit = ui.ask_days_until_next()
+cart = Cart()
 #TODO display recommended cart
 #TODO let user choose start new cart or use recommened cart
-cart = ui.enter_grocery_list(fridge, history)
-remarks = ui.ask_remarks()
+ui.enter_grocery_list(cart, fridge, history)
+remarks = ui.get_cart_remarks()
 cart.set_remarks(remarks)
 
 #region AI Recommendations
@@ -94,6 +82,7 @@ ai_recommendations, error = ai_manager.get_ai_recommendations(
 if error or ai_recommendations is None:
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 # Extract validated AI results.
+cart.set_ai_enhanced(True)
 recommendations = ai_recommendations["Recommendations_List"]
 total_planned_calories = ai_recommendations["Total_Planned_Estimated_Calories"]
 total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]

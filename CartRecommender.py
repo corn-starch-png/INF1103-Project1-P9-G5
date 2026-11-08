@@ -26,6 +26,7 @@ class CartRecommender:
                         pass
                         #TODO create CartItem from past consumption history
                         #recommendations.add_item()
+                        #recommended amout is average_consumption * average_days_between_trips
         return recommendations
 
     def display_recommendation(self) -> str:

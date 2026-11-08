@@ -22,8 +22,8 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
     def __calculate_family_kcal(self, days_until_next_visit: int, family:Household):
         daily_total = 0
         for person in family.get_members():
-            age = self.__get_age_from_KCAL(person.get_age())
-            gender = person.get_gender()
+            age = self.__get_age_from_KCAL(person.get_age)
+            gender = person.get_gender
             daily_total += self.KCAL_TABLE[age][gender] #male + female calorie
         return daily_total * days_until_next_visit
     
