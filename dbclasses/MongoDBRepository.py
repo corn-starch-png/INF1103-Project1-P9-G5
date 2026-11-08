@@ -1,12 +1,14 @@
-
 import os
 
+from dotenv import load_dotenv
 from pymongo import MongoClient
 
 from dbclasses.RepositoryFunctions import RepositoryFunctions
 from core.Household import Household
 from core.Fridge import Fridge
 from core.ConsumptionHistory import ConsumptionHistory
+
+load_dotenv()
 
 
 class MongoDBRepository(RepositoryFunctions):
@@ -25,10 +27,10 @@ class MongoDBRepository(RepositoryFunctions):
         # Connect to MongoDB Atlas
         self.__client = MongoClient(
             uri,
-            serverSelectionTimeoutMS=10000
+            serverSelectionTimeoutMS=5000
         )
 
-        # Verify the connection
+        # Verify the connection (raises if Atlas is unreachable)
         self.__client.admin.command("ping")
 
         self.__database = self.__client[database_name]
@@ -40,24 +42,17 @@ class MongoDBRepository(RepositoryFunctions):
             "consumption_history": ConsumptionHistory(),
         }
 
-    def load(self) -> list:
-        """Load data from MongoDB Atlas into existing objects."""
+    def load(self):
+        """Load data from MongoDB Atlas into existing objects.
+        Returns (errors, stores). Connection errors are NOT caught here,
+        so main.py can fall back to local JSON."""
         errors = []
 
         for collection_name, store in self.__stores.items():
-            try:
-                collection = self.__database[collection_name]
-
-                rows = list(
-                    collection.find({}, {"_id": 0})
-                )
-
-                errors.extend(store.load_dicts(rows))
-
-            except Exception as e:
-                errors.append(
-                    f"Could not load {collection_name}: {e}"
-                )
+            rows = list(
+                self.__database[collection_name].find({}, {"_id": 0})
+            )
+            errors.extend(store.load_dicts(rows))
 
         return errors, self.__stores
 
@@ -69,11 +64,13 @@ class MongoDBRepository(RepositoryFunctions):
 
             rows = store.to_dicts()
 
-            # WARNING: This replaces all documents in the collection.
+            # WARNING: This replaces all documents in the collection,
+            # so avoid editing at the same time as a teammate.
             collection.delete_many({})
 
             if rows:
-                collection.insert_many(rows)
+                # Insert copies so PyMongo doesn't add "_id" to your own dicts
+                collection.insert_many([dict(r) for r in rows])
 
     def close(self) -> None:
         """Close the MongoDB connection."""
