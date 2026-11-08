@@ -1,9 +1,9 @@
 from datetime import date
 from decimal import Decimal
-from DB_manager import (MAX_ITEM_NAME_LENGTH, MAX_PERSON_NAME_LENGTH, MAX_DIETARY_LENGTH,
-                        MAX_QUANTITY, MAX_REMARKS_LENGTH, normalize_quantity, send_log, shift_calendar_years)
+from DB_manager import send_log
 from ioclasses import (TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt,
                        QuantityUnitPrompt, EditQuantityPrompt)
+from core.ItemRecord import ItemRecord
 from core.Person import Person
 from core.Household import Household
 from core.Fridge import Fridge
@@ -13,6 +13,18 @@ from core.CartItem import CartItem
 from core.Cart import Cart
 from core.UnitValidator import UnitValidator
 
+#temporarily moving here to decouple DB manager and IO manager
+# will remove because checks are already being done at the ItemRecord class level
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+QUANTITY_STEP = Decimal("0.0001")
+def normalize_quantity(value):
+    try:
+        amount = Decimal(str(value))
+        if not amount.is_finite() or not 0 <= amount <= ItemRecord.MAX_QUANTITY:
+            raise ValueError("Quantity must be between 0 and 1,000,000.")
+        return float(amount.quantize(QUANTITY_STEP,rounding=ROUND_HALF_UP))
+    except (InvalidOperation, TypeError) as error:
+        raise ValueError("Invalid quantity.") from error
 
 class IO_manager:
     def __init__(self):
@@ -20,7 +32,7 @@ class IO_manager:
         self.__valid_genders = ["male", "female"]
         self.__remarks_prompt = TextPrompt(
             "\nAny remarks for this week? e.g. hosting a party, going on holiday (leave blank if none): ",
-            allow_blank=True, max_length=MAX_REMARKS_LENGTH)
+            allow_blank=True, max_length=ItemRecord.MAX_REMARKS_LENGTH)
         self.__days_prompt = IntRangePrompt("\nIn how many days do you plan to shop next? (e.g. 7): ", 1, 365)
 
     def __ask_yes_no(self, question, error_message="Please answer yes or no."):
@@ -30,15 +42,15 @@ class IO_manager:
     # Ask for a date in YYYY-MM-DD format and check it is a real date.
     def __ask_date(self, question, allow_past=False, purchase_date=""):
         today = date.today()
-        earliest = shift_calendar_years(today, -1) if allow_past else today
+        earliest = FridgeItem.shift_calendar_years(today, -1) if allow_past else today
         # maximum expiry date
-        latest = shift_calendar_years(today, 3)
+        latest = FridgeItem.shift_calendar_years(today, 3)
         return DatePrompt(question, earliest, latest, purchase_date).ask()
 
     # Ask for one item's name, quantity and unit, validating bad input.
     # If the item was entered before, its unit is reused.
     def __enter_item(self, unit_validator, other_items=None):
-        item_name = TextPrompt("Item name: ", max_length=MAX_ITEM_NAME_LENGTH).ask()
+        item_name = TextPrompt("Item name: ", max_length=ItemRecord.MAX_NAME_LENGTH).ask()
 
         # Check if this item was entered before, and lock its unit
         locked_unit = unit_validator.find_unit(item_name, other_items)
@@ -47,7 +59,7 @@ class IO_manager:
 
         # Ask for quantity and unit together
         quantity, unit = QuantityUnitPrompt(item_name, self.__valid_units, locked_unit,
-                                            normalize_quantity, MAX_QUANTITY).ask()
+                                            normalize_quantity, ItemRecord.MAX_QUANTITY).ask()
         return item_name, quantity, unit
 
     # Ask whether the user wants to add another item or edit/delete an item.
@@ -61,7 +73,7 @@ class IO_manager:
         item_name, quantity, unit = self.__enter_item(UnitValidator(home_items))
         expiry_date = self.__ask_date("Expiry date (YYYY-MM-DD): ")
         item_remarks = TextPrompt("Any remarks about this item? e.g. opened, for a party (leave blank if none): ",
-                                  allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
+                                  allow_blank=True, max_length=ItemRecord.MAX_REMARKS_LENGTH).ask()
 
         if item_remarks == "":
             item_remarks = "none"
@@ -97,7 +109,7 @@ class IO_manager:
     def __edit_item(self, item, remove_item):
         new_qty = EditQuantityPrompt(f"Selected {item.name}, Current Quantity: {item.quantity}\n"
                                      "Enter new amount (enter 0 to delete item): ",
-                                     item.unit == 'pcs', normalize_quantity, MAX_QUANTITY).ask()
+                                     item.unit == 'pcs', normalize_quantity, ItemRecord.MAX_QUANTITY).ask()
         if new_qty == 0:
             remove_item(item)
         else:
@@ -123,12 +135,12 @@ class IO_manager:
     def create_profile(self):
         genders = ", ".join(self.__valid_genders)
         household = Household()
-        name = TextPrompt("Please enter your name: ", max_length=MAX_PERSON_NAME_LENGTH).ask()
+        name = TextPrompt("Please enter your name: ", max_length=Person.MAX_NAME_LENGTH).ask()
         age = IntRangePrompt("Please enter your age: ", 10, 120,"Please enter a valid age (whole number between 10 and 120).").ask()
         gender = ChoicePrompt(f"Please enter your gender ({genders}): ", self.__valid_genders,
                               "Please enter male or female.").ask()
         dietary_restrictions = TextPrompt("Please enter your dietary restrictions (leave blank if none): ",
-                                          allow_blank=True, max_length=MAX_DIETARY_LENGTH).ask()
+                                          allow_blank=True, max_length=Person.MAX_DIETARY_LENGTH).ask()
         if dietary_restrictions == "":
             dietary_restrictions = "none"
         family = IntRangePrompt("Please enter your family size including yourself: ", 1, 20).ask()
@@ -137,13 +149,13 @@ class IO_manager:
 
         for i in range(family - 1):
             member_name = TextPrompt(f"Please enter the name of family member {i + 1}: ",
-                                     max_length=MAX_PERSON_NAME_LENGTH).ask()
+                                     max_length=Person.MAX_NAME_LENGTH).ask()
             member_age = IntRangePrompt(f"Please enter the age of {member_name}: ", 1, 120,
                                         "Please enter a valid age (whole number between 0 and 120).").ask()
             member_gender = ChoicePrompt(f"Please enter the gender of {member_name} ({genders}): ",
                                          self.__valid_genders, "Please enter male or female.").ask()
             member_diet = TextPrompt(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ",
-                                     allow_blank=True, max_length=MAX_DIETARY_LENGTH).ask()
+                                     allow_blank=True, max_length=Person.MAX_DIETARY_LENGTH).ask()
             if member_diet == "":
                 member_diet = "none"
             household.add_member(Person(i + 2, member_name, member_age, member_gender.capitalize(), member_diet))
@@ -181,7 +193,7 @@ class IO_manager:
     # Asked once, then added to every item
     def get_consumption_remarks(self) -> str:
         remarks = TextPrompt("Any remarks about your consumption since last time? (leave blank if none): ",
-                                allow_blank=True, max_length=MAX_REMARKS_LENGTH).ask()
+                                allow_blank=True, max_length=ItemRecord.MAX_REMARKS_LENGTH).ask()
         if remarks == "" or remarks.lower() == "none":
             remarks = "none"
         return remarks

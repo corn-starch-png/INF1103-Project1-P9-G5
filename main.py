@@ -106,7 +106,7 @@ context = AnalysisContext(cart= cart,
                           next_purchase_date= days_until_next_visit
                           )
 
-cart = logicmgr.add_confidence_score(ctx=context)
+logicmgr.add_confidence_score(ctx=context)
 
 findings = logicmgr.process_recommendations(ctx= context)
 

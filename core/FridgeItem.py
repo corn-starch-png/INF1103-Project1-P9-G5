@@ -7,9 +7,7 @@ from core.ConsumptionRecord import ConsumptionRecord
 
 class FridgeItem(ItemRecord, ItemFunctions):
     """One batch of an item stored in the fridge."""
-
-    MAX_REMARKS_LENGTH = 500
-
+    
     def __init__(self, name: str, quantity: float, unit: str, purchase_date: str,
                  expiry_date: str, remarks: str = ""):
         super().__init__(name, quantity, unit)
@@ -50,7 +48,7 @@ class FridgeItem(ItemRecord, ItemFunctions):
         if self.__purchase_date != "":
             if date.fromisoformat(self.__purchase_date) > date.fromisoformat(self.__expiry_date):
                 return False
-        if not isinstance(self.__remarks, str) or len(self.__remarks) > self.MAX_REMARKS_LENGTH:
+        if not isinstance(self.__remarks, str) or len(self.__remarks) > ItemRecord.MAX_REMARKS_LENGTH:
             return False
         return True
 
@@ -86,6 +84,14 @@ class FridgeItem(ItemRecord, ItemFunctions):
             if date.fromisoformat(self.__purchase_date) > date.fromisoformat(new_expiry_date):
                 raise ValueError("Expiry date cannot be before purchase date.")
         self.__expiry_date = new_expiry_date
+
+    # does not edit the FridgeItem itself but is used for validation before the item turns into a fridge item
+    def shift_calendar_years(value, years):
+        target_year = value.year + years
+        try:
+            return value.replace(year=target_year)
+        except ValueError:
+            return value.replace(year=target_year, month=2, day=28)
 
     def is_expired(self) -> bool:
         """An item is expired once today is after its expiry date (same rule as the original code)."""
