@@ -41,6 +41,7 @@ jobs: #gitub required status checks are expecting job names to pass!
       uses: actions/checkout@v6 #clones repo source code
 
     - name: Test Ruff configuration
+      uses: astral-sh/ruff-action@v4.1.0
       run: |
         pwd
         ruff --version
