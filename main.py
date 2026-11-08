@@ -45,6 +45,8 @@ fridge = data_bundle["fridge"]
 household_info = data_bundle["household"]
 history = data_bundle["consumption_history"]
 
+#TODO:fallback 
+
 #-------END OF DEPENDENCY LINE----------#
 
 # old code
