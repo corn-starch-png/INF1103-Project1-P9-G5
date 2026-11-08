@@ -45,7 +45,32 @@ fridge = data_bundle["fridge"]
 household_info = data_bundle["household"]
 history = data_bundle["consumption_history"]
 
-#TODO:fallback 
+# ---------- local JSON copy (fallback + backup) ----------
+OFFLINE_MARKER = os.path.join("database", ".offline_changes")
+
+def mirror_to_json(backup=False):
+    """When running on the cloud, keep the local JSON files in sync."""
+    if isinstance(REPOSITORY, JsonRepository):
+        return                                   # already running on local JSON
+    try:
+        if backup:                               # keep the old local files before overwriting them
+            dest = os.path.join("database", "backup_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+            os.makedirs(dest, exist_ok=True)
+            for name in ("fridge.json", "household.json", "consumption_history.json"):
+                src = os.path.join("database", name)
+                if os.path.exists(src):
+                    shutil.copy2(src, dest)
+
+        json_repo = JsonRepository(folder="database")
+        _, json_stores = json_repo.load()        # gives us JsonRepository's own stores
+        json_stores.update({
+            "fridge": fridge,
+            "household": household_info,
+            "consumption_history": history,
+        })
+        json_repo.save()
+    except Exception as e:
+        print(f"Warning: could not update the local JSON backup: {e}")
 
 #-------END OF DEPENDENCY LINE----------#
 
