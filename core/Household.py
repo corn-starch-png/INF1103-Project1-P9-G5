@@ -5,6 +5,9 @@ from core.CanBeStored import CanBeStored
 class Household(CanBeStored):
     """Holds the people who live in the household (aggregation of Person)."""
 
+    MIN_PAX = 1
+    MAX_PAX = 20
+
     def __init__(self):
         self.__members = []
 

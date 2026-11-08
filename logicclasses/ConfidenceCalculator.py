@@ -1,9 +1,9 @@
 from core.CartItem import CartItem
 from core.Fridge import Fridge
-from LogicClasses.AnalysisContext import AnalysisContext
-from LogicClasses.ConfidenceMetrics import ConfidenceMetrics
-from LogicClasses.BonusCalculator import BonusCalculator
-from DB_manager import send_log
+from logicclasses.AnalysisContext import AnalysisContext
+from logicclasses.ConfidenceMetrics import ConfidenceMetrics
+from logicclasses.BonusCalculator import BonusCalculator
+from logger import app_logger
 
 class ConfidenceCalculator:
     def __init__(self):
@@ -13,7 +13,7 @@ class ConfidenceCalculator:
     def calculate_confidence_score(self, item: CartItem, ctx: AnalysisContext) -> float:
         if not item.is_enhanced():
             raise NotImplementedError("Item must have AI Data for confidence score to be calculated")
-        fridge_amt = ctx.fridge.get_total_quantity(item.name, False)
+        fridge_amt = ctx.fridge.get_item_total(item.name, include_expired=False)
         normalized_daily_consumption = ctx.history.get_normalized_records(item.name)
         #if no previous consumption, no score can be calculated
         if normalized_daily_consumption == []:
@@ -31,15 +31,15 @@ class ConfidenceCalculator:
             + 0.4 * agreement_score
         ) * 100
 
-        bonus_score = self.__bonusMetrics.bonus(ctx.remarks)
+        bonus_score = self.__bonusMetrics.bonus(ctx.cart.get_remarks())
         
-        send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item.name}---")
-        send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")
-        send_log(f"[CONFIDENCE SCORE] consistency_score: {consistency_score}")
-        send_log(f"[CONFIDENCE SCORE] AI agreement_score: {agreement_score}")
-        send_log(f"[CONFIDENCE SCORE] confidence_score: {confidence_score}")
-        send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
-        send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item.name}---")
+        app_logger.send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] consistency_score: {consistency_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] AI agreement_score: {agreement_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] confidence_score: {confidence_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
 
         if confidence_score == 0: #do not add bonus if score is 0 
             return 0.0

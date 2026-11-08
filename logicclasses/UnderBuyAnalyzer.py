@@ -1,8 +1,8 @@
-from LogicClasses.ItemAnalyzer import ItemAnalyzer
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.ItemAnalyzer import ItemAnalyzer
+from logicclasses.AnalysisContext import AnalysisContext
 from core.CartItem import CartItem
-from DB_manager import send_log
-from LogicClasses.Finding import Finding
+from logger import app_logger
+from logicclasses.Finding import Finding
 
 class UnderBuyAnalyzer(ItemAnalyzer):        
     ANALYZER_NAME = "UnderBuy"
@@ -24,7 +24,7 @@ class UnderBuyAnalyzer(ItemAnalyzer):
             if estimated_consumption_rate > 0: 
                 daily_consumption_rate = estimated_consumption_rate / 7
                 quantity_needed = daily_consumption_rate * ctx.next_purchase_date
-                amount_to_topup = round (quantity_needed - ctx.total_item, 2)
+                amount_to_topup = round (quantity_needed - ctx.get_total_items(item_name), 2)
         
                 if amount_to_topup > 0:
                     result = True
@@ -33,7 +33,7 @@ class UnderBuyAnalyzer(ItemAnalyzer):
                 elif amount_to_topup <=0:
                     result = False
                     message = None
-                    send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
+                    app_logger.send_log(f"[LOGIC] underbuy: additional {item_name} is not needed")
                     
                 return Finding(
                         analyzer_name= self.ANALYZER_NAME,
@@ -42,7 +42,7 @@ class UnderBuyAnalyzer(ItemAnalyzer):
                         ) 
         
             else:
-                send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
+                app_logger.send_log(f"[LOGIC] underbuy cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
                 return Finding(
                         analyzer_name= self.ANALYZER_NAME,
                         result=False,

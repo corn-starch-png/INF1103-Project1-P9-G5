@@ -12,7 +12,7 @@ try:
     from core.AIRecData import AIRecData
     from aiclasses.AI_manager import AIManager
     from aiclasses.OpenRouterProvider import OpenRouterProvider
-    from Logic_manager import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
+    from Logic_managerOLD import (under_buy, calories_surplus, risk_of_expiry, calculate_confidence_score, should_evaluate_underbuy)
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 

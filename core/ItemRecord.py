@@ -12,6 +12,7 @@ class ItemRecord(Record):
     """
 
     MAX_NAME_LENGTH = 50
+    MAX_REMARKS_LENGTH = 500 #not checked in this class, but every child class has some form of remarks that should have the same max length
     MAX_QUANTITY = 1_000_000
     QUANTITY_STEP = Decimal("0.0001")
     VALID_UNITS = ("kg", "g", "l", "ml", "pcs")
@@ -79,3 +80,11 @@ class ItemRecord(Record):
         if self._unit == "pcs" and amount != amount.to_integral_value():
             raise ValueError("Quantity in pcs must be a whole number.")
         self._quantity = float(amount)
+
+    # mainly utilized to check expiry date of fridgeitems, but may have functionalites over other itemrecords
+    def shift_calendar_years(value, years):
+        target_year = value.year + years
+        try:
+            return value.replace(year=target_year)
+        except ValueError:
+            return value.replace(year=target_year, month=2, day=28)

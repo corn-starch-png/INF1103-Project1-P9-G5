@@ -1,5 +1,6 @@
 from datetime import date
 
+from core.Cart import Cart
 from core.ConsumptionHistory import ConsumptionHistory
 from core.Fridge import Fridge
 
@@ -14,7 +15,7 @@ class CartRecommender:
         self.__history = history
 
     def generate_recommendation(self) -> list:
-        recommendations = []
+        recommendations = Cart() 
         history_items = self.__history.get_unique_item_names()
         for name in history_items:
             item_records = self.__history.search_records(name)
@@ -22,7 +23,10 @@ class CartRecommender:
                 latest_record_date = max(record.record_date for record in item_records)
                 if self.__check_item_recent(latest_record_date) and latest_record_date != 0:
                     if self.__check_item_consumption(name):
-                        recommendations.append(name)
+                        pass
+                        #TODO create CartItem from past consumption history
+                        #recommendations.add_item()
+                        #recommended amout is average_consumption * average_days_between_trips
         return recommendations
 
     def display_recommendation(self) -> str:
@@ -54,7 +58,7 @@ class CartRecommender:
             return False  # No consumption records found
 
         average_consumption = sum(normalized_records) / len(normalized_records)
-        fridge_quantity = self.__fridge.get_total_quantity(name, False)
+        fridge_quantity = self.__fridge.get_item_total(name, include_expired=False)
         
         item_records = self.__history.search_records(name)
         average_days_between_trips = sum(record.date_range for record in item_records)/len(item_records)

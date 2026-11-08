@@ -16,3 +16,7 @@ class ListFunctions(ABC):
     def get_items(self) -> list:
         pass
 
+    @abstractmethod
+    def get_item_at(self, index: int):
+        pass
+

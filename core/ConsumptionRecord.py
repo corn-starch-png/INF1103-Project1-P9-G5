@@ -8,7 +8,6 @@ class ConsumptionRecord(ItemRecord):
 
     MIN_DATE_RANGE = 1
     MAX_DATE_RANGE = 365
-    MAX_REMARKS_LENGTH = 500
 
     def __init__(self, name: str, quantity: float, unit: str, date_range: int,
                  remarks: str = "", record_date: str = None):
@@ -37,7 +36,7 @@ class ConsumptionRecord(ItemRecord):
                 return False
         except (TypeError, ValueError):
             return False
-        if not isinstance(self.__remarks, str) or len(self.__remarks) > self.MAX_REMARKS_LENGTH:
+        if not isinstance(self.__remarks, str) or len(self.__remarks) > ItemRecord.MAX_REMARKS_LENGTH:
             return False
         return True
 

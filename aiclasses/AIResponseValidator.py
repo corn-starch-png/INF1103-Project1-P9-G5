@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 import json
 import math
-from DB_manager import MAX_QUANTITY, send_log, shift_calendar_years
+
+from core.ItemRecord import ItemRecord
+from logger import app_logger
 
 class AIResponseValidator:
     def get_recommendation_schema(self) -> dict:
@@ -141,8 +143,8 @@ class AIResponseValidator:
             recommended_cal = item["Estimated_Calories"]
             
             # Validate AI quantity limits
-            if planned_qty > MAX_QUANTITY or recommended_qty > MAX_QUANTITY:
-                return None, (f"{item_name}: quantity exceeds\nthe supported maximum of {MAX_QUANTITY:,}.")
+            if planned_qty > ItemRecord.MAX_QUANTITY or recommended_qty > ItemRecord.MAX_QUANTITY:
+                return None, (f"{item_name}: quantity exceeds\nthe supported maximum of {ItemRecord.MAX_QUANTITY:,}.")
             # Validate whole-number quantities for pcs
             if item["Unit"] == "pcs" and (not float(planned_qty).is_integer() or not float(recommended_qty).is_integer()):
                 return None, f"{item_name}: Quantities in pcs must be whole numbers."
@@ -184,12 +186,12 @@ class AIResponseValidator:
             except (OverflowError, ValueError):
                 return None, (f"{item['Item_Name']}: Expiration days are outside the supported date range.")
             # Validate AI estimated expiry date (max 3 years)
-            if expiry_date > shift_calendar_years(date.today(), 3):
+            if expiry_date > ItemRecord.shift_calendar_years(date.today(), 3):
                 return None, (f"{item['Item_Name']}: estimated expiry exceeds the 3-year stock limit.")
 
             item["Estimated_Expiry_Date"] = expiry_date.isoformat()
             item["Expiry_Date_Is_Default"] = is_default
-        send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
+        app_logger.send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
         return data, None
     def check_ai_output(self, recommendations: list, grocery_list: list) -> bool:
         if not isinstance(recommendations, list) or not isinstance(grocery_list, list):

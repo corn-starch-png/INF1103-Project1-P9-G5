@@ -2,7 +2,7 @@ from ioclasses.Prompt import Prompt
 
 
 class QuantityUnitPrompt(Prompt):
-    def __init__(self, item_name, valid_units, locked_unit, normalize, max_quantity):
+    def __init__(self, item_name, valid_units, locked_unit, max_quantity):
         self.__units = ", ".join(valid_units)
         if locked_unit != "":
             question = f"Quantity in {locked_unit} (e.g. 3): "
@@ -12,7 +12,6 @@ class QuantityUnitPrompt(Prompt):
         self.__item_name = item_name
         self.__valid_units = valid_units
         self.__locked_unit = locked_unit
-        self.__normalize = normalize
         self.__max_quantity = max_quantity
 
     def __split(self, text):
@@ -38,7 +37,7 @@ class QuantityUnitPrompt(Prompt):
         if (unit or self.__locked_unit) == "pcs" and not number_part.isdigit():
             return "Items in pcs must be a whole number."
         try:
-            quantity = self.__normalize(number_part)
+            quantity = self.normalize_quantity(number_part)
         except ValueError:
             return f"Quantity must be a valid number no greater than {self.__max_quantity:,}."
         if quantity == 0:
@@ -49,4 +48,4 @@ class QuantityUnitPrompt(Prompt):
         number_part, unit = self.__split(text)
         if unit == "":
             unit = self.__locked_unit
-        return self.__normalize(number_part), unit
+        return self.normalize_quantity(number_part), unit

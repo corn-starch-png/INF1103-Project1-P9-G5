@@ -9,8 +9,9 @@ class ChoicePrompt(Prompt):
         self.__error_message = error_message
 
     def _validate(self, text):
-        if text.lower() in self.__options:
-            return ""
+        for option in self.__options:
+            if text.lower() == option.lower():
+                return ""
         if self.__error_message is not None:
             return self.__error_message
         return f"Please enter one of: {', '.join(self.__options)}."

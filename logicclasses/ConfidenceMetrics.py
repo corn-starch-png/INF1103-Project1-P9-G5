@@ -1,5 +1,5 @@
 import statistics
-from DB_manager import send_log
+from logger import app_logger
 
 class ConfidenceMetrics:
     def quality_score(self, data_count):
@@ -29,7 +29,7 @@ class ConfidenceMetrics:
         if algorithm_quantity < 0: # no negative recommendations
             algorithm_quantity = 0
         ai_quantity = recAmt
-        send_log(f"[CONFIDENCE SCORE] calculated qty:{algorithm_quantity} AI qty: {ai_quantity}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] calculated qty:{algorithm_quantity} AI qty: {ai_quantity}")
 
         if algorithm_quantity == 0 and ai_quantity == 0:
             return 1.0

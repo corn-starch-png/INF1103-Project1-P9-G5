@@ -1,9 +1,9 @@
 from core.CartItem import CartItem
-from LogicClasses.Finding import Finding
-from LogicClasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
-from LogicClasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
-from LogicClasses.UnderBuyAnalyzer import UnderBuyAnalyzer
-from LogicClasses.AnalysisContext import AnalysisContext
+from logicclasses.Finding import Finding
+from logicclasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from logicclasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from logicclasses.UnderBuyAnalyzer import UnderBuyAnalyzer
+from logicclasses.AnalysisContext import AnalysisContext
 
 class CartEvaluator():
     def __init__(self):
@@ -18,7 +18,6 @@ class CartEvaluator():
         for analyzer in self.__cart_analyzers:
             result = analyzer.analyze(ctx)
             findings.append(result)
-        print(f"fingier{findings}")
         ctx.update_findings(findings)
         
         
@@ -31,6 +30,5 @@ class CartEvaluator():
         for analyzer in self.__item_analyzers:
                     result = analyzer.analyze(item, ctx)
                     findings.append(result)
-                    print(f"fgfdgdf{result}")
                     ctx.update_findings([result])
         return findings
