@@ -3,7 +3,6 @@ import json
 import math
 
 from core.ItemRecord import ItemRecord
-from core.FridgeItem import FridgeItem
 from DB_manager import send_log
 
 class AIResponseValidator:
@@ -187,7 +186,7 @@ class AIResponseValidator:
             except (OverflowError, ValueError):
                 return None, (f"{item['Item_Name']}: Expiration days are outside the supported date range.")
             # Validate AI estimated expiry date (max 3 years)
-            if expiry_date > FridgeItem.shift_calendar_years(date.today(), 3):
+            if expiry_date > ItemRecord.shift_calendar_years(date.today(), 3):
                 return None, (f"{item['Item_Name']}: estimated expiry exceeds the 3-year stock limit.")
 
             item["Estimated_Expiry_Date"] = expiry_date.isoformat()

@@ -85,14 +85,6 @@ class FridgeItem(ItemRecord, ItemFunctions):
                 raise ValueError("Expiry date cannot be before purchase date.")
         self.__expiry_date = new_expiry_date
 
-    # does not edit the FridgeItem itself but is used for validation before the item turns into a fridge item
-    def shift_calendar_years(value, years):
-        target_year = value.year + years
-        try:
-            return value.replace(year=target_year)
-        except ValueError:
-            return value.replace(year=target_year, month=2, day=28)
-
     def is_expired(self) -> bool:
         """An item is expired once today is after its expiry date (same rule as the original code)."""
         return date.fromisoformat(self.__expiry_date) < date.today()

@@ -42,9 +42,9 @@ class IO_manager:
     # Ask for a date in YYYY-MM-DD format and check it is a real date.
     def __ask_date(self, question, allow_past=False, purchase_date=""):
         today = date.today()
-        earliest = FridgeItem.shift_calendar_years(today, -1) if allow_past else today
+        earliest = ItemRecord.shift_calendar_years(today, -1) if allow_past else today
         # maximum expiry date
-        latest = FridgeItem.shift_calendar_years(today, 3)
+        latest = ItemRecord.shift_calendar_years(today, 3)
         return DatePrompt(question, earliest, latest, purchase_date).ask()
 
     # Ask for one item's name, quantity and unit, validating bad input.
