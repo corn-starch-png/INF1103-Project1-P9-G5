@@ -34,10 +34,10 @@ ui.show_welcome()
 #if new user, direct them to create a new profile then add items they have in thier fridge
 if not household_info.get_members():
     #TODO this will not change the actual household being used, but will instead point household_info to another household
-    household_info = ui.create_profile()
+    ui.initialize_household(household_info)
     ui.show_profile(household_info)
     #TODO same logic as above
-    fridge = ui.create_fridge()
+    ui.add_to_fridge(fridge)
     ui.display_list("Fridge", fridge.get_items())
 else:
     ui.show_welcome_back(household_info)
@@ -123,6 +123,7 @@ underbuy_msgs = logicmgr.get_recommedations("UnderBuy", True)
 ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)
 
 ui.shopping_cart_conclusion(cart) #output is list of fridge_items
+#TODO check if cart can checkout empty
 cart.checkout(fridge)
 
 DB_manager().save_database(REPOSITORY)  # Save the database to the specified folder

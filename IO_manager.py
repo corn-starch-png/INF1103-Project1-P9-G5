@@ -136,62 +136,54 @@ class IO_manager:
             else:
                 print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
 
-    # Collect a new user's profile and their family members' details.
-    def create_profile(self):
-        genders = ", ".join(self.__valid_genders)
-        household = Household()
-        name = TextPrompt("Please enter your name: ", max_length=Person.MAX_NAME_LENGTH).ask()
-        age = IntRangePrompt("Please enter your age: ", 10, 120,"Please enter a valid age (whole number between 10 and 120).").ask()
-        gender = ChoicePrompt(f"Please enter your gender ({genders}): ", self.__valid_genders,
-                              "Please enter male or female.").ask()
-        dietary_restrictions = TextPrompt("Please enter your dietary restrictions (leave blank if none): ",
-                                          allow_blank=True, max_length=Person.MAX_DIETARY_LENGTH).ask()
+    def __get_person_info(self) -> tuple:
+        genders = ", ".join(Person.VALID_GENDERS)
+        name = TextPrompt("Please enter name: ", max_length=Person.MAX_NAME_LENGTH).ask()
+        age = IntRangePrompt("Please enter age: ", Person.MIN_AGE, Person.MAX_AGE, f"Please enter a valid age (whole number between {Person.MIN_AGE} and {Person.MAX_AGE}).").ask()
+        gender = ChoicePrompt(f"Please enter gender ({genders}): ", Person.VALID_GENDERS,
+                                f"Please enter from the list of options: ({genders})").ask()
+        dietary_restrictions = TextPrompt("Please enter dietary restrictions (leave blank if none): ",
+                                            allow_blank=True, max_length=Person.MAX_DIETARY_LENGTH).ask()
         if dietary_restrictions == "":
             dietary_restrictions = "none"
-        family = IntRangePrompt("Please enter your family size including yourself: ", 1, 20).ask()
 
+        return name, age, gender, dietary_restrictions
+
+    # Collect a new user's profile and their family members' details.
+    def initialize_household(self, household: Household):
+        name, age, gender, dietary_restrictions = self.__get_person_info()
         household.add_member(Person(1, name, age, gender.capitalize(), dietary_restrictions))
 
+        family = IntRangePrompt("Please enter your family size including yourself: ", Household.MIN_PAX, Household.MAX_PAX).ask()
         for i in range(family - 1):
-            member_name = TextPrompt(f"Please enter the name of family member {i + 1}: ",
-                                     max_length=Person.MAX_NAME_LENGTH).ask()
-            member_age = IntRangePrompt(f"Please enter the age of {member_name}: ", 1, 120,
-                                        "Please enter a valid age (whole number between 0 and 120).").ask()
-            member_gender = ChoicePrompt(f"Please enter the gender of {member_name} ({genders}): ",
-                                         self.__valid_genders, "Please enter male or female.").ask()
-            member_diet = TextPrompt(f"Please enter the dietary restrictions of {member_name} (leave blank if none): ",
-                                     allow_blank=True, max_length=Person.MAX_DIETARY_LENGTH).ask()
-            if member_diet == "":
-                member_diet = "none"
-            household.add_member(Person(i + 2, member_name, member_age, member_gender.capitalize(), member_diet))
+            print(f"Please enter the details for the next family member")
+            others_name, others_age, others_gender, others_dietary_restrictions = self.__get_person_info()
+            household.add_member(Person(i + 2, others_name, others_age, others_gender.capitalize(), others_dietary_restrictions))
 
         print(f"User {name} registered successfully!")
-        return household
 
     # Collect home inventory during initial registration
-    def create_fridge(self) -> Fridge:
-        #new fridge for new user
-        home_items = Fridge()
+    def add_to_fridge(self, fridge: Fridge) -> None:
         if not self.__ask_yes_no("\nDo you have any food items at home you want to add? "):
-            return home_items.get_items()
+            return
         print("\nEnter the items you currently have at home.")
-        self.__add_item(home_items)
+        self.__add_item(fridge)
         while True:
-            self.display_list("Fridge", home_items.get_items())
+            self.display_list("Fridge", fridge.get_items())
             user_choice = self.__ask_add_another()
 
             if user_choice == "1":
-                self.__add_item(home_items)
+                self.__add_item(fridge)
             elif user_choice == "2":
-                if not home_items.get_items():
+                if not fridge.get_items():
                     print("No items to edit or remove.")
                     continue
                 while True:
-                    self.display_list("Fridge", home_items.get_items())
-                    if self.__edit_list(home_items):
+                    self.display_list("Fridge", fridge.get_items())
+                    if self.__edit_list(fridge):
                         break
             else:
-                return home_items
+                return 
 
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
