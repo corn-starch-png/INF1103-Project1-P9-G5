@@ -2,7 +2,7 @@ from logicclasses.ItemAnalyzer import ItemAnalyzer
 from logicclasses.Finding import Finding
 from core.CartItem import CartItem
 from datetime import datetime,date,timedelta
-from DB_manager import send_log
+from logger import app_logger
 
 
 class RiskOfExpiryAnalyzer(ItemAnalyzer):
@@ -28,16 +28,16 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
             item_expiry_date = datetime.strptime(estimated_expiry_date, "%Y-%m-%d").date() #strptime convert to date, .date() removes hh:00 part of date
             #if the days taken to consume an item is greater than days to expire
             if today + timedelta(days=estimated_days_to_consume) > item_expiry_date:
-                send_log(f"[LOGIC] Risk of expiry is True for {item_name}")
+                app_logger.send_log(f"[LOGIC] Risk of expiry is True for {item_name}")
                 result = True
                 message = f"{item_quantity}{item_unit} of {item_name} --> estimated expiry: {item_expiry_date}. (avg consumption: {estimated_consumption_rate} {item_unit} a week)"
             else:
                 result = False
-                send_log(f"[LOGIC] Risk of expiry is False for {item_name}")
+                app_logger.send_log(f"[LOGIC] Risk of expiry is False for {item_name}")
                 message = None
                 
             return Finding(analyzer_name= self.ANALYZER_NAME, result=result, message=message)
         else:
             # estimated_consumption_rate <= 0:
-            send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
+            app_logger.send_log(f"[LOGIC] Risk of expiry cannot be determined (estimated_consumption_rate <= 0) for {item_name}")
             return Finding(analyzer_name= self.ANALYZER_NAME, result=False, message=None) 

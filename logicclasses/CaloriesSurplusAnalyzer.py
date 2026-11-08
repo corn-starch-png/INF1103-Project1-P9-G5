@@ -1,4 +1,4 @@
-from DB_manager import send_log
+from logger import app_logger
 from logicclasses.CartAnalyzer import CartAnalyzer
 from logicclasses.Finding import Finding
 from logicclasses.AnalysisContext import AnalysisContext
@@ -32,19 +32,19 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
         #extract name, gender from household info from Household.py
         family_calorie_until_next_visit = self.__calculate_family_kcal(ctx.next_purchase_date, ctx.household)
 
-        send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")
+        app_logger.send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")
         
         # if total calories (AI output)  > total calories that family needs (User in put) and returns true, else false
         exceed_calorie = ctx.total_est_calories - family_calorie_until_next_visit
         if ctx.total_est_calories > family_calorie_until_next_visit:
-            send_log(f"[LOGIC] Calories surplus is: True") 
+            app_logger.send_log(f"[LOGIC] Calories surplus is: True") 
             result = True
             message = (f"Grocery cart exceeds recommended calories values for {ctx.next_purchase_date} days by {exceed_calorie}kcal")
             
         else:
             # We will no longer print the message if calorie surplus is false as it is not useful for the user
             # we will however keep it for now in case we decide to reimplement it
-            send_log(f"[LOGIC] Calories surplus is: False")
+            app_logger.send_log(f"[LOGIC] Calories surplus is: False")
             result = False
             message = (f"Short of {abs(exceed_calorie)}kcal to hit recommended calories for {ctx.next_purchase_date} days")
             

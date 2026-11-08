@@ -3,7 +3,7 @@ import json
 import math
 
 from core.ItemRecord import ItemRecord
-from DB_manager import send_log
+from logger import app_logger
 
 class AIResponseValidator:
     def get_recommendation_schema(self) -> dict:
@@ -191,7 +191,7 @@ class AIResponseValidator:
 
             item["Estimated_Expiry_Date"] = expiry_date.isoformat()
             item["Expiry_Date_Is_Default"] = is_default
-        send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
+        app_logger.send_log(f"[AI] AI Recommendations: {json.dumps(data, indent=2)}")
         return data, None
     def check_ai_output(self, recommendations: list, grocery_list: list) -> bool:
         if not isinstance(recommendations, list) or not isinstance(grocery_list, list):

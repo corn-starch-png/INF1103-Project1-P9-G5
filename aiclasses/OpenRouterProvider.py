@@ -2,7 +2,7 @@ import os
 import time
 import requests
 from openai import (OpenAI, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, RateLimitError, APIStatusError,)
-from DB_manager import send_log
+from logger import app_logger
 from .AIProvider import AIProvider
 
 class OpenRouterProvider(AIProvider):
@@ -164,4 +164,4 @@ class OpenRouterProvider(AIProvider):
         return False
 
     def _update_ai_status(self, message: str) -> None:
-        send_log(f"[AI STATUS] {message}")
+        app_logger.send_log(f"[AI STATUS] {message}")

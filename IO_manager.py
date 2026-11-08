@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from DB_manager import send_log
+from logger import app_logger
 from ioclasses import (TextPrompt, QuantityPrompt, DatePrompt, IntRangePrompt, ChoicePrompt,
                        QuantityUnitPrompt, EditQuantityPrompt)
 from core.ItemRecord import ItemRecord
@@ -229,7 +229,7 @@ class IO_manager:
                 else:
                     break
 
-        send_log(f"[IO MANAGER] grocery_list = {[item.to_dict() for item in cart.get_items()]}") #log grocery list for verification
+        app_logger.send_log(f"[IO MANAGER] grocery_list = {[item.to_dict() for item in cart.get_items()]}") #log grocery list for verification
         return cart
 
     # Ask for optional remarks about this week (e.g. events).

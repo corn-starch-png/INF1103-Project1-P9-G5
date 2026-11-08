@@ -3,7 +3,7 @@ from core.Fridge import Fridge
 from logicclasses.AnalysisContext import AnalysisContext
 from logicclasses.ConfidenceMetrics import ConfidenceMetrics
 from logicclasses.BonusCalculator import BonusCalculator
-from DB_manager import send_log
+from logger import app_logger
 
 class ConfidenceCalculator:
     def __init__(self):
@@ -33,13 +33,13 @@ class ConfidenceCalculator:
 
         bonus_score = self.__bonusMetrics.bonus(ctx.cart.get_remarks())
         
-        send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item.name}---")
-        send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")
-        send_log(f"[CONFIDENCE SCORE] consistency_score: {consistency_score}")
-        send_log(f"[CONFIDENCE SCORE] AI agreement_score: {agreement_score}")
-        send_log(f"[CONFIDENCE SCORE] confidence_score: {confidence_score}")
-        send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
-        send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] ---CONFIDENCE SCORE FOR {item.name}---")
+        app_logger.send_log(f"[CONFIDENCE SCORE] quantity_score: {quantity_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] consistency_score: {consistency_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] AI agreement_score: {agreement_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] confidence_score: {confidence_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
+        app_logger.send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
 
         if confidence_score == 0: #do not add bonus if score is 0 
             return 0.0
