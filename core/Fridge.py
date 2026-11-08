@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from core.ItemRecord import ItemRecord
 from core.ListFunctions import ListFunctions
 from core.FridgeItem import FridgeItem
 from core.ConsumptionRecord import ConsumptionRecord
@@ -107,13 +108,12 @@ class Fridge(ListFunctions, CanBeStored):
                         # if len(new_remarks) > FridgeItem.MAX_REMARKS_LENGTH:
                         #     raise ValueError(f"Combined remarks cannot exceed {FridgeItem.MAX_REMARKS_LENGTH} characters.")
                         #merge the two items by adding their quantities
-                        item.quantity += other_item.quantity
-                        if item.validate(): #check if merging items will overflow the max quantity
-                            self.__items.remove(other_item)
-                            duplicate_found = True
-                        else:
-                            item.quantity += other_item.quantity
+                        new_amt = item.quantity + other_item.quantity
+                        if new_amt > ItemRecord.MAX_QUANTITY:
                             raise ValueError("Error, item is similar to another and merging them will exceed the max quantity")
+                        item.set_quantity(new_amt)
+                        self.__items.remove(other_item)
+                        duplicate_found = True
         return duplicate_found
 
     def get_fridge_totals(self) -> list:
