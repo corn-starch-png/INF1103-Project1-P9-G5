@@ -54,7 +54,7 @@ jobs: #gitub required status checks are expecting job names to pass!
     - name: Check formatting with Ruff
       uses: astral-sh/ruff-action@v4.1.0
       with:
-        args: format --check --config .github/pyproject.toml --diff --exit-zero.
+        args: format --check --config .github/pyproject.toml --diff --exit-zero .
 
   CustomPytestScript: #name of  job
       name: Running PytestScript 
