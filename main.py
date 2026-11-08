@@ -1,8 +1,10 @@
 #-------START OF DEPENDENCY LINE----------#
 try:
     from dotenv import load_dotenv
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime
     import sys
+    import os
+    import shutil
     from DB_manager import DB_manager
     from IO_manager import IO_manager
     from Logic_manager import Logic_manager
@@ -13,22 +15,52 @@ try:
     from core.AIRecData import AIRecData
     from logicclasses.AnalysisContext import AnalysisContext
     from dbclasses.JsonRepository import JsonRepository
-    from dbclasses.MongoDBRepository import MongoDBRepository
     from aiclasses.AI_manager import AIManager
     from aiclasses.OpenRouterProvider import OpenRouterProvider
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
+
 # Load environment variables once
 load_dotenv()
-REPOSITORY = JsonRepository(folder="database")
 ui = IO_manager()
 logicmgr = Logic_manager()
 
-errors, data_bundle = DB_manager().load_database(REPOSITORY)
+# ---------- database selection: shared MongoDB first, local JSON as fallback ----------
+def choose_repository():
+    if os.getenv("USE_MONGO", "1") == "1":
+        try:
+            from dbclasses.MongoDBRepository import MongoDBRepository
+            repo = MongoDBRepository()
+            errors, bundle = DB_manager().load_database(repo)
+            print("Connected to the shared MongoDB database.")
+            return repo, errors, bundle
+        except Exception as e:
+            print(f"MongoDB unavailable ({e}). Using local JSON instead.")
+    repo = JsonRepository(folder="database")
+    errors, bundle = DB_manager().load_database(repo)
+    return repo, errors, bundle
+
+REPOSITORY, errors, data_bundle = choose_repository()
 fridge = data_bundle["fridge"]
 household_info = data_bundle["household"]
 history = data_bundle["consumption_history"]
+
 #-------END OF DEPENDENCY LINE----------#
+
+# old code
+# Load environment variables once
+# load_dotenv()
+# REPOSITORY = JsonRepository(folder="database")
+# ui = IO_manager()
+# logicmgr = Logic_manager()
+
+# errors, data_bundle = DB_manager().load_database(REPOSITORY)
+# fridge = data_bundle["fridge"]
+# household_info = data_bundle["household"]
+# history = data_bundle["consumption_history"]
+#-------END OF DEPENDENCY LINE----------#
+
+
 #region user IO
 ui.show_welcome()
 #if new user, direct them to create a new profile then add items they have in thier fridge
@@ -52,7 +84,8 @@ else:
             ui.update_fridge(fridge)
         #exit program
         else:
-            DB_manager().save_database(REPOSITORY)
+            # DB_manager().save_database(REPOSITORY)
+            save_everything()
             ui.show_exit()
             sys.exit(0)
 
@@ -115,5 +148,6 @@ ui.shopping_cart_conclusion(cart) #output is list of fridge_items
 #TODO check if cart can checkout empty
 cart.checkout(fridge)
 
-DB_manager().save_database(REPOSITORY)  # Save the database to the specified folder
+save_everything()
+# DB_manager().save_database(REPOSITORY)  # Save the database to the specified folder
 ui.show_exit()
