@@ -19,24 +19,23 @@ class Cart(ListFunctions):
     def get_ai_enhanced(self) -> bool:
         return self.__ai_enhanced
 
-    def add_item(self, item: CartItem) -> None:
+    def add_item(self, item: CartItem) -> bool:
         if not isinstance(item, CartItem):
             raise TypeError("Only CartItem objects can be added to a Cart.")
         if not item.validate():
             raise ValueError("Cannot add an invalid item to the cart.")
         
         #check if item with same name and units exists, then merge the quantites
-        merging = False
         for existing in self.__items:
             if existing.name.lower() == item.name.lower() and existing.unit == item.unit:
                 combined_quantity = Decimal(str(existing.quantity)) + Decimal(str(item.quantity))
                 if combined_quantity > CartItem.MAX_QUANTITY:
                     raise ValueError(f"Total quantity cannot exceed {CartItem.MAX_QUANTITY:,}.")
                 existing.set_quantity(combined_quantity)
-                merging = True
+                return True
                     
         self.__items.append(item)
-        return merging
+        return False
 
     def remove_item(self, item: CartItem) -> None:
         if item not in self.__items:

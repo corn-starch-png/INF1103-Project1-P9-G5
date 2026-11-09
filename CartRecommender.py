@@ -1,12 +1,15 @@
 from datetime import date
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from core.Cart import Cart
+from core.CartItem import CartItem
 from core.ConsumptionHistory import ConsumptionHistory
 from core.Fridge import Fridge
+from core.ItemRecord import ItemRecord
 
 class CartRecommender:
     """
-    returns a list of item_names that the user frequently consumes, and is running out
+    returns a Cart of items that the user frequently consumes, and is running out
     """
     RECENT_DAYS_THRESHOLD = 14  # Number of days to consider a record as recent
 
@@ -14,30 +17,20 @@ class CartRecommender:
         self.__fridge = fridge
         self.__history = history
 
-    def generate_recommendation(self) -> list:
-        recommendations = Cart() 
+    def generate_recommendation(self) -> Cart:
+        recommendations = Cart()
         history_items = self.__history.get_unique_item_names()
-        for name in history_items:
+        for name in sorted(history_items):
             item_records = self.__history.search_records(name)
             if item_records:
-                latest_record_date = max(record.record_date for record in item_records)
-                if self.__check_item_recent(latest_record_date) and latest_record_date != 0:
+                latest_record = max(item_records, key=lambda record: record.record_date)
+                if self.__check_item_recent(latest_record.record_date):
                     if self.__check_item_consumption(name):
-                        pass
-                        #TODO create CartItem from past consumption history
-                        #recommendations.add_item()
-                        #recommended amout is average_consumption * average_days_between_trips
+                        # recommended amount is average_consumption * average_days_between_trips
+                        amount = self.__get_recommended_amount(name, latest_record.unit)
+                        if amount > 0:
+                            recommendations.add_item(CartItem(latest_record.name, amount, latest_record.unit))
         return recommendations
-
-    def display_recommendation(self) -> str:
-        recommendations = self.generate_recommendation()
-        message = f"Recommended items to buy: \n"
-        longest_string = max(max(len(name) for name in recommendations), len(message))
-        message += f"|{"-"*(longest_string-1)}|\n"
-        for item in recommendations:
-            message += f"| {item:<{longest_string-2}}|\n"
-            message += f"|{"-"*(longest_string-1)}|\n"
-        print(message)
 
     def __check_item_recent(self, record_date: str) -> bool:
         """
@@ -47,22 +40,39 @@ class CartRecommender:
         record_date_obj = date.fromisoformat(record_date)
         return (date.today() - record_date_obj).days <= self.RECENT_DAYS_THRESHOLD
 
+    def __get_expected_consumption(self, name: str) -> float:
+        """
+        Average daily consumption of the item multiplied by the average number of days between trips.
+        Returns 0 if there are no consumption records.
+        """
+        normalized_records = self.__history.get_normalized_records(name)
+        if not normalized_records:
+            return 0  # No consumption records found
+
+        average_consumption = sum(normalized_records) / len(normalized_records)
+        item_records = self.__history.search_records(name)
+        average_days_between_trips = sum(record.date_range for record in item_records)/len(item_records)
+        return average_consumption * average_days_between_trips
 
     def __check_item_consumption(self, name: str) -> bool:
         """
         Check the average consumption rate of the item and determine if it should be 
         recommended based on stock levels.
         """
-        normalized_records = self.__history.get_normalized_records(name)
-        if not normalized_records:
-            return False  # No consumption records found
-
-        average_consumption = sum(normalized_records) / len(normalized_records)
         fridge_quantity = self.__fridge.get_item_total(name, include_expired=False)
-        
-        item_records = self.__history.search_records(name)
-        average_days_between_trips = sum(record.date_range for record in item_records)/len(item_records)
 
         # Recommend if the average consumption is greater than the current stock
-        return (average_consumption * average_days_between_trips) > fridge_quantity
-            
+        return self.__get_expected_consumption(name) > fridge_quantity
+
+    def __get_recommended_amount(self, name: str, unit: str) -> float:
+        """
+        Expected consumption rounded so it is a valid cart quantity:
+        pcs is rounded up to a whole number, other units to 4 decimal places.
+        Capped at MAX_QUANTITY.
+        """
+        amount = Decimal(str(self.__get_expected_consumption(name)))
+        amount = amount.quantize(ItemRecord.QUANTITY_STEP, rounding=ROUND_HALF_UP)
+        if unit == "pcs":
+            amount = amount.to_integral_value(rounding=ROUND_CEILING)
+        amount = min(amount, Decimal(ItemRecord.MAX_QUANTITY))
+        return float(amount)

@@ -9,6 +9,7 @@ try:
     from IO_manager import IO_manager
     from Logic_manager import Logic_manager
     from core.Cart import Cart
+    from CartRecommender import CartRecommender
     from core.Fridge import Fridge
     from core.Household import Household
     from core.ConsumptionHistory import ConsumptionHistory
@@ -146,8 +147,12 @@ else:
 
 days_until_next_visit = ui.ask_days_until_next()
 cart = Cart()
-#TODO display recommended cart
-#TODO let user choose start new cart or use recommened cart
+recommended_cart = CartRecommender(fridge, history).generate_recommendation()
+if recommended_cart.get_items():
+    if ui.ask_use_recommended_cart(recommended_cart):
+        cart = recommended_cart
+else:
+    ui.show_no_recommendations()
 ui.enter_grocery_list(cart, fridge, history)
 remarks = ui.get_cart_remarks()
 cart.set_remarks(remarks)
