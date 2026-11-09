@@ -11,7 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import pytest
-from CartRecommender import CartRecommender
 from logger import Logger, app_logger
 from modules.ai.AI_manager import AIManager
 from modules.ai.AIProvider import AIProvider
@@ -30,6 +29,7 @@ from modules.logic.AnalysisContext import AnalysisContext
 from modules.logic.BonusCalculator import BonusCalculator
 from modules.logic.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
 from modules.logic.CartEvaluator import CartEvaluator
+from modules.logic.CartRecommender import CartRecommender
 from modules.logic.ConfidenceCalculator import ConfidenceCalculator
 from modules.logic.ConfidenceMetrics import ConfidenceMetrics
 from modules.logic.Finding import Finding
@@ -341,8 +341,9 @@ class TestAIProvider:
     # Test 14 - Prevent direct construction of the abstract provider.
     # Expected: AIProvider cannot be instantiated without implementing its contract.
     def test_ai_provider_is_abstract(self):
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as captured:
             AIProvider()
+        print(f"Expected error: {captured.value}")
 
     # Test 15 - Detect missing configuration before contacting the API.
     # Expected: A clear error is returned and no HTTP request occurs.
@@ -511,8 +512,9 @@ class TestAnalysisContext:
     @pytest.mark.parametrize("invalid", [None, {}, [True], ["text"]])
     def test_update_findings_rejects_invalid_values(self, make_context, invalid):
         _, ctx = make_context()
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError) as captured:
             ctx.update_findings(invalid)
+        print(f"Expected error: {captured.value}")
 
     # Test 25 - Handle normalized names, fridge-only items and absent items.
     # Expected: Names match consistently and missing quantities contribute zero.
@@ -655,8 +657,9 @@ class TestConfidenceCalculator:
     # Expected: An item without AI data raises NotImplementedError.
     def test_item_without_ai_data_is_rejected(self, make_context):
         _, ctx = make_context()
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(NotImplementedError) as captured:
             ConfidenceCalculator().calculate_confidence_score(CartItem("milk", 2, "l"), ctx)
+        print(f"Expected error: {captured.value}")
 
     # Test 39 - Handle zero-consumption history without division by zero.
     # Expected: The current weighted formula returns 49.5.
@@ -796,7 +799,7 @@ class TestCartRecommender:
         today = date.today()
         fridge, history = make_recommendation_context(age_days=age_days, today=today)
 
-        with patch("CartRecommender.date") as mock_date:
+        with patch("modules.logic.CartRecommender.date") as mock_date:
             mock_date.today.return_value = today
             mock_date.fromisoformat.side_effect = date.fromisoformat
             items = CartRecommender(fridge, history).generate_recommendation().get_items()
@@ -981,8 +984,9 @@ class TestJsonRepository:
         original = destination.read_bytes()
 
         with patch("modules.repositories.JsonRepository.os.replace", side_effect=OSError("replacement failed")) as replace:
-            with pytest.raises(OSError, match="replacement failed"):
+            with pytest.raises(OSError, match="replacement failed") as captured:
                 repository.save()
+            print(f"Expected error: {captured.value}")
             replace.assert_called_once()
 
         assert destination.read_bytes() == original
@@ -1012,8 +1016,9 @@ class TestMongoDBRepository:
         monkeypatch.delenv(missing_variable, raising=False)
 
         with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
-            with pytest.raises(ValueError, match=missing_variable):
+            with pytest.raises(ValueError, match=missing_variable) as captured:
                 MongoDBRepository()
+            print(f"Expected error: {captured.value}")
             client_class.assert_not_called()
 
     # Test 66 - Surface connection failures for application-level fallback.
@@ -1024,8 +1029,9 @@ class TestMongoDBRepository:
 
         with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
             client_class.return_value.admin.command.side_effect = OSError("database unavailable")
-            with pytest.raises(OSError, match="database unavailable"):
+            with pytest.raises(OSError, match="database unavailable") as captured:
                 MongoDBRepository()
+            print(f"Expected error: {captured.value}")
 
     # Test 67 - Convert loaded records into domain objects and report invalid rows.
     # Expected: Valid data is retained and each collection is queried correctly.
@@ -1138,6 +1144,7 @@ class TestApplicationStartupAndRecovery:
     def test_cloud_startup_failure_uses_json(self, tmp_path, pending_local_changes):
         _, expected = pending_local_changes
         ui = MagicMock()
+        ui.send_message.side_effect = print
         cloud_factory = MagicMock(side_effect=OSError("Cloud unavailable"))
         manager = DB_manager(ui, database_dir=tmp_path, use_mongo=True, mongo_factory=cloud_factory)
 
@@ -1156,6 +1163,7 @@ class TestApplicationStartupAndRecovery:
     def test_cloud_save_failure_preserves_latest_data(self, tmp_path, recovery_cloud):
         cloud, stores = recovery_cloud
         ui = MagicMock()
+        ui.send_message.side_effect = print
         manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
         manager.start()
 
@@ -1177,14 +1185,21 @@ class TestApplicationStartupAndRecovery:
     def test_local_fallback_failure_is_reported(self, tmp_path, recovery_cloud):
         cloud, _ = recovery_cloud
         ui = MagicMock()
+        ui.send_message.side_effect = print
         manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
         manager.start()
         ui.reset_mock()
 
+        # Simulate failure of both cloud saving and the local JSON fallback.
         cloud.save.side_effect = OSError("Cloud save failed")
-        with patch.object(JsonRepository, "save", side_effect=OSError("Disk unavailable")):
-            with pytest.raises(RuntimeError, match="Could not save the local fallback"):
+        with patch.object(JsonRepository, "save", side_effect=OSError("Disk unavailable")) as local_save:
+            # Verify the application reports that neither destination could save.
+            with pytest.raises(RuntimeError, match="Could not save the local fallback") as captured:
                 manager.save()
+            # Confirm the local fallback was actually attempted.
+            local_save.assert_called_once_with()
+
+        print(f"Expected error: {captured.value}")
 
         assert not manager.offline_marker.exists()
         assert not any("Changes saved locally" in call.args[0] for call in ui.send_message.call_args_list)
@@ -1197,12 +1212,14 @@ class TestApplicationStartupAndRecovery:
         original_cloud_fridge = cloud_stores["fridge"]
         original_files = {name: (tmp_path / f"{name}.json").read_bytes() for name in expected_local}
         ui = MagicMock()
+        ui.send_message.side_effect = print
         ui.ask_upload_offline_changes.return_value = True
         cloud.save.side_effect = OSError("Upload interrupted")
         manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
 
-        with pytest.raises(RuntimeError, match="Offline upload failed"):
+        with pytest.raises(RuntimeError, match="Offline upload failed") as captured:
             manager.start()
+        print(f"Expected error: {captured.value}")
 
         assert marker.exists()
         assert cloud_stores["fridge"] is original_cloud_fridge
@@ -1216,6 +1233,7 @@ class TestApplicationStartupAndRecovery:
         cloud, cloud_stores = recovery_cloud
         marker, expected_local = pending_local_changes
         ui = MagicMock()
+        ui.send_message.side_effect = print
         ui.ask_upload_offline_changes.return_value = True
 
         # Inspect the state at the exact moment cloud saving is attempted.
@@ -1238,11 +1256,13 @@ class TestApplicationStartupAndRecovery:
         marker, _ = pending_local_changes
         (tmp_path / "household.json").unlink()
         ui = MagicMock()
+        ui.send_message.side_effect = print
         ui.ask_upload_offline_changes.return_value = True
         manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
 
-        with pytest.raises(RuntimeError, match="local database file is missing"):
+        with pytest.raises(RuntimeError, match="local database file is missing") as captured:
             manager.start()
+        print(f"Expected error: {captured.value}")
 
         cloud.save.assert_not_called()
         assert marker.exists()
@@ -1257,6 +1277,7 @@ class TestApplicationStartupAndRecovery:
         repository.save()
 
         ui = MagicMock()
+        ui.send_message.side_effect = print
         ui.ask_main_menu_choice.return_value = "1"
         ui.ask_last_use_days.return_value = 7
         ui.get_consumption_remarks.return_value = "none"
@@ -1282,8 +1303,9 @@ class TestApplicationStartupAndRecovery:
         application = Application(ui=ui, data_manager=data_manager, ai_manager=ai_manager, logic_manager=logic_manager)
 
         with patch.object(Cart, "checkout") as checkout:
-            with pytest.raises(RuntimeError, match="AI recommendation failed: AI unavailable"):
+            with pytest.raises(RuntimeError, match="AI recommendation failed: AI unavailable") as captured:
                 application.run()
+            print(f"Expected error: {captured.value}")
             checkout.assert_not_called()
 
         errors, saved = JsonRepository(folder=tmp_path).load()
@@ -1312,6 +1334,7 @@ class TestApplicationStartupAndRecovery:
     def test_startup_and_save_exit(self, make_context):
         _, ctx = make_context()
         ui = MagicMock()
+        ui.send_message.side_effect = print
         ui.ask_main_menu_choice.return_value = "3"
         data_manager = MagicMock()
         data_manager.start.return_value = {"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history}
