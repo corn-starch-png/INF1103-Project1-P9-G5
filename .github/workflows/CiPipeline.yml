@@ -93,7 +93,7 @@ jobs: #gitub required status checks are expecting job names to pass!
 
 
   test-docker-images: #name of  job, test our container
-    name: Build QuantiFresh Docker image + smoke test 
+    name: QuantiFresh image smoketest
     runs-on: ubuntu-latest
    #no container this time, we are already building docker image
 
