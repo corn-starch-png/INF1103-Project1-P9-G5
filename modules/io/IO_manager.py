@@ -406,7 +406,7 @@ class IO_manager:
 
     # Print the start-up welcome message.
     def show_welcome(self):
-        print("Welcome to the Waste Management System!")
+        print("Welcome to the QuantiFresh!")
 
     # Print the welcome-back message for a returning user (Person_ID 1 is the user).
     def show_welcome_back(self, household_info):
@@ -416,10 +416,15 @@ class IO_manager:
     # Print exit message
     def show_exit(self):
         print(f"Your data has been recorded into the system")
-        print(f"Thank you for using the Waste Management System!")
+        print(f"Thank you for using the QuantiFresh!")
 
+    # Display application status and recovery messages.
     def send_message(self, message):
         print(f"{message}")
+
+    # Ask explicitly before replacing cloud records with pending local changes.
+    def ask_upload_offline_changes(self):
+        return self.__ask_yes_no("You made changes while offline. Upload them to the shared database? This REPLACES the cloud data. ")
 
 
 # =====================================================================
