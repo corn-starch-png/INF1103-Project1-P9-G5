@@ -1,12 +1,13 @@
 import json
 import os
 from .RepositoryFunctions import RepositoryFunctions
+from .AppPaths import AppPaths
 from modules.core.Household import Household
 from modules.core.Fridge import Fridge
 from modules.core.ConsumptionHistory import ConsumptionHistory
 
 class JsonRepository(RepositoryFunctions):
-    def __init__(self, folder="database"):
+    def __init__(self, folder=AppPaths.DATABASE_DIR):
         self.__folder = folder
         self.__stores = {
             "fridge": Fridge(),

@@ -3,6 +3,7 @@
 .env.*
 
 # Database
+app_data/
 **/*.json
 database/
 

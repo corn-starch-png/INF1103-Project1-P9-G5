@@ -6,7 +6,7 @@ try:
     import os
     import shutil
     from modules.repositories.DB_manager import DB_manager
-    from modules.io.IO_manager import IO_manager, send_log
+    from modules.io.IO_manager import IO_manager
     from modules.logic.Logic_manager import Logic_manager
     from modules.core.Cart import Cart
     from modules.core.Fridge import Fridge
@@ -15,6 +15,7 @@ try:
     from modules.core.AIRecData import AIRecData
     from modules.logic.AnalysisContext import AnalysisContext
     from modules.repositories.JsonRepository import JsonRepository
+    from modules.repositories.AppPaths import AppPaths
     from modules.ai.AI_manager import AIManager
     from modules.ai.OpenRouterProvider import OpenRouterProvider
     from CartRecommender import CartRecommender
@@ -33,11 +34,11 @@ def choose_repository():
             from modules.repositories.MongoDBRepository import MongoDBRepository
             repo = MongoDBRepository()
             errors, bundle = DB_manager().load_database(repo)
-            send_log("Connected to the shared MongoDB database.")
+            ui.send_message("Connected to the shared MongoDB database.")
             return repo, errors, bundle
         except Exception as e:
-            send_log(f"MongoDB unavailable ({e}). Using local JSON instead.")
-    repo = JsonRepository(folder="database")
+            ui.send_message(f"MongoDB unavailable ({e}). Using local JSON instead.")
+    repo = JsonRepository()
     errors, bundle = DB_manager().load_database(repo)
     return repo, errors, bundle
 
@@ -47,7 +48,7 @@ household_info = data_bundle["household"]
 history = data_bundle["consumption_history"]
 
 # ---------- local JSON copy (fallback + backup) ----------
-OFFLINE_MARKER = os.path.join("database", ".offline_changes")
+OFFLINE_MARKER = AppPaths.OFFLINE_MARKER
 
 def mirror_to_json(backup=False):
     """When running on the cloud, keep the local JSON files in sync."""
@@ -55,14 +56,15 @@ def mirror_to_json(backup=False):
         return                                   # already running on local JSON
     try:
         if backup:                               # keep the old local files before overwriting them
-            dest = os.path.join("database", "backup_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+            dest = AppPaths.DATABASE_DIR / ("backup_" + datetime.now().strftime("%Y%m%d_%H%M%S"))            
             os.makedirs(dest, exist_ok=True)
             for name in ("fridge.json", "household.json", "consumption_history.json"):
-                src = os.path.join("database", name)
+                src = AppPaths.DATABASE_DIR / name
                 if os.path.exists(src):
                     shutil.copy2(src, dest)
 
-        json_repo = JsonRepository(folder="database")
+        # Mirror cloud data into the shared local database directory.
+        json_repo = JsonRepository()
         _, json_stores = json_repo.load()        # gives us JsonRepository's own stores
         json_stores.update({
             "fridge": fridge,
@@ -71,7 +73,7 @@ def mirror_to_json(backup=False):
         })
         json_repo.save()
     except Exception as e:
-        send_log(f"Warning: could not update the local JSON backup: {e}")
+        ui.send_message(f"Warning: could not update the local JSON backup: {e}")
 
 # Preserve unsaved changes locally and flag them for cloud upload if MongoDB saving fails.
 def save_everything():
@@ -83,10 +85,11 @@ def save_everything():
         if isinstance(REPOSITORY, JsonRepository):
             raise SystemExit(f"Could not save local data: {e}") from e
         # If MongoDB saving fails, fall back to local JSON storage
-        send_log(f"Cloud save failed: {e}. Saving changes locally.")
+        ui.send_message(f"Cloud save failed: {e}. Saving changes locally.")
         try:
             # Load existing local data and update it with the latest in-memory changes
-            local_repo = JsonRepository(folder="database")
+            # Save pending changes in the shared local database directory.
+            local_repo = JsonRepository()
             _, local_stores = local_repo.load()
             local_stores.update({"fridge": fridge, "household": household_info, "consumption_history": history})
             # Save the updated data locally
@@ -98,13 +101,14 @@ def save_everything():
             # Exit with an error if the local fallback save also fails
             raise SystemExit(f"Could not save the local fallback: {local_error}") from local_error
         # Inform the user that changes are saved locally and need uploading
-        send_log("Changes saved locally. Upload them when the shared database is available.")
+        ui.send_message("Changes saved locally. Upload them when the shared database is available.")
         return
     # Update the local JSON backup after a successful repository save
     mirror_to_json()
     # Mark data as pending upload if using the offline JSON repository
     if isinstance(REPOSITORY, JsonRepository):
-        os.makedirs("database", exist_ok=True)
+        # Ensure the shared database directory exists before writing the marker.
+        AppPaths.DATABASE_DIR.mkdir(parents=True, exist_ok=True)        
         # Create the offline marker file
         with open(OFFLINE_MARKER, "w"):
             pass
@@ -114,15 +118,16 @@ if not isinstance(REPOSITORY, JsonRepository) and os.path.exists(OFFLINE_MARKER)
     answer = input("You made changes while offline. Upload them to the shared database? "
                    "This REPLACES the cloud data (y/n): ").strip().lower()
     if answer == "y":
-        _, local_stores = JsonRepository(folder="database").load()
+        # Load pending changes from the same directory used by local saves.
+        _, local_stores = JsonRepository().load()
         data_bundle.update(local_stores)         # swap the cloud-loaded objects for the local ones
         fridge = data_bundle["fridge"]
         household_info = data_bundle["household"]
         history = data_bundle["consumption_history"]
         DB_manager().save_database(REPOSITORY)
-        send_log("Offline changes uploaded to the shared database.")
+        ui.send_message("Offline changes uploaded to the shared database.")
     else:
-        send_log("Offline changes discarded. Using the shared database data.")
+        ui.send_message("Offline changes discarded. Using the shared database data.")
     os.remove(OFFLINE_MARKER)
 mirror_to_json(backup=True)     # back up the old local files, then refresh them from the cloud
 

@@ -11,5 +11,5 @@ services:
       - ./.env
 
     volumes:
-      - ./database:/app/database
-      - ./logs:/app/logs
+      - ./app_data/database:/app/app_data/database
+      - ./app_data/logs:/app/app_data/logs
