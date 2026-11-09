@@ -1349,4 +1349,49 @@ class TestApplicationStartupAndRecovery:
         data_manager.save.assert_called_once_with()
         ui.show_exit.assert_called_once_with()
         ai_manager.get_ai_recommendations.assert_not_called()
+
+    # Test 83 - Simulate a missing dependency during application startup.
+    # Expected: Display a useful error and exit without starting the application.
+    def test_startup_reports_missing_module(self):
+        original_import = __import__
+
+        # Simulate an AI dependency error propagating through the application import.
+        def simulate_missing_module(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "Application":
+                raise ModuleNotFoundError("No module named 'openai'", name="openai")
+            return original_import(name, globals, locals, fromlist, level)
+
+        # Execute the actual entry point without starting the application.
+        with patch("builtins.__import__", side_effect=simulate_missing_module):
+            with pytest.raises(SystemExit) as captured:
+                runpy.run_path(str(AppPaths.PROJECT_ROOT / "main.py"), run_name="__main__")
+
+        # Verify the handler identifies the missing package and explains the next step.
+        message = str(captured.value)
+        assert "required module 'openai' was not found" in message
+        assert "python_dependencies.txt" in message
+        print(f"\nSimulated missing AI dependency:\n{message}")
+
+    # Test 84 - Simulate an unavailable AIManager class during application startup.
+    # Expected: Report the AI import problem and exit without starting the workflow.
+    def test_startup_reports_invalid_import(self):
+        original_import = __import__
+
+        # Simulate AI_manager loading without the AIManager name expected by Application.
+        def simulate_invalid_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "Application":
+                raise ImportError("cannot import name 'AIManager' from 'modules.ai.AI_manager'")
+            return original_import(name, globals, locals, fromlist, level)
+
+        # Execute the actual entry point with the simulated import failure.
+        with patch("builtins.__import__", side_effect=simulate_invalid_import):
+            with pytest.raises(SystemExit) as captured:
+                runpy.run_path(str(AppPaths.PROJECT_ROOT / "main.py"), run_name="__main__")
+
+        # Verify the message identifies the unavailable class and its module.
+        message = str(captured.value)
+        assert "Application import failed" in message
+        assert "cannot import name 'AIManager'" in message
+        assert "modules.ai.AI_manager" in message
+        print(f"\nSimulated AI module import failure:\n{message}")
 #endregion
