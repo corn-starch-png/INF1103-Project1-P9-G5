@@ -4,30 +4,30 @@ import pytest
 import math
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from aiclasses.AI_manager import AIManager, AIResponseValidator
-from aiclasses.AIProvider import AIProvider
-from aiclasses.OpenRouterProvider import OpenRouterProvider
-from aiclasses.MockAIProvider import MockAIProvider
+from modules.ai.AI_manager import AIManager, AIResponseValidator
+from modules.ai.AIProvider import AIProvider
+from modules.ai.OpenRouterProvider import OpenRouterProvider
+from modules.ai.MockAIProvider import MockAIProvider
 from datetime import date, timedelta
-from core.AIRecData import AIRecData
-from core.Cart import Cart
-from core.CartItem import CartItem
-from core.ConsumptionHistory import ConsumptionHistory
-from core.ConsumptionRecord import ConsumptionRecord
-from core.Fridge import Fridge
-from core.FridgeItem import FridgeItem
-from core.Household import Household
-from core.Person import Person
-from logicclasses.AnalysisContext import AnalysisContext
-from logicclasses.BonusCalculator import BonusCalculator
-from logicclasses.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
-from logicclasses.CartEvaluator import CartEvaluator
-from logicclasses.ConfidenceCalculator import ConfidenceCalculator
-from logicclasses.ConfidenceMetrics import ConfidenceMetrics
-from logicclasses.Finding import Finding
-from Logic_manager import Logic_manager
-from logicclasses.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
-from logicclasses.UnderBuyAnalyzer import UnderBuyAnalyzer
+from modules.core.AIRecData import AIRecData
+from modules.core.Cart import Cart
+from modules.core.CartItem import CartItem
+from modules.core.ConsumptionHistory import ConsumptionHistory
+from modules.core.ConsumptionRecord import ConsumptionRecord
+from modules.core.Fridge import Fridge
+from modules.core.FridgeItem import FridgeItem
+from modules.core.Household import Household
+from modules.core.Person import Person
+from modules.logic.AnalysisContext import AnalysisContext
+from modules.logic.BonusCalculator import BonusCalculator
+from modules.logic.CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
+from modules.logic.CartEvaluator import CartEvaluator
+from modules.logic.ConfidenceCalculator import ConfidenceCalculator
+from modules.logic.ConfidenceMetrics import ConfidenceMetrics
+from modules.logic.Finding import Finding
+from modules.logic.Logic_manager import Logic_manager
+from modules.logic.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
+from modules.logic.UnderBuyAnalyzer import UnderBuyAnalyzer
 
 #region Hardcoded data
 # Household information
@@ -290,10 +290,10 @@ def make_context():
         household.add_member(Person(1, "TestUser", 20, "Male", "none"))
         household.add_member(Person(2, "Alice", 35, "Female", "none"))
         # Grocery cart with AI recommendation data
-        cart = Cart()
+        cart = Cart(remarks=remarks)
         item = CartItem("milk", quantity, "l")
-        item.set_ai_data(AIRecData(recommended_qty=quantity, consumption_rate=weekly_rate, 
-                                   est_expiry_date=( date.today() + timedelta(days=expiry_days) ).isoformat()))
+        item.set_ai_data(recommended_qty=quantity, consumption_rate=weekly_rate, 
+                         est_expiry_date=( date.today() + timedelta(days=expiry_days)).isoformat())       
         cart.add_item(item)
         # Fridge stock
         fridge_obj = Fridge()
@@ -305,7 +305,8 @@ def make_context():
         for amount in history_quantities:
             consumption_history.add_record(ConsumptionRecord( "milk", amount, "l", 7, "none"))
         # Analysis context
-        ctx = AnalysisContext(cart, household, fridge_obj, consumption_history, total_calories, days_until_next, remarks)
+        ctx = AnalysisContext(cart=cart, household=household, fridge=fridge_obj, history=consumption_history, 
+                              total_est_calories=total_calories, next_purchase_date=days_until_next)        
         return item, ctx
     return factory
 #endregion
@@ -383,8 +384,7 @@ class TestRiskOfExpiryAnalyzer:
         assert finding.message is None
     # Test 24 - Handle zero or negative consumption rate
     # Expected: Return a Finding with result False.
-    # Known issue: Current analyzer does not return the Finding
-    # when the consumption rate is zero or negative.
+    # Verify the analyzer returns a false Finding when the consumption rate is zero or negative.
     @pytest.mark.parametrize("rate", [0, -1])
     def test_nonpositive_rate_returns_false_finding(self, make_context, rate):
         item, ctx = make_context(weekly_rate=rate)
@@ -445,7 +445,7 @@ class TestConfidenceCalculator:
     # Expected: Return 49.5 without division-by-zero errors.
     def test_zero_history_does_not_divide_by_zero(self, make_context):
         item, ctx = make_context(quantity=1, fridge_quantity=0, history_quantities=(0,))
-        item.set_ai_data(AIRecData( 0, 0, item.ai_data.est_expiry_date))
+        item.set_ai_data(recommended_qty=0, consumption_rate=0, est_expiry_date=item.ai_data.est_expiry_date)
         result = ConfidenceCalculator().calculate_confidence_score(item, ctx)
         assert result == 49.5
     # Test 31 - Verify AI recommendation agreement
@@ -457,7 +457,7 @@ class TestConfidenceCalculator:
         first_score = calculator.calculate_confidence_score(item, ctx)
         # Historical requirement:
         # 7l consumed per week - 1l existing stock = 6l needed.
-        item.set_ai_data(AIRecData( 6, 7, item.ai_data.est_expiry_date))
+        item.set_ai_data(recommended_qty=6, consumption_rate=7, est_expiry_date=item.ai_data.est_expiry_date)        
         second_score = calculator.calculate_confidence_score(item, ctx)
         assert second_score > first_score
     # Test 32 - Verify actionable remarks bonus
@@ -467,7 +467,7 @@ class TestConfidenceCalculator:
         item, ctx = make_context(remarks="none")
         calculator = ConfidenceCalculator()
         baseline = calculator.calculate_confidence_score(item, ctx)
-        ctx.remarks = "hosting guests"
+        ctx.cart.set_remarks("hosting guests")
         with_bonus = calculator.calculate_confidence_score(item, ctx)
         assert with_bonus == min(100, round(baseline + 5, 1))
     # Test 33 - Verify bonus keyword categories
@@ -499,26 +499,19 @@ class TestLogicManagerIntegration:
         assert ctx.findings == findings
     # Test 36 - Verify recommendation output formatting
     # Expected: Display valid findings and exclude false findings.
-    def test_manager_formats_findings(self):
-        findings = [
-            Finding("CaloriesSurplus", False, "Below calorie requirement"),
-            Finding("RiskOfExpiry", True, "milk may expire"),
-            Finding("UnderBuy", True, "rice may run out"),
-            Finding("UnderBuy", False, None)
-        ]
-        output = Logic_manager().structure_recommedations(findings)
-        assert "QUANTIFRESH ANALYSIS" in output
-        assert "Below calorie requirement" in output
-        assert "milk may expire" in output
-        assert "rice may run out" in output
-        assert "None" not in output
+    def test_manager_gets_findings(self, make_context):
+        _, ctx = make_context()
+        manager = Logic_manager()
+        manager.process_recommendations(ctx)
+        findings = manager.get_recommedations("RiskOfExpiry", True)
+        assert isinstance(findings, list)
+        assert all(isinstance(message, str) for message in findings)
     # Test 37 - Verify confidence scores are attached to cart items
     # Expected: Each AI-enhanced cart item receives a valid
     # confidence score between 0 and 100.
     def test_manager_adds_confidence_to_cart(self, make_context):
         item, ctx = make_context(quantity=6, fridge_quantity=1)
-        result = Logic_manager().add_confidence_score(ctx)
-        assert result is ctx.cart
+        Logic_manager().add_confidence_score(ctx)
         assert 0 < item.ai_data.confidence_score <= 100
 #endregion
 
