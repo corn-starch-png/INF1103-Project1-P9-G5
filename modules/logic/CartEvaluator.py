@@ -11,6 +11,10 @@ class CartEvaluator():
         self.__item_analyzers = [RiskOfExpiryAnalyzer(), UnderBuyAnalyzer()]
 
     def evaluate(self, ctx: AnalysisContext) -> list[Finding]:
+        # Start each evaluation with fresh findings for the current cart state.
+        # Remove results left by an earlier evaluation of this context.
+        ctx.findings.clear()
+        # Collect the new results that this evaluation will return.
         findings: list[Finding] = []
 
         items = ctx.cart.get_items()

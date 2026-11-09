@@ -167,23 +167,27 @@ class Fridge(ListFunctions, CanBeStored):
         if amount > total_quantity:
             raise ValueError(f"Cannot consume {amount}{units} of {item_name};\nonly {total_quantity} available.")
         
-        # Save the requested amount for the record before we mutate it
+        # Consume batches using decimal arithmetic while retaining the requested amount for history.
+        # Preserve the original quantity for the ConsumptionRecord.
         requested_amount = amount
+        # Track the remaining quantity without binary floating-point subtraction errors.
+        amount = Decimal(str(amount))
         
         i = 0
         while amount > 0 and i < len(self.__items):
             item = self.__items[i]
+            # Reduce matching batches using exact decimal quantities.
             if item.name.strip().casefold() == item_name.strip().casefold():
-                if item.quantity <= amount:
-                    amount -= item.quantity
-                    self.__items.pop(i)  # Remove item and let index stay in place for the shifted element
+                item_quantity = Decimal(str(item.quantity))
+                # Remove a fully consumed batch and keep the index on the next shifted batch.
+                if item_quantity <= amount:
+                    amount -= item_quantity
+                    self.__items.pop(i)
                 else:
-                    amt_after = item.quantity - amount
-                    item.set_quantity(amt_after)
-                    amount = 0
-                    i += 1  # Move to the next item since this one still has remaining quantity
-            else:
-                i += 1
+                    # Keep the unconsumed portion and finish processing the requested amount.
+                    item.set_quantity(item_quantity - amount)
+                    amount = Decimal("0")
+                    i += 1
                 
         return ConsumptionRecord(item_name, requested_amount, units, date_range, consumption_remarks)
 

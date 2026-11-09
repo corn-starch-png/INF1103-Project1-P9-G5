@@ -69,7 +69,13 @@ class CartRecommender:
         pcs is rounded up to a whole number, other units to 4 decimal places.
         Capped at MAX_QUANTITY.
         """
-        amount = Decimal(str(self.__get_expected_consumption(name)))
+        # Recommend only the expected consumption not already covered by usable fridge stock.
+        # Recommend only the expected consumption that usable fridge stock cannot cover.
+        # Calculate demand and available stock using decimal arithmetic.
+        expected_consumption = Decimal(str(self.__get_expected_consumption(name)))
+        available_stock = Decimal(str(self.__fridge.get_item_total(name, include_expired=False)))
+        # Subtract existing stock and prevent a negative purchase quantity.
+        amount = max(Decimal("0"), expected_consumption - available_stock)        
         amount = amount.quantize(ItemRecord.QUANTITY_STEP, rounding=ROUND_HALF_UP)
         if unit == "pcs":
             amount = amount.to_integral_value(rounding=ROUND_CEILING)

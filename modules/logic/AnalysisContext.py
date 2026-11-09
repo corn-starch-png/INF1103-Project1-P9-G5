@@ -28,13 +28,13 @@ class AnalysisContext():
                 raise TypeError("findings must be a list of findings.")
             self.findings.extend(new_findings)
 
-    def get_total_items(self, item_name: str) -> int:
+    # Return usable fridge stock + matching cart quantities, including fridge only items.
+    def get_total_items(self, item_name: str) -> float:
+        # Exclude expired fridge batches from the available stock.
         fridge_amt = self.fridge.get_item_total(item_name, include_expired=False)
-        cart_item = self.cart.search_item(item_name)
-        if cart_item == None:
-             cart_amt = 0
-        else:
-            cart_amt = cart_item.quantity
+        # Match names consistently and use zero when no cart item matches.
+        cart_amt = sum(item.quantity for item in self.cart.get_items() if item.name.strip().casefold() == item_name.strip().casefold())
+        # Return the combined quantity, which can include fractional units.
         return fridge_amt + cart_amt
 
 

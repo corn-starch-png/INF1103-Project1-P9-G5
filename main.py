@@ -6,7 +6,7 @@ try:
     import os
     import shutil
     from modules.repositories.DB_manager import DB_manager
-    from modules.io.IO_manager import IO_manager
+    from modules.io.IO_manager import IO_manager, send_log
     from modules.logic.Logic_manager import Logic_manager
     from modules.core.Cart import Cart
     from modules.core.Fridge import Fridge
@@ -33,10 +33,10 @@ def choose_repository():
             from modules.repositories.MongoDBRepository import MongoDBRepository
             repo = MongoDBRepository()
             errors, bundle = DB_manager().load_database(repo)
-            print("Connected to the shared MongoDB database.")
+            send_log("Connected to the shared MongoDB database.")
             return repo, errors, bundle
         except Exception as e:
-            print(f"MongoDB unavailable ({e}). Using local JSON instead.")
+            send_log(f"MongoDB unavailable ({e}). Using local JSON instead.")
     repo = JsonRepository(folder="database")
     errors, bundle = DB_manager().load_database(repo)
     return repo, errors, bundle
@@ -71,18 +71,44 @@ def mirror_to_json(backup=False):
         })
         json_repo.save()
     except Exception as e:
-        print(f"Warning: could not update the local JSON backup: {e}")
+        send_log(f"Warning: could not update the local JSON backup: {e}")
 
+# Preserve unsaved changes locally and flag them for cloud upload if MongoDB saving fails.
 def save_everything():
     try:
+        # Attempt to save all changes to the selected repository
         DB_manager().save_database(REPOSITORY)
     except Exception as e:
-        print(f"Warning: could not save to the database: {e}")
-    mirror_to_json()                             # always keep the local copy current
-    if isinstance(REPOSITORY, JsonRepository):   # saved offline: remember it
+        # Stop if saving to the local JSON repository fails
+        if isinstance(REPOSITORY, JsonRepository):
+            raise SystemExit(f"Could not save local data: {e}") from e
+        # If MongoDB saving fails, fall back to local JSON storage
+        send_log(f"Cloud save failed: {e}. Saving changes locally.")
+        try:
+            # Load existing local data and update it with the latest in-memory changes
+            local_repo = JsonRepository(folder="database")
+            _, local_stores = local_repo.load()
+            local_stores.update({"fridge": fridge, "household": household_info, "consumption_history": history})
+            # Save the updated data locally
+            local_repo.save()
+            # Create an offline marker to indicate pending cloud uploads
+            with open(OFFLINE_MARKER, "w"):
+                pass
+        except Exception as local_error:
+            # Exit with an error if the local fallback save also fails
+            raise SystemExit(f"Could not save the local fallback: {local_error}") from local_error
+        # Inform the user that changes are saved locally and need uploading
+        send_log("Changes saved locally. Upload them when the shared database is available.")
+        return
+    # Update the local JSON backup after a successful repository save
+    mirror_to_json()
+    # Mark data as pending upload if using the offline JSON repository
+    if isinstance(REPOSITORY, JsonRepository):
         os.makedirs("database", exist_ok=True)
-        open(OFFLINE_MARKER, "w").close()
-
+        # Create the offline marker file
+        with open(OFFLINE_MARKER, "w"):
+            pass
+        
 # ---------- startup: handle changes made while offline ----------
 if not isinstance(REPOSITORY, JsonRepository) and os.path.exists(OFFLINE_MARKER):
     answer = input("You made changes while offline. Upload them to the shared database? "
@@ -94,28 +120,11 @@ if not isinstance(REPOSITORY, JsonRepository) and os.path.exists(OFFLINE_MARKER)
         household_info = data_bundle["household"]
         history = data_bundle["consumption_history"]
         DB_manager().save_database(REPOSITORY)
-        print("Offline changes uploaded to the shared database.")
+        send_log("Offline changes uploaded to the shared database.")
     else:
-        print("Offline changes discarded. Using the shared database data.")
+        send_log("Offline changes discarded. Using the shared database data.")
     os.remove(OFFLINE_MARKER)
-
 mirror_to_json(backup=True)     # back up the old local files, then refresh them from the cloud
-
-#-------END OF DEPENDENCY LINE----------#
-
-# old code
-# Load environment variables once
-# load_dotenv()
-# REPOSITORY = JsonRepository(folder="database")
-# ui = IO_manager()
-# logicmgr = Logic_manager()
-
-# errors, data_bundle = DB_manager().load_database(REPOSITORY)
-# fridge = data_bundle["fridge"]
-# household_info = data_bundle["household"]
-# history = data_bundle["consumption_history"]
-#-------END OF DEPENDENCY LINE----------#
-
 
 #region user IO
 ui.show_welcome()
@@ -163,16 +172,13 @@ ui.send_message("Getting AI recommendations... This can take a while.")
 ai_manager = AIManager(OpenRouterProvider())
 # Generate recommendations.
 ai_recommendations, error = ai_manager.get_ai_recommendations(
-    household_info=household_info, 
-    consumption_history=history, 
-    fridge_stock=fridge, 
-    purchase_stock=cart, 
-    remarks=cart.get_remarks(), 
-    days_until_next=days_until_next_visit,
-    notify=ui.send_message
-    )
-# Handle unsuccessful AI requests.
+    household_info=household_info,  consumption_history=history, 
+    fridge_stock=fridge, purchase_stock=cart,  remarks=cart.get_remarks(), 
+    days_until_next=days_until_next_visit, notify=ui.send_message)
+# Preserve completed household, fridge and consumption changes before exiting after an AI failure.
 if error or ai_recommendations is None:
+    # Save existing data without checking out the unconfirmed grocery cart.
+    save_everything()
     raise SystemExit(f"AI recommendation failed: {error or 'No response returned.'}")
 # Extract validated AI results.
 cart.set_ai_enhanced(True)
@@ -182,24 +188,18 @@ total_recommended_calories = ai_recommendations["Total_Estimated_Calories"]
 #endregion
 
 #create context object for logic calculations
-context = AnalysisContext(cart= cart,
-                          household= household_info,
-                          fridge= fridge,
-                          history= history,
+context = AnalysisContext(cart= cart,  household= household_info,
+                          fridge= fridge, history= history,
                           total_est_calories= total_planned_calories,
-                          next_purchase_date= days_until_next_visit
-                          )
+                          next_purchase_date= days_until_next_visit)
 
 logicmgr.add_confidence_score(ctx=context)
-
 findings = logicmgr.process_recommendations(ctx= context)
-
 calorie_msg = logicmgr.get_recommedations("CaloriesSurplus", False) #calorie msg is special where we will return a message regardless of the finding state
 if not calorie_msg:
     calorie_msg = logicmgr.get_recommedations("CaloriesSurplus", True)
 roe_msgs = logicmgr.get_recommedations("RiskOfExpiry", True)
 underbuy_msgs = logicmgr.get_recommedations("UnderBuy", True)
-
 
 #region user IO confirmation
 ui.output_recommendations(calorie_msg, roe_msgs, underbuy_msgs)

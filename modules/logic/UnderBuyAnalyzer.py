@@ -55,9 +55,9 @@ class UnderBuyAnalyzer(ItemAnalyzer):
         for finding in findings:
             if finding.analyzer_name == "CaloriesSurplus":
                 cal_result = finding.result
-            if finding.analyzer_name == "RiskOfExpiry" and finding.result == True and item.name in finding.message:
+            # Skip under buy analysis only when this exact item has an expiry warning.
+            if finding.analyzer_name == "RiskOfExpiry" and finding.result is True and finding.item_name == item.name:
                 return False
-
         if cal_result == False:
             return True
         return False

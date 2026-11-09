@@ -405,7 +405,7 @@ class TestUnderBuyAnalyzer:
         item, ctx = make_context(quantity=1, fridge_quantity=1, weekly_rate=7)
         ctx.update_findings([Finding( "CaloriesSurplus", surplus, "test" )])
         if expiry_risk:
-            ctx.update_findings([Finding( "RiskOfExpiry", True, "milk will expire")])
+            ctx.update_findings([Finding("RiskOfExpiry", True, "milk will expire", item_name=item.name)])
         finding = UnderBuyAnalyzer().analyze(item, ctx)
         assert finding.analyzer_name == "UnderBuy"
         assert finding.result is should_buy
