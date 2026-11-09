@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
-from CartRecommender import CartRecommender
 from modules.ai.AI_manager import AIManager
 from modules.ai.OpenRouterProvider import OpenRouterProvider
 from modules.core.Cart import Cart
 from modules.io.IO_manager import IO_manager
+from modules.logic.CartRecommender import CartRecommender
 from modules.logic.AnalysisContext import AnalysisContext
 from modules.logic.Logic_manager import Logic_manager
 from modules.repositories.DB_manager import DB_manager
