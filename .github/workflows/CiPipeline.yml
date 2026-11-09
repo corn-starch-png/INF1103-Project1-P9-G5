@@ -30,6 +30,17 @@ jobs: #gitub required status checks are expecting job names to pass!
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #auto created by github to allow PR comments
 
+
+  PipAudit
+  name: Auditing vulnerable dependencies
+  runs-on: ubuntu-latest
+  steps:
+  - uses: actions/checkout@v6
+  - name: install
+    run: python -m pip install .
+  - uses: pypa/gh-action-pip-audit@v1.1.0
+
+
   Linting_with_ruff: #name of  job
     name: Linting with Ruff
     runs-on: ubuntu-latest #spins up ubuntu vm
@@ -39,8 +50,6 @@ jobs: #gitub required status checks are expecting job names to pass!
     steps: #copies repo code into the created container
     - name : Checkout repository 
       uses: actions/checkout@v6 #clones repo source code
-
-
       #rule set docs https://docs.astral.sh/ruff/rules/
     - name: Log Advisory rules violations with ruff 
       uses: astral-sh/ruff-action@v4.1.0
@@ -58,7 +67,8 @@ jobs: #gitub required status checks are expecting job names to pass!
       with:
         args: format --check --diff  .
 
-  CustomPytestScript: #name of  job
+
+  Pytest_Python: #name of  job
       name: Running PytestScript 
       runs-on: ubuntu-latest #spins up ubuntu vm
       container:
@@ -90,4 +100,19 @@ jobs: #gitub required status checks are expecting job names to pass!
 
     - name: Docker smoke test
       run: bash .github/scripts/docker-smoke-test.sh 
+
+
+  Pytest_Docker: #name of  job
+    name: Running PytestScript on QuantiFresh
+    runs-on: ubuntu-latest #spins up ubuntu vm
+
+    steps: 
+    - name : Checkout repository 
+      uses: actions/checkout@v6 #clones repo source code
+
+    - name: Build Docker image
+      run: docker compose -f .github/smoke_test/docker-compose.ci.yml build test
+
+    - name: Run pytest inside Docker
+      run: docker compose -f .github/smoke_test/docker-compose.ci.yml run --rm test python -m pytest test_script.py -v
 
