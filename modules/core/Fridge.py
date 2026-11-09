@@ -188,7 +188,9 @@ class Fridge(ListFunctions, CanBeStored):
                     item.set_quantity(item_quantity - amount)
                     amount = Decimal("0")
                     i += 1
-                
+            else:
+                # Skip unrelated items so the loop can reach the requested stock.
+                i += 1
         return ConsumptionRecord(item_name, requested_amount, units, date_range, consumption_remarks)
 
     def to_dicts(self) -> list:
