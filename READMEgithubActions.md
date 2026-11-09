@@ -21,7 +21,7 @@ use checkout @v6 (latest version as of Nov 2026)
 DO NOT CHANGE DIRECTORY OF ANY FILES,
 If you need to change, kindly check and update the directories in CiPipeline.yml.
 
-###smoke_test. 
+### smoke_test 
 
 Relevant directory changes has to be reflected in both docker-compose.ci.yml AND docker-smoke-test.sh. 
 
