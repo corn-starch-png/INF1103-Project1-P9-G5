@@ -2,6 +2,14 @@ import copy
 import json
 import pytest
 import math
+import subprocess
+import sys
+from pathlib import Path
+from CartRecommender import CartRecommender
+from logger import Logger, app_logger
+from modules.repositories.AppPaths import AppPaths
+from modules.repositories.JsonRepository import JsonRepository
+from modules.repositories.MongoDBRepository import MongoDBRepository
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from modules.ai.AI_manager import AIManager, AIResponseValidator
@@ -28,6 +36,58 @@ from modules.logic.Finding import Finding
 from modules.logic.Logic_manager import Logic_manager
 from modules.logic.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
 from modules.logic.UnderBuyAnalyzer import UnderBuyAnalyzer
+
+#region Shared Test Fixtures
+# Redirect application log writes into a temporary directory for each test.
+@pytest.fixture(autouse=True)
+def isolate_test_logs(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_logger, "filename", str(tmp_path / "application.log"))
+
+# Build recent history and fridge stock for public cart recommendation tests.
+@pytest.fixture
+def make_recommendation_context():
+    def factory(history_quantities=(7,), stock=0, expired_stock=0, unit="l", age_days=0):
+        fridge_obj = Fridge()
+        history_obj = ConsumptionHistory()
+        today = date.today()
+        # Create one seven-day consumption record for each supplied quantity.
+        for quantity in history_quantities:
+            history_obj.add_record(ConsumptionRecord("milk", quantity, unit, 7, "none", record_date=(today - timedelta(days=age_days)).isoformat()))
+        # Keep usable and expired stock in separate batches.
+        if stock > 0:
+            fridge_obj.add_item(FridgeItem("milk", stock, unit, (today - timedelta(days=2)).isoformat(), (today + timedelta(days=10)).isoformat(), "none"))
+        if expired_stock > 0:
+            fridge_obj.add_item(FridgeItem("milk", expired_stock, unit, (today - timedelta(days=3)).isoformat(), (today - timedelta(days=1)).isoformat(), "none"))
+        return fridge_obj, history_obj
+    return factory
+# Build a populated JSON repository without touching the real application database.
+@pytest.fixture
+def populated_json_repository(tmp_path, make_context):
+    _, ctx = make_context()
+    folder = tmp_path / "database"
+    repository = JsonRepository(folder=folder)
+    errors, stores = repository.load()
+    assert errors == []
+    # Supply real domain objects so saving exercises their serialization methods.
+    stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
+    expected = {name: store.to_dicts() for name, store in stores.items()}
+    return repository, folder, expected
+# Supply a mocked MongoDB client before constructing the repository.
+@pytest.fixture
+def mongo_repository(monkeypatch):
+    monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
+    monkeypatch.setenv("MONGODB_DATABASE", "test_database")
+    # Patch the client where MongoDBRepository looks it up.
+    with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
+        client = client_class.return_value
+        database = client.__getitem__.return_value
+        collections = {name: MagicMock() for name in ("fridge", "household", "consumption_history")}
+        database.__getitem__.side_effect = collections.__getitem__
+        for collection in collections.values():
+            collection.find.return_value = []
+        repository = MongoDBRepository()
+        yield repository, client, collections
+#endregion
 
 #region Hardcoded data
 # Household information
@@ -94,22 +154,21 @@ for item in RAW_AI_RESPONSE["Recommendations_List"]:
 class TestAIResponseValidator:
     def setup_method(self):
         self.validator = AIResponseValidator()
-    # Test 1 - Verify top-level JSON fields
-    # Expected result: Contains exactly the three required top-level fields.
+    # Test 1 - Verify the validator's actual top-level output fields.
+    # Expected: Processed output contains exactly the three required fields.
     def test_final_output_exact_top_level_fields(self):
+        result, error = self.validator.process_ai_response(json.dumps(RAW_AI_RESPONSE))
+        assert error is None
         expected = {"Recommendations_List", "Total_Planned_Estimated_Calories", "Total_Estimated_Calories"}
-        assert set(SAMPLE_AI_RESPONSE) == expected
-    # Test 2 - Verify all 10 recommendation fields
-    # Expected result: All six recommendations contain exactly the 10 required fields.
+        assert set(result) == expected
+    # Test 2 - Verify the validator produces all ten recommendation fields.
+    # Expected: Each processed recommendation contains exactly the required fields.
     def test_final_output_has_all_10_item_fields(self):
-        expected = {
-            "Item_Name", "Planned_Quantity", "Unit", "Recommended_Quantity",
-            "Estimated_Consumption_Rate", "Planned_Estimated_Calories",
-            "Estimated_Calories", "Estimated_Expiration_Days",
-            "Estimated_Expiry_Date", "Expiry_Date_Is_Default"
-        }
-        assert len(AI_RECOMMENDATIONS) == 6
-        for item in AI_RECOMMENDATIONS:
+        result, error = self.validator.process_ai_response(json.dumps(RAW_AI_RESPONSE))
+        assert error is None
+        expected = {"Item_Name", "Planned_Quantity", "Unit", "Recommended_Quantity", "Estimated_Consumption_Rate", "Planned_Estimated_Calories", "Estimated_Calories", "Estimated_Expiration_Days", "Estimated_Expiry_Date", "Expiry_Date_Is_Default"}
+        assert len(result["Recommendations_List"]) == len(grocery_list)
+        for item in result["Recommendations_List"]:
             assert set(item) == expected
     # Test 3 - Verify recommendations match the original grocery list
     # Expected result: Returns True when item names, quantities, units and order match.
@@ -143,15 +202,19 @@ class TestAIResponseValidator:
         modified = copy.deepcopy(AI_RECOMMENDATIONS)
         modified[0]["Item_Name"] = "other"
         assert self.validator.check_ai_output(modified, grocery_list) is False
-    # Test 9 - Process valid raw AI response
-    # Expected result: Returns valid recommendations with the two expiry-date fields added.
+    # Test 9 - Verify calculated expiry values in a valid response.
+    # Expected: Dates match expiration days and known estimates are not marked as defaults.
     def test_process_valid_ai_response(self):
-        result, error = self.validator.process_ai_response(json.dumps(RAW_AI_RESPONSE))
+        # Fix the validator's date so the expected values cannot change at midnight.
+        with patch("modules.ai.AIResponseValidator.date") as mock_date:
+            mock_date.today.return_value = CAPTURE_DATE
+            result, error = self.validator.process_ai_response(json.dumps(RAW_AI_RESPONSE))
         assert error is None
         assert result is not None
         for item in result["Recommendations_List"]:
-            assert "Estimated_Expiry_Date" in item
-            assert "Expiry_Date_Is_Default" in item
+            expected_date = CAPTURE_DATE + timedelta(days=item["Estimated_Expiration_Days"])
+            assert item["Estimated_Expiry_Date"] == expected_date.isoformat()
+            assert item["Expiry_Date_Is_Default"] is False
     # Test 10 - Reject malformed JSON
     # Expected result: Returns None and an error message when the AI response is invalid JSON.
     def test_process_invalid_json(self):
@@ -182,16 +245,19 @@ class TestAIProvider:
     def test_ai_provider_is_abstract(self):
         with pytest.raises(TypeError):
             AIProvider()
-    # Test 13 - Handle missing API configuration
-    # Expected result: Returns False and an error message without raising an exception.
-    def test_missing_api_configuration(self, monkeypatch):
-        provider = OpenRouterProvider()
-        def raise_config_error():
-            raise ValueError("API_KEY not found in environment file")
-        monkeypatch.setattr(provider, "check_api_conn", raise_config_error)
-        connected, message = provider.check_connection()
+    # Test 13 - Verify missing configuration is detected before any network request.
+    # Expected: Missing API_KEY or API_CONN_URL returns a clear connection error.
+    @pytest.mark.parametrize("missing_variable", ["API_KEY", "API_CONN_URL"])
+    def test_missing_api_configuration(self, monkeypatch, missing_variable):
+        monkeypatch.setenv("API_KEY", "test-key")
+        monkeypatch.setenv("API_CONN_URL", "https://test.invalid/key")
+        monkeypatch.delenv(missing_variable, raising=False)
+        # Mock HTTP as an additional guarantee that no live connection is made.
+        with patch("modules.ai.OpenRouterProvider.requests.get") as request:
+            connected, message = OpenRouterProvider().check_connection()
         assert connected is False
-        assert "API_KEY" in message
+        assert missing_variable in message
+        request.assert_not_called()
     # Test 14 - Switch to backup after primary model failure
     # Expected result: Primary failure triggers the backup model, which returns a valid response.
     def test_primary_model_fallback(self, monkeypatch):
@@ -337,7 +403,7 @@ class TestAnalysisContext:
 class TestCaloriesSurplusAnalyzer:
     # Test 19 - Verify age category mapping
     # Expected: Ages map to the correct calorie-table categories.
-    @pytest.mark.parametrize("age, expected", [ (1, 1), (18, 18), (19, 19), (29, 19), (30, 30), (59, 30), (60, 60), (100, 60)])
+    @pytest.mark.parametrize("age, expected", [(1, 1), (18, 18), (19, 19), (29, 19), (30, 30), (59, 30), (60, 60), (100, 60)])
     def test_age_brackets(self, age, expected):
         analyzer = CaloriesSurplusAnalyzer()
         result = analyzer._CaloriesSurplusAnalyzer__get_age_from_KCAL(age)
@@ -355,7 +421,7 @@ class TestCaloriesSurplusAnalyzer:
     # Above requirement = True
     # Equal requirement = False
     # Below requirement = False
-    @pytest.mark.parametrize("calories, expected", [ (33146, True), (33145, False), (33144, False)])
+    @pytest.mark.parametrize("calories, expected", [(33146, True), (33145, False), (33144, False)])
     def test_surplus_boundary(self, make_context, calories, expected):
         _, ctx = make_context(total_calories=calories)
         finding = CaloriesSurplusAnalyzer().analyze(ctx)
@@ -400,7 +466,7 @@ class TestUnderBuyAnalyzer:
     # Expected:
     # No calorie surplus and no expiry risk = Evaluate
     # Calorie surplus or expiry risk = Skip
-    @pytest.mark.parametrize("surplus, expiry_risk, should_buy", [ (False, False, True), (True, False, False), (False, True, False), (True, True, False)])
+    @pytest.mark.parametrize("surplus, expiry_risk, should_buy", [(False, False, True), (True, False, False), (False, True, False), (True, True, False)])
     def test_analysis_gate(self, make_context, surplus, expiry_risk, should_buy):
         item, ctx = make_context(quantity=1, fridge_quantity=1, weekly_rate=7)
         ctx.update_findings([Finding( "CaloriesSurplus", surplus, "test" )])
@@ -475,7 +541,7 @@ class TestConfidenceCalculator:
     # Full bonus = 5
     # Partial bonus = 2.5
     # No actionable remarks = 0
-    @pytest.mark.parametrize("remarks, expected", [ ("none", 0), ("", 0), ("hosting guests", 5), ("eating out", 2.5), ("ordinary note", 0)])
+    @pytest.mark.parametrize("remarks, expected", [("none", 0), ("", 0), ("hosting guests", 5), ("eating out", 2.5), ("ordinary note", 0)])
     def test_bonus_keywords(self, remarks, expected):
         result = BonusCalculator().bonus(remarks)
         assert result == expected
@@ -488,31 +554,45 @@ class TestConfidenceCalculator:
 
 #region Logic Manager Integration Tests
 class TestLogicManagerIntegration:
-    # Test 35 - Verify CartEvaluator integration
-    # Expected: Generate calorie surplus, expiry risk and
-    # under-buy findings for each cart item.
-    def test_cart_evaluator_produces_three_findings_per_item(self, make_context):
+    # Test 35 - Verify findings for a cart containing two items.
+    # Expected: One calorie finding per cart and two findings per item.
+    def test_cart_evaluator_produces_cart_and_item_findings(self, make_context):
         _, ctx = make_context(quantity=3, fridge_quantity=1, weekly_rate=7, expiry_days=20)
+        eggs = CartItem("eggs", 2, "pcs")
+        eggs.set_ai_data(recommended_qty=2, consumption_rate=7, est_expiry_date=(date.today() + timedelta(days=20)).isoformat())
+        ctx.cart.add_item(eggs)
         findings = CartEvaluator().evaluate(ctx)
-        expected = ["CaloriesSurplus", "RiskOfExpiry", "UnderBuy"]
-        assert [f.analyzer_name for f in findings] == expected
+        assert [finding.analyzer_name for finding in findings] == ["CaloriesSurplus", "RiskOfExpiry", "UnderBuy", "RiskOfExpiry", "UnderBuy"]
+        assert len(findings) == 1 + 2 * len(ctx.cart.get_items())
         assert ctx.findings == findings
-    # Test 36 - Verify recommendation output formatting
-    # Expected: Display valid findings and exclude false findings.
-    def test_manager_gets_findings(self, make_context):
-        _, ctx = make_context()
+        assert [finding.item_name for finding in findings if finding.analyzer_name == "RiskOfExpiry"] == ["milk", "eggs"]
+    # Test 36 - Verify true expiry findings are returned and false findings are excluded.
+    # Expected: A risky item produces its message; a safe item produces no true-risk messages.
+    @pytest.mark.parametrize("expiry_days, expected_count", [(1, 1), (20, 0)])
+    def test_manager_gets_findings(self, make_context, expiry_days, expected_count):
+        _, ctx = make_context(quantity=3, fridge_quantity=1, weekly_rate=7, expiry_days=expiry_days)
         manager = Logic_manager()
         manager.process_recommendations(ctx)
-        findings = manager.get_recommedations("RiskOfExpiry", True)
-        assert isinstance(findings, list)
-        assert all(isinstance(message, str) for message in findings)
-    # Test 37 - Verify confidence scores are attached to cart items
-    # Expected: Each AI-enhanced cart item receives a valid
-    # confidence score between 0 and 100.
+        messages = manager.get_recommedations("RiskOfExpiry", True)
+        expected = [finding.message for finding in ctx.findings if finding.analyzer_name == "RiskOfExpiry" and finding.result is True]
+        assert messages == expected
+        assert len(messages) == expected_count
+        if expected_count:
+            assert "milk" in messages[0]
+    # Test 37 - Verify confidence is calculated and attached to every enhanced item.
+    # Expected: Stored scores match the calculator, including zero for an item without history.
     def test_manager_adds_confidence_to_cart(self, make_context):
-        item, ctx = make_context(quantity=6, fridge_quantity=1)
+        milk, ctx = make_context(quantity=6, fridge_quantity=1)
+        eggs = CartItem("eggs", 2, "pcs")
+        eggs.set_ai_data(recommended_qty=2, consumption_rate=7, est_expiry_date=(date.today() + timedelta(days=20)).isoformat())
+        ctx.cart.add_item(eggs)
+        calculator = ConfidenceCalculator()
+        expected = {item.name: calculator.calculate_confidence_score(item, ctx) for item in ctx.cart.get_items()}
         Logic_manager().add_confidence_score(ctx)
-        assert 0 < item.ai_data.confidence_score <= 100
+        for item in ctx.cart.get_items():
+            assert item.ai_data.confidence_score == pytest.approx(expected[item.name])
+        assert milk.ai_data.confidence_score > 0
+        assert eggs.ai_data.confidence_score == 0
 #endregion
 
 # =========================================================
@@ -554,3 +634,86 @@ class TestAIOutputSnapshot:
         assert json.loads(json.dumps(SAMPLE_AI_RESPONSE)) == SAMPLE_AI_RESPONSE
 #endregion
 
+# =========================================================
+# 6. CART RECOMMENDATION TESTS
+# Input: Consumption history and usable/expired fridge stock.
+# Expected: Recommend only shortages using recent history,
+# preserve valid quantities and leave source data unchanged.
+# =========================================================
+#region Cart Recommendation Tests
+class TestCartRecommender:
+    # Test 42 - Handle missing or zero consumption history.
+    # Expected: No items are recommended.
+    @pytest.mark.parametrize("quantities", [(), (0,)])
+    def test_no_demand_returns_empty_cart(self, make_recommendation_context, quantities):
+        fridge_obj, history_obj = make_recommendation_context(history_quantities=quantities)
+        result = CartRecommender(fridge_obj, history_obj).generate_recommendation()
+        assert isinstance(result, Cart)
+        assert result.get_items() == []
+    # Test 43 - Deduct usable stock while ignoring expired stock.
+    # Expected: Recommendations contain only the shortage.
+    @pytest.mark.parametrize("stock, expired_stock, expected", [(0, 0, 7), (3, 0, 4), (7, 0, 0), (10, 0, 0), (0, 3, 7), (2, 3, 5)])
+    def test_recommends_only_shortage(self, make_recommendation_context, stock, expired_stock, expected):
+        fridge_obj, history_obj = make_recommendation_context(stock=stock, expired_stock=expired_stock)
+        items = CartRecommender(fridge_obj, history_obj).generate_recommendation().get_items()
+        if expected == 0:
+            assert items == []
+        else:
+            assert len(items) == 1
+            assert items[0].name == "milk"
+            assert items[0].unit == "l"
+            assert items[0].quantity == pytest.approx(expected)
+    # Test 44 - Verify the recent-history boundary.
+    # Expected: Records up to fourteen days old remain eligible; older records do not.
+    @pytest.mark.parametrize("age_days, expected_count", [(0, 1), (14, 1), (15, 0)])
+    def test_recent_history_boundary(self, make_recommendation_context, age_days, expected_count):
+        today = date.today()
+        fridge_obj, history_obj = make_recommendation_context(age_days=age_days)
+        with patch("CartRecommender.date") as mock_date:
+            mock_date.today.return_value = today
+            mock_date.fromisoformat.side_effect = date.fromisoformat
+            items = CartRecommender(fridge_obj, history_obj).generate_recommendation().get_items()
+        assert len(items) == expected_count
+    # Test 45 - Use the newest record to decide whether an item remains relevant.
+    # Expected: A recent record allows an item with older history to be considered.
+    def test_latest_record_controls_eligibility(self, make_recommendation_context):
+        fridge_obj, history_obj = make_recommendation_context(age_days=15)
+        history_obj.add_record(ConsumptionRecord("milk", 7, "l", 7, "none", record_date=date.today().isoformat()))
+        items = CartRecommender(fridge_obj, history_obj).generate_recommendation().get_items()
+        assert len(items) == 1
+        assert items[0].quantity == pytest.approx(7)
+    # Test 46 - Produce valid quantities for different units.
+    # Expected: Pieces round upward; other units round to four decimal places.
+    @pytest.mark.parametrize("quantities, unit, expected", [((3, 4), "pcs", 4), ((1, 1, 2), "l", 1.3333)])
+    def test_quantity_rounding(self, make_recommendation_context, quantities, unit, expected):
+        fridge_obj, history_obj = make_recommendation_context(history_quantities=quantities, unit=unit)
+        items = CartRecommender(fridge_obj, history_obj).generate_recommendation().get_items()
+        assert len(items) == 1
+        assert items[0].quantity == pytest.approx(expected)
+        assert items[0].validate() is True
+    # Test 47 - Process several items without altering fridge or history data.
+    # Expected: Correct shortages are returned and source records remain unchanged.
+    def test_multiple_items_preserve_sources(self, make_recommendation_context):
+        fridge_obj, history_obj = make_recommendation_context(stock=3)
+        history_obj.add_record(ConsumptionRecord("eggs", 4, "pcs", 7, "none"))
+        history_obj.add_record(ConsumptionRecord("rice", 0, "kg", 7, "none"))
+        before_fridge = copy.deepcopy(fridge_obj.to_dicts())
+        before_history = copy.deepcopy(history_obj.to_dicts())
+        cart = CartRecommender(fridge_obj, history_obj).generate_recommendation()
+        actual = {item.name: (item.quantity, item.unit) for item in cart.get_items()}
+        assert actual == {"eggs": (4, "pcs"), "milk": (4, "l")}
+        assert fridge_obj.to_dicts() == before_fridge
+        assert history_obj.to_dicts() == before_history
+        assert cart.get_ai_enhanced() is False
+        assert all(item.is_enhanced() is False for item in cart.get_items())
+    # Test 48 - Follow the current historical shopping-period calculation.
+    # Expected: Historical demand is averaged across records before deducting stock.
+    def test_different_history_periods(self):
+        fridge_obj = Fridge()
+        history_obj = ConsumptionHistory()
+        history_obj.add_record(ConsumptionRecord("milk", 7, "l", 7, "none"))
+        history_obj.add_record(ConsumptionRecord("milk", 14, "l", 14, "none"))
+        items = CartRecommender(fridge_obj, history_obj).generate_recommendation().get_items()
+        assert len(items) == 1
+        assert items[0].quantity == pytest.approx(10.5)
+#endregion
