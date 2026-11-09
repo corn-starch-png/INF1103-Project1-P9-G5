@@ -839,5 +839,316 @@ assert fridge.get_item_total("eggs", include_expired=True) == 2
         except subprocess.TimeoutExpired:
             pytest.fail("Fridge.consume() did not advance past an unrelated item.")
         assert result.returncode == 0, result.stderr
+#endregion
 
+# =========================================================
+# 9. JSON REPOSITORY TESTS
+# Input: Temporary storage, valid records and corrupt files.
+# Expected: Reliable persistence and useful failure reporting.
+# =========================================================
+#region JSON Repository Tests
+class TestJsonRepository:
+    # Test 59 - Initialize storage when files do not exist.
+    # Expected: Empty stores load without errors and the directory is created.
+    def test_missing_directory_and_files(self, tmp_path):
+        folder = tmp_path / "nested" / "database"
+        errors, stores = JsonRepository(folder=folder).load()
+        assert errors == []
+        assert folder.is_dir()
+        assert set(stores) == {"fridge", "household", "consumption_history"}
+        assert all(store.to_dicts() == [] for store in stores.values())
+    # Test 60 - Reload saved records using a fresh repository instance.
+    # Expected: All three stores preserve their serialized data.
+    def test_save_load_round_trip(self, populated_json_repository):
+        repository, folder, expected = populated_json_repository
+        repository.save()
+        errors, loaded = JsonRepository(folder=folder).load()
+        assert errors == []
+        assert {name: store.to_dicts() for name, store in loaded.items()} == expected
+    # Test 61 - Report corrupt or incorrectly structured JSON.
+    # Expected: The bad file is reported while the remaining files still load.
+    @pytest.mark.parametrize("content", ["{invalid json}", "{}"])
+    def test_bad_file_does_not_block_other_stores(self, populated_json_repository, content):
+        repository, folder, expected = populated_json_repository
+        repository.save()
+        (folder / "fridge.json").write_text(content, encoding="utf-8")
+        errors, stores = JsonRepository(folder=folder).load()
+        assert errors
+        assert any("fridge" in error for error in errors)
+        assert stores["fridge"].to_dicts() == []
+        assert stores["household"].to_dicts() == expected["household"]
+        assert stores["consumption_history"].to_dicts() == expected["consumption_history"]
+    # Test 62 - Skip an invalid record without losing valid records in the same file.
+    # Expected: Valid rows load and the invalid row produces an error.
+    def test_invalid_row_preserves_valid_rows(self, populated_json_repository):
+        repository, folder, expected = populated_json_repository
+        repository.save()
+        rows = expected["fridge"] + [{}]
+        (folder / "fridge.json").write_text(json.dumps(rows), encoding="utf-8")
+        errors, stores = JsonRepository(folder=folder).load()
+        assert len(errors) == 1
+        assert stores["fridge"].to_dicts() == expected["fridge"]
+    # Test 63 - Save valid empty lists for an empty repository.
+    # Expected: Every store has a valid JSON file containing an empty list.
+    def test_save_empty_stores(self, tmp_path):
+        repository = JsonRepository(folder=tmp_path)
+        repository.save()
+        for name in ("fridge", "household", "consumption_history"):
+            assert json.loads((tmp_path / f"{name}.json").read_text(encoding="utf-8")) == []
+    # Test 64 - Preserve the existing file when atomic replacement fails.
+    # Expected: The error is raised and the previous destination contents remain intact.
+    def test_failed_replace_preserves_existing_file(self, populated_json_repository):
+        repository, folder, _ = populated_json_repository
+        repository.save()
+        original = (folder / "fridge.json").read_bytes()
+        with patch("modules.repositories.JsonRepository.os.replace", side_effect=OSError("replacement failed")):
+            with pytest.raises(OSError, match="replacement failed"):
+                repository.save()
+        assert (folder / "fridge.json").read_bytes() == original
+    # Test 65 - Keep explicitly supplied storage independent of the working directory.
+    # Expected: Files are created only in the selected temporary directory.
+    def test_custom_directory_after_working_directory_change(self, tmp_path, monkeypatch):
+        folder = tmp_path / "chosen_database"
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        JsonRepository(folder=folder).save()
+        assert (folder / "fridge.json").is_file()
+        assert not (elsewhere / "database").exists()
+        assert not (elsewhere / "app_data").exists()
+#endregion
+
+# =========================================================
+# 10. MONGODB REPOSITORY TESTS
+# Input: Mocked MongoDB client and domain records.
+# Expected: Correct database interaction without a live connection.
+# =========================================================
+#region MongoDB Repository Tests
+class TestMongoDBRepository:
+    # Test 66 - Reject incomplete database configuration.
+    # Expected: Configuration errors occur before constructing a MongoDB client.
+    @pytest.mark.parametrize("missing_variable", ["MONGODB_URI", "MONGODB_DATABASE"])
+    def test_missing_configuration(self, monkeypatch, missing_variable):
+        monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
+        monkeypatch.setenv("MONGODB_DATABASE", "test_database")
+        monkeypatch.delenv(missing_variable, raising=False)
+        with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
+            with pytest.raises(ValueError, match=missing_variable):
+                MongoDBRepository()
+            client_class.assert_not_called()
+    # Test 67 - Surface connection failures for the application fallback.
+    # Expected: A failed ping does not appear as a successful connection.
+    def test_ping_failure_is_reported(self, monkeypatch):
+        monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
+        monkeypatch.setenv("MONGODB_DATABASE", "test_database")
+        with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
+            client_class.return_value.admin.command.side_effect = OSError("database unavailable")
+            with pytest.raises(OSError, match="database unavailable"):
+                MongoDBRepository()
+    # Test 68 - Load valid records and report an invalid record.
+    # Expected: Valid domain objects are retained and invalid rows are reported.
+    def test_load_valid_and_invalid_records(self, mongo_repository, make_context):
+        repository, client, collections = mongo_repository
+        _, ctx = make_context()
+        collections["fridge"].find.return_value = ctx.fridge.to_dicts() + [{}]
+        collections["household"].find.return_value = ctx.household.to_dicts()
+        collections["consumption_history"].find.return_value = ctx.history.to_dicts()
+        errors, stores = repository.load()
+        assert len(errors) == 1
+        assert stores["fridge"].to_dicts() == ctx.fridge.to_dicts()
+        assert stores["household"].to_dicts() == ctx.household.to_dicts()
+        assert stores["consumption_history"].to_dicts() == ctx.history.to_dicts()
+        client.admin.command.assert_called_once_with("ping")
+        for collection in collections.values():
+            collection.find.assert_called_once_with({}, {"_id": 0})
+    # Test 69 - Save current domain records to their matching collections.
+    # Expected: Each collection receives the serialized records.
+    def test_save_populated_stores(self, mongo_repository, make_context):
+        repository, _, collections = mongo_repository
+        _, ctx = make_context()
+        _, stores = repository.load()
+        stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
+        repository.save()
+        for name, collection in collections.items():
+            collection.delete_many.assert_called_once_with({})
+            collection.insert_many.assert_called_once_with(stores[name].to_dicts())
+    # Test 70 - Reflect quantity updates and deletions in saved database contents.
+    # Expected: Updated quantities are saved and empty stores clear their collections.
+    def test_updates_and_deletions_are_saved(self, mongo_repository, make_context):
+        repository, _, collections = mongo_repository
+        _, ctx = make_context()
+        _, stores = repository.load()
+        stores["fridge"] = ctx.fridge
+        item = ctx.fridge.get_items()[0]
+        item.set_quantity(2)
+        repository.save()
+        assert collections["fridge"].insert_many.call_args.args[0][0]["Quantity"] == 2
+        for collection in collections.values():
+            collection.reset_mock()
+        ctx.fridge.remove_item(item)
+        repository.save()
+        collections["fridge"].delete_many.assert_called_once_with({})
+        collections["fridge"].insert_many.assert_not_called()
+    # Test 71 - Avoid inserting an empty document list.
+    # Expected: Empty stores clear collections without calling insert_many.
+    def test_save_empty_stores(self, mongo_repository):
+        repository, _, collections = mongo_repository
+        repository.save()
+        for collection in collections.values():
+            collection.delete_many.assert_called_once_with({})
+            collection.insert_many.assert_not_called()
+    # Test 72 - Close the database client.
+    # Expected: Repository cleanup delegates to the client.
+    def test_close_client(self, mongo_repository):
+        repository, client, _ = mongo_repository
+        repository.close()
+        client.close.assert_called_once_with()
+#endregion
+
+# =========================================================
+# 11. STORAGE PATH AND LOGGER TESTS
+# Input: Shared path configuration and temporary log directories.
+# Expected: Stable locations and preserved log messages.
+# =========================================================
+#region Storage Path And Logger Tests
+class TestStoragePathsAndLogger:
+    # Test 73 - Verify shared paths remain anchored to the project.
+    # Expected: Changing the working directory does not redirect application storage.
+    def test_paths_are_project_relative(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project_root = Path(__file__).resolve().parent
+        assert AppPaths.PROJECT_ROOT == project_root
+        assert AppPaths.DATABASE_DIR == project_root / "app_data" / "database"
+        assert AppPaths.LOGS_DIR == project_root / "app_data" / "logs"
+        assert AppPaths.OFFLINE_MARKER == AppPaths.DATABASE_DIR / ".offline_changes"
+    # Test 74 - Append messages without overwriting previous log content.
+    # Expected: Both messages remain in the chosen temporary log file.
+    def test_logger_preserves_messages(self, tmp_path):
+        log_dir = tmp_path / "logs"
+        logger = Logger(logs_dir=log_dir)
+        logger.send_log("First message")
+        logger.send_log("Second message")
+        assert log_dir.is_dir()
+        assert Path(logger.filename).read_text(encoding="utf-8").splitlines() == ["First message", "Second message"]
+#endregion
+
+# =========================================================
+# 12. AI FAILURE AND PIPELINE TESTS
+# Input: Invalid AI values, failed providers and mixed fridge stock.
+# Expected: Reject unsafe output, report failures and preserve the AI pipeline.
+# =========================================================
+#region AI Failure And Pipeline Tests
+class TestAIValidationEdgeCases:
+    # Test 75 - Reject invalid recommendation values.
+    # Expected: Invalid numbers, units and expiration-day values return an error.
+    @pytest.mark.parametrize("field, value", [
+        ("Recommended_Quantity", -1), ("Estimated_Consumption_Rate", -1),
+        ("Unit", "bucket"), ("Estimated_Expiration_Days", -1), ("Estimated_Expiration_Days", 1.5),
+        ("Estimated_Expiration_Days", True), ("Estimated_Expiration_Days", 2000),
+        ("Estimated_Calories", float("nan")), ("Estimated_Calories", float("inf")),])
+    def test_invalid_item_values(self, field, value):
+        modified = copy.deepcopy(RAW_AI_RESPONSE)
+        modified["Recommendations_List"][0][field] = value
+        result, error = AIResponseValidator().process_ai_response(json.dumps(modified))
+        assert result is None
+        assert error
+    # Test 76 - Reject fractional recommendations for whole-piece items.
+    # Expected: A fractional pcs quantity is rejected.
+    def test_fractional_piece_quantity(self):
+        modified = copy.deepcopy(RAW_AI_RESPONSE)
+        modified["Recommendations_List"][1]["Recommended_Quantity"] = 1.5
+        result, error = AIResponseValidator().process_ai_response(json.dumps(modified))
+        assert result is None
+        assert "whole" in error.lower()
+    # Test 77 - Reject calorie totals that do not match item totals.
+    # Expected: Either incorrect total is rejected.
+    @pytest.mark.parametrize("field", ["Total_Planned_Estimated_Calories", "Total_Estimated_Calories"])
+    def test_incorrect_calorie_totals(self, field):
+        modified = copy.deepcopy(RAW_AI_RESPONSE)
+        modified[field] += 100
+        result, error = AIResponseValidator().process_ai_response(json.dumps(modified))
+        assert result is None
+        assert field in error
+    # Test 78 - Reject inconsistent calories per unit.
+    # Expected: Matching totals cannot hide inconsistent planned/recommended nutrition.
+    def test_inconsistent_calories_per_unit(self):
+        modified = copy.deepcopy(RAW_AI_RESPONSE)
+        modified["Recommendations_List"][0]["Estimated_Calories"] += 1000
+        modified["Total_Estimated_Calories"] += 1000
+        result, error = AIResponseValidator().process_ai_response(json.dumps(modified))
+        assert result is None
+        assert "inconsistent" in error.lower()
+    # Test 79 - Generate the documented default expiry date.
+    # Expected: Null expiration days produce a 365-day date and a true default flag.
+    def test_default_expiration_date(self):
+        modified = copy.deepcopy(RAW_AI_RESPONSE)
+        modified["Recommendations_List"][0]["Estimated_Expiration_Days"] = None
+        with patch("modules.ai.AIResponseValidator.date") as mock_date:
+            mock_date.today.return_value = CAPTURE_DATE
+            result, error = AIResponseValidator().process_ai_response(json.dumps(modified))
+        assert error is None
+        item = result["Recommendations_List"][0]
+        assert item["Estimated_Expiry_Date"] == (CAPTURE_DATE + timedelta(days=365)).isoformat()
+        assert item["Expiry_Date_Is_Default"] is True
+class TestAIWorkflowFailures:
+    # Test 80 - Stop before generation when the provider is unavailable.
+    # Expected: The connection error is returned and the cart remains unenhanced.
+    def test_connection_failure_stops_generation(self, make_context):
+        _, ctx = make_context()
+        provider = MagicMock(spec=AIProvider)
+        provider.check_connection.return_value = (False, "Provider unavailable")
+        result, error = AIManager(provider).get_ai_recommendations(household_info=ctx.household, consumption_history=ctx.history, fridge_stock=ctx.fridge, purchase_stock=Cart(), remarks="none", days_until_next=7)
+        assert result is None
+        assert error == "Provider unavailable"
+        provider.generate.assert_not_called()
+    # Test 81 - Report failure after both configured models return empty responses.
+    # Expected: Both models are attempted and the caller receives an error.
+    def test_both_models_fail(self, monkeypatch):
+        provider = OpenRouterProvider()
+        client = MagicMock()
+        client.with_options.return_value = client
+        client.chat.completions.create.return_value = SimpleNamespace(choices=[])
+        monkeypatch.setattr(provider, "_create_ai_client", lambda: client)
+        monkeypatch.setattr(provider, "_get_ai_model", lambda name: "primary" if name == "AI_MODEL" else "backup")
+        monkeypatch.setenv("MAX_RETRIES", "0")
+        result, error = provider.generate("Test prompt", AIResponseValidator().get_recommendation_schema(), grocery_list, AIResponseValidator())
+        assert result is None
+        assert "Both AI models failed" in error
+        assert client.chat.completions.create.call_count == 2
+    # Test 82 - Exclude expired stock from AI input and warn the user.
+    # Expected: Only usable batches reach the prompt builder.
+    def test_expired_stock_is_excluded(self, make_context):
+        _, ctx = make_context()
+        today = date.today()
+        ctx.fridge.add_item(FridgeItem("milk", 2, "l", (today - timedelta(days=3)).isoformat(), (today - timedelta(days=1)).isoformat(), "expired"))
+        provider = MagicMock(spec=AIProvider)
+        provider.check_connection.return_value = (True, "Ready")
+        provider.generate.return_value = (None, "Simulated generation failure")
+        notify = MagicMock()
+        with patch("modules.ai.AI_manager.PromptBuilder") as builder_class:
+            builder_class.return_value.build_ai_prompt.return_value = "Test prompt"
+            result, error = AIManager(provider).get_ai_recommendations(household_info=ctx.household, consumption_history=ctx.history, fridge_stock=ctx.fridge, purchase_stock=ctx.cart, remarks="none", days_until_next=7, notify=notify)
+            supplied_data = builder_class.return_value.build_ai_prompt.call_args.args[0]
+        assert result is None
+        assert error == "Simulated generation failure"
+        assert supplied_data["fridge_stock"] == [item.to_dict() for item in ctx.fridge.get_items() if not item.is_expired()]
+        notify.assert_called_once()
+        assert "expired" in notify.call_args.args[0].lower()
+    # Test 83 - Process a generated cart through mock AI and domain analysis.
+    # Expected: Initial recommendations receive AI data and produce logic findings.
+    def test_recommended_cart_runs_through_ai_and_logic(self, make_recommendation_context):
+        fridge_obj, history_obj = make_recommendation_context(stock=3)
+        cart = CartRecommender(fridge_obj, history_obj).generate_recommendation()
+        household_obj = Household()
+        household_obj.add_member(Person(1, "TestUser", 20, "Male", "none"))
+        # Build a valid raw AI response for the generated four-litre cart.
+        response = {"Recommendations_List": [{"Item_Name": "milk", "Planned_Quantity": 4, "Unit": "l", "Recommended_Quantity": 4, "Estimated_Consumption_Rate": 7, "Planned_Estimated_Calories": 2400, "Estimated_Calories": 2400, "Estimated_Expiration_Days": 20}], "Total_Planned_Estimated_Calories": 2400, "Total_Estimated_Calories": 2400}
+        manager = AIManager(MockAIProvider(json.dumps(response)))
+        result, error = manager.get_ai_recommendations(household_info=household_obj, consumption_history=history_obj, fridge_stock=fridge_obj, purchase_stock=cart, remarks="none", days_until_next=7)
+        assert error is None
+        assert cart.get_items()[0].is_enhanced() is True
+        ctx = AnalysisContext(cart=cart, household=household_obj, fridge=fridge_obj, history=history_obj, total_est_calories=result["Total_Planned_Estimated_Calories"], next_purchase_date=7)
+        findings = CartEvaluator().evaluate(ctx)
+        assert [finding.analyzer_name for finding in findings] == ["CaloriesSurplus", "RiskOfExpiry", "UnderBuy"]
+        assert next(finding.result for finding in findings if finding.analyzer_name == "UnderBuy") is False
 #endregion
