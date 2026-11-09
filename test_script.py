@@ -717,3 +717,73 @@ class TestCartRecommender:
         assert len(items) == 1
         assert items[0].quantity == pytest.approx(10.5)
 #endregion
+
+# =========================================================
+# 7. LOGIC REGRESSION TESTS
+# Input: Boundary quantities, similar item names and reused contexts.
+# Expected: Recent fixes remain correct across edge cases.
+# =========================================================
+#region Logic Regression Tests
+class TestLogicRegressions:
+    # Test 49 - Detect fractional-day expiry risks without rounding them away.
+    # Expected: Exact consumption capacity is safe; excess stock is risky.
+    @pytest.mark.parametrize("quantity, expected", [(3, False), (3.4, True)])
+    def test_fractional_expiry_boundary(self, make_context, quantity, expected):
+        item, ctx = make_context(quantity=quantity, fridge_quantity=0, weekly_rate=7, expiry_days=3)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert finding.result is expected
+        assert finding.item_name == item.name
+    # Test 50 - Handle very small positive consumption rates.
+    # Expected: Return a risk finding without overflowing date arithmetic.
+    def test_tiny_rate_does_not_overflow(self, make_context):
+        item, ctx = make_context(quantity=1, fridge_quantity=0, weekly_rate=1e-12, expiry_days=3)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert finding.result is True
+        assert finding.item_name == "milk"
+    # Test 51 - Preserve item identity even when expiry cannot be calculated.
+    # Expected: A nonpositive rate still produces an item-specific finding.
+    @pytest.mark.parametrize("rate", [0, -1])
+    def test_nonpositive_rate_preserves_identity(self, make_context, rate):
+        item, ctx = make_context(weekly_rate=rate)
+        finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
+        assert finding.result is False
+        assert finding.item_name == item.name
+    # Test 52 - Match expiry warnings by identity rather than message wording.
+    # Expected: Another item's warning is ignored; this item's warning blocks under-buy.
+    @pytest.mark.parametrize("warning_item, message, expected", [("brown rice", "brown rice will expire", True), ("rice", "Food will expire", False)])
+    def test_underbuy_uses_exact_item_identity(self, make_context, warning_item, message, expected):
+        _, ctx = make_context()
+        rice = CartItem("rice", 1, "kg")
+        rice.set_ai_data(recommended_qty=1, consumption_rate=7, est_expiry_date=(date.today() + timedelta(days=20)).isoformat())
+        ctx.cart.add_item(rice)
+        ctx.update_findings([Finding("CaloriesSurplus", False, "No surplus"), Finding("RiskOfExpiry", True, message, item_name=warning_item)])
+        finding = UnderBuyAnalyzer().analyze(rice, ctx)
+        assert finding.result is expected
+    # Test 53 - Remove stale findings when evaluating an updated cart.
+    # Expected: An old expiry warning cannot block the new under-buy result.
+    def test_reevaluation_replaces_old_findings(self, make_context):
+        item, ctx = make_context(quantity=10, fridge_quantity=0, weekly_rate=7, expiry_days=3)
+        evaluator = CartEvaluator()
+        first = evaluator.evaluate(ctx)
+        assert next(f.result for f in first if f.analyzer_name == "RiskOfExpiry") is True
+        item.set_quantity(1)
+        second = evaluator.evaluate(ctx)
+        assert len(second) == 3
+        assert ctx.findings == second
+        assert next(f.result for f in second if f.analyzer_name == "RiskOfExpiry") is False
+        assert next(f.result for f in second if f.analyzer_name == "UnderBuy") is True
+    # Test 54 - Handle fridge-only, missing and differently formatted item names.
+    # Expected: Missing cart entries contribute zero and names are normalized.
+    def test_total_items_handles_missing_cart_and_normalized_names(self, make_context):
+        item, ctx = make_context(quantity=3, fridge_quantity=2)
+        assert ctx.get_total_items(" MILK ") == pytest.approx(5)
+        ctx.cart.remove_item(item)
+        assert ctx.get_total_items("milk") == pytest.approx(2)
+        assert ctx.get_total_items("unknown") == pytest.approx(0)
+    # Test 55 - Exclude expired fridge batches from analysis totals.
+    # Expected: Only the planned cart quantity remains available.
+    def test_total_items_excludes_expired_stock(self, make_context):
+        _, ctx = make_context(quantity=3, fridge_quantity=0)
+        ctx.fridge.add_item(FridgeItem("milk", 2, "l", (date.today() - timedelta(days=2)).isoformat(), (date.today() - timedelta(days=1)).isoformat(), "none"))
+        assert ctx.get_total_items("milk") == pytest.approx(3)
+#endregion
