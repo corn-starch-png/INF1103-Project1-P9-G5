@@ -787,3 +787,57 @@ class TestLogicRegressions:
         ctx.fridge.add_item(FridgeItem("milk", 2, "l", (date.today() - timedelta(days=2)).isoformat(), (date.today() - timedelta(days=1)).isoformat(), "none"))
         assert ctx.get_total_items("milk") == pytest.approx(3)
 #endregion
+
+# =========================================================
+# 8. FRIDGE CONSUMPTION TESTS
+# Input: Separate decimal batches and mixed-item inventory.
+# Expected: Correct stock reduction and valid consumption records.
+# =========================================================
+#region Fridge Consumption Tests
+class TestFridgeConsumption:
+    # Test 56 - Consume the exact total across separate decimal batches.
+    # Expected: Both batches are removed without tiny-quantity errors.
+    def test_decimal_batches_are_consumed_exactly(self):
+        fridge_obj = Fridge()
+        today = date.today()
+        fridge_obj.add_item(FridgeItem("milk", 0.1, "l", today.isoformat(), (today + timedelta(days=5)).isoformat(), "none"))
+        fridge_obj.add_item(FridgeItem("milk", 0.2, "l", today.isoformat(), (today + timedelta(days=6)).isoformat(), "none"))
+        assert len(fridge_obj.get_items()) == 2
+        record = fridge_obj.consume("milk", 0.3, "l", 7, "none")
+        assert fridge_obj.get_items() == []
+        assert record.quantity == pytest.approx(0.3)
+        assert record.validate() is True
+    # Test 57 - Keep the remaining quantity after partial consumption.
+    # Expected: Stock and recorded consumption match the requested amount.
+    def test_partial_consumption(self):
+        fridge_obj = Fridge()
+        today = date.today()
+        fridge_obj.add_item(FridgeItem("milk", 1, "l", today.isoformat(), (today + timedelta(days=5)).isoformat(), "none"))
+        record = fridge_obj.consume("milk", 0.3, "l", 7, "none")
+        assert fridge_obj.get_item_total("milk", include_expired=True) == pytest.approx(0.7)
+        assert record.quantity == pytest.approx(0.3)
+    # Test 58 - Advance past unrelated items when locating stock to consume.
+    # Expected: Consumption finishes and unrelated stock remains unchanged.
+    def test_consumption_skips_unrelated_items(self):
+        # Run separately so an infinite loop fails with a timeout instead of freezing pytest.
+        script = """
+from datetime import date, timedelta
+from modules.core.Fridge import Fridge
+from modules.core.FridgeItem import FridgeItem
+fridge = Fridge()
+today = date.today()
+expiry = (today + timedelta(days=5)).isoformat()
+fridge.add_item(FridgeItem("eggs", 2, "pcs", today.isoformat(), expiry, "none"))
+fridge.add_item(FridgeItem("milk", 1, "l", today.isoformat(), expiry, "none"))
+record = fridge.consume("milk", 1, "l", 7, "none")
+assert record.quantity == 1
+assert fridge.get_item_total("milk", include_expired=True) == 0
+assert fridge.get_item_total("eggs", include_expired=True) == 2
+"""
+        try:
+            result = subprocess.run([sys.executable, "-B", "-c", script], cwd=AppPaths.PROJECT_ROOT, capture_output=True, text=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            pytest.fail("Fridge.consume() did not advance past an unrelated item.")
+        assert result.returncode == 0, result.stderr
+
+#endregion
