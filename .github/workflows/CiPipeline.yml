@@ -42,6 +42,8 @@ jobs: #gitub required status checks are expecting job names to pass!
       - name: Install project dependencies
         run: python -m pip install .
       - uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements.txt python_dependencies.txt 
 
 
   Linting_with_ruff: #name of  job
