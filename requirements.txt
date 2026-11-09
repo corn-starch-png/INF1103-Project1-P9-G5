@@ -1,4 +1,3 @@
 requests
 python-dotenv
 openai
-PyYAML==5.3.1
