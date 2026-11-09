@@ -17,23 +17,18 @@ class Person(Record):
         self.__gender = gender
         self.__dietary_restriction = dietary_restriction
 
-    @property
     def get_id(self) -> int:
         return self.__id
 
-    @property
     def get_name(self) -> str:
         return self.__name
 
-    @property
     def get_age(self) -> int:
         return self.__age
 
-    @property
     def get_gender(self) -> str:
         return self.__gender
 
-    @property
     def get_dietary_restriction(self):
         return self.__dietary_restriction
 

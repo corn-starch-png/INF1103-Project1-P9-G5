@@ -397,7 +397,7 @@ class IO_manager:
     # Print the welcome-back message for a returning user (Person_ID 1 is the user).
     def show_welcome_back(self, household_info):
         user = household_info.get_members()[0]
-        print(f"Welcome back, {user.get_name}!")
+        print(f"Welcome back, {user.get_name()}!")
 
     # Print exit message
     def show_exit(self):
