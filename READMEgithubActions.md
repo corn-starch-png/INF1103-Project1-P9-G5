@@ -62,6 +62,12 @@ all default rules applied, job will feedback on any rules violations in workflow
 ###enforced###
 certain formatting rules removed, allows team member to view violations which are potentially more serious
 
+###format###
+Checks and reformat codes if needed, pumps out output in workflow logs
+
+###why ruff was used###
+> "Ruff can be used to replace Flake8 (plus dozens of plugins), Black, isort, pydocstyle, pyupgrade, autoflake, and more, all while executing tens or hundreds of times faster than any individual tool." 
+
 _ignored rules: B904,B905,B007,E712,E501,E701,I001,F401,F541,F841,SIM102,RUF059,FURB157,PLC0206_
 _ruff tehcnical documentation: https://docs.astral.sh/ruff/rules/ ._
 
