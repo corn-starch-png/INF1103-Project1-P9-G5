@@ -190,11 +190,26 @@ class IO_manager:
         self.show_consumption(total_records, last_used_days, consumption_remarks)
 
 
+    # For returning users: show the recommended cart and ask whether to start with it.
+    def ask_use_recommended_cart(self, recommended_cart: Cart) -> bool:
+        print("\nBased on your consumption history, we recommend these items:")
+        self.display_cart(recommended_cart)
+        choice = ChoicePrompt("\n1. Start with the recommended items\n2. Start with an empty cart\n"
+                              "Choose your option (1 or 2): ", ["1", "2"],
+                              "Please choose a valid option (1 or 2)").ask()
+        return choice == "1"
+
+    # Tell the user there are no recommended items, before the normal grocery list.
+    def show_no_recommendations(self):
+        print("\nNo items to recommend right now. There may not be enough recent consumption history,"
+              "\nor you still have enough in your fridge of the items you usually use.")
+
     # Collect the groceries the user plans to buy, until they say they are done.
     def enter_grocery_list(self, cart: Cart, fridge: Fridge, history: ConsumptionHistory) -> None:
         unit_validator = UnitValidator(fridge, history)
         print("\nEnter the groceries you are planning to buy.")
-        self.__add_cart_item(cart, unit_validator)
+        if not cart.get_items():
+            self.__add_cart_item(cart, unit_validator)
         while True:
             self.display_cart(cart)
             user_choice = self.__ask_add_another()
