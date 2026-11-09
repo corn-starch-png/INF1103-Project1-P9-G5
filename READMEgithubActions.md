@@ -15,6 +15,8 @@ https://github.com/pypa/gh-action-pip-audit/blob/main/README.md
 
 
 # pytest
+133 testcases on custom pytest.py 
+average runtime around 1 second 
 
 
 # Docker smoketest

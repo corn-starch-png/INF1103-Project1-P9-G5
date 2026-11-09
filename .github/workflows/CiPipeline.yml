@@ -74,7 +74,7 @@ jobs: #gitub required status checks are expecting job names to pass!
 
 
   Pytest_Python: #name of  job
-      name: Running PytestScript 
+      name: PytestScript on Py3.14 image  
       runs-on: ubuntu-latest #spins up ubuntu vm
       container:
         image: python:3.14-slim  #pulls up docker image to finish the job
