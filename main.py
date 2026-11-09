@@ -5,19 +5,19 @@ try:
     import sys
     import os
     import shutil
-    from DB_manager import DB_manager
-    from IO_manager import IO_manager
-    from Logic_manager import Logic_manager
-    from core.Cart import Cart
+    from modules.repositories.DB_manager import DB_manager
+    from modules.io.IO_manager import IO_manager
+    from modules.logic.Logic_manager import Logic_manager
+    from modules.core.Cart import Cart
+    from modules.core.Fridge import Fridge
+    from modules.core.Household import Household
+    from modules.core.ConsumptionHistory import ConsumptionHistory
+    from modules.core.AIRecData import AIRecData
+    from modules.logic.AnalysisContext import AnalysisContext
+    from modules.repositories.JsonRepository import JsonRepository
+    from modules.ai.AI_manager import AIManager
+    from modules.ai.OpenRouterProvider import OpenRouterProvider
     from CartRecommender import CartRecommender
-    from core.Fridge import Fridge
-    from core.Household import Household
-    from core.ConsumptionHistory import ConsumptionHistory
-    from core.AIRecData import AIRecData
-    from logicclasses.AnalysisContext import AnalysisContext
-    from dbclasses.JsonRepository import JsonRepository
-    from aiclasses.AI_manager import AIManager
-    from aiclasses.OpenRouterProvider import OpenRouterProvider
 except ImportError as e :
     raise SystemExit(f"requried libraries do not exist! Ensure requried manager files are in the same directory \n{e}")
 
@@ -30,7 +30,7 @@ logicmgr = Logic_manager()
 def choose_repository():
     if os.getenv("USE_MONGO", "1") == "1":
         try:
-            from dbclasses.MongoDBRepository import MongoDBRepository
+            from modules.repositories.MongoDBRepository import MongoDBRepository
             repo = MongoDBRepository()
             errors, bundle = DB_manager().load_database(repo)
             print("Connected to the shared MongoDB database.")

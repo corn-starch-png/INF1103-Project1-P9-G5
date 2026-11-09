@@ -1,11 +1,10 @@
 from datetime import date
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
-
-from core.Cart import Cart
-from core.CartItem import CartItem
-from core.ConsumptionHistory import ConsumptionHistory
-from core.Fridge import Fridge
-from core.ItemRecord import ItemRecord
+from modules.core.Cart import Cart
+from modules.core.CartItem import CartItem
+from modules.core.ConsumptionHistory import ConsumptionHistory
+from modules.core.Fridge import Fridge
+from modules.core.ItemRecord import ItemRecord
 
 class CartRecommender:
     """
