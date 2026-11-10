@@ -18,6 +18,7 @@ class JsonRepository(RepositoryFunctions):
     def load(self) -> list:
         """Returns a list of problems; an empty list means everything loaded."""
         os.makedirs(self.__folder, exist_ok=True)
+        self.__stores = {"fridge": Fridge(), "household": Household(), "consumption_history": ConsumptionHistory(),}
         errors = []
         for filename, store in self.__stores.items():
             path = os.path.join(self.__folder, filename + ".json")
@@ -26,7 +27,7 @@ class JsonRepository(RepositoryFunctions):
             try:
                 with open(path, encoding="utf-8") as f:
                     rows = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
                 errors.append(f"Could not read {filename}: {e}")
                 continue
             if not isinstance(rows, list):

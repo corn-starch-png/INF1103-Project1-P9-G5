@@ -1,3 +1,4 @@
+from decimal import Decimal
 from .Prompt import Prompt
 
 class EditQuantityPrompt(Prompt):
@@ -9,7 +10,8 @@ class EditQuantityPrompt(Prompt):
     def _validate(self, text):
         if not text.replace(".", "", 1).isdecimal():
             return "Invalid input. Enter a positive number"
-        if float(text) == 0:
+        # Treat only an exact zero as the delete command.
+        if Decimal(text) == 0:
             return ""
         if self.__whole_number and not text.isdigit():
             return "quantity must be a whole number for unit pcs"

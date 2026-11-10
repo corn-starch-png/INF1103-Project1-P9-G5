@@ -20,14 +20,6 @@ class DB_manager:
         self.stores = None
         self.is_local = True
 
-    @staticmethod
-    def load_database(repository):
-        return repository.load()
-
-    @staticmethod
-    def save_database(repository):
-        repository.save()
-
     # Delay MongoDB construction until application startup actually requests it.
     @staticmethod
     def _create_mongo_repository():
@@ -43,7 +35,7 @@ class DB_manager:
         if self.use_mongo:
             try:
                 repository = self.mongo_factory()
-                errors, stores = self.load_database(repository)
+                errors, stores = repository.load()
                 if errors:
                     raise RuntimeError("Cloud data could not be loaded completely: " + "; ".join(errors))
             except Exception as error:
@@ -57,7 +49,7 @@ class DB_manager:
         # Use local storage if cloud initialization did not succeed.
         if self.repository is None:
             self.repository = self._new_local_repository()
-            errors, self.stores = self.load_database(self.repository)
+            errors, self.stores = self.repository.load()
             if errors:
                 raise RuntimeError("Could not load local data completely: " + "; ".join(errors))
             self.is_local = True
@@ -131,7 +123,7 @@ class DB_manager:
         self.stores.update(local_stores)
 
         try:
-            self.save_database(self.repository)
+            self.repository.save()
         except Exception as error:
             # Restore the previous in-memory mapping; keep local files and marker for retry.
             self.stores.clear()
@@ -148,7 +140,7 @@ class DB_manager:
             raise RuntimeError("Database manager must be started before saving.")
 
         try:
-            self.save_database(self.repository)
+            self.repository.save()
         except Exception as error:
             if self.is_local:
                 raise RuntimeError(f"Could not save local data: {error}") from error

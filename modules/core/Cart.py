@@ -64,7 +64,13 @@ class Cart(ListFunctions):
         Move all items from the cart to the fridge, converting them to FridgeItem.
         The cart is cleared after checkout.
         """
-        for item in self.__items:
-            fridge_item = item.to_fridge_item(self.__remarks)
-            fridge.add_item(fridge_item)
+        from copy import deepcopy
+        # Validate every purchase before changing live fridge stock.
+        incoming = [item.to_fridge_item(self.__remarks) for item in self.__items]
+        preview = deepcopy(fridge)
+        for item in incoming:
+            preview.add_item(deepcopy(item))
+
+        for item in incoming:
+            fridge.add_item(item)
         self.__items.clear()

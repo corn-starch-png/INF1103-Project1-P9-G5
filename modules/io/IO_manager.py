@@ -77,6 +77,8 @@ class IO_manager:
             print(error)
             return
         if merged:
+            # Display the retained cart item containing the merged quantity.
+            cart_item = next(existing for existing in cart.get_items() if existing.name.lower() == cart_item.name.lower() and existing.unit == cart_item.unit)
             print(f"{cart_item.name} is already in your list.\nTotal is now {self.__format_item(cart_item)}.")
         else:
             print(f"Added {self.__format_item(cart_item)}.")
@@ -180,9 +182,11 @@ class IO_manager:
                                     max_value=combined_item['quantity'], allow_zero=True, whole_number=(combined_item['units'] == "pcs"),
                                     normalize=True,
                                     max_message=f"That's more than you have ({combined_item['quantity']} {combined_item['units']}). Please try again.").ask()
+            # Record zero consumption without removing any fridge stock
             if consumed_amount == 0:
-                continue
-            record = fridge.consume(combined_item['item_name'], consumed_amount, combined_item['units'], last_used_days, consumption_remarks)
+                record = ConsumptionRecord(combined_item["item_name"], 0, combined_item["units"], last_used_days, consumption_remarks)
+            else:
+                record = fridge.consume(combined_item["item_name"], consumed_amount, combined_item["units"], last_used_days, consumption_remarks)
             history.add_record(record)
             total_records.append(record)
 
