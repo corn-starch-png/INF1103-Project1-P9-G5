@@ -42,6 +42,8 @@ class MongoDBRepository(RepositoryFunctions):
         """Load data from MongoDB Atlas into existing objects.
         Returns (errors, stores). Connection errors are NOT caught here,
         so main.py can fall back to local JSON."""
+                # Rebuild stores so repeated loads do not accumulate existing records.
+        self.__stores = {"fridge": Fridge(), "household": Household(), "consumption_history": ConsumptionHistory(),}
         errors = []
 
         for collection_name, store in self.__stores.items():

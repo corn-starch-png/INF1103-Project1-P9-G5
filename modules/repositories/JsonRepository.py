@@ -18,6 +18,7 @@ class JsonRepository(RepositoryFunctions):
     def load(self) -> list:
         """Returns a list of problems; an empty list means everything loaded."""
         os.makedirs(self.__folder, exist_ok=True)
+        self.__stores = {"fridge": Fridge(), "household": Household(), "consumption_history": ConsumptionHistory(),}
         errors = []
         for filename, store in self.__stores.items():
             path = os.path.join(self.__folder, filename + ".json")
