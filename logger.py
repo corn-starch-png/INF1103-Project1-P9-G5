@@ -1,9 +1,10 @@
 # logger_setup.py
 from datetime import datetime
 import os
+from modules.repositories.AppPaths import AppPaths
 
 class Logger:
-    def __init__(self, logs_dir: str = "logs"):
+    def __init__(self, logs_dir=AppPaths.LOGS_DIR):
         self.logs_dir = logs_dir
         os.makedirs(self.logs_dir, exist_ok=True)
         
