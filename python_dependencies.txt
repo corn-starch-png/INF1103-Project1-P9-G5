@@ -3,3 +3,4 @@ requests
 python-dotenv
 pytest
 pymongo
+pyyaml=5.3 
