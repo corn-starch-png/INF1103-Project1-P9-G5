@@ -47,15 +47,16 @@ class Fridge(ListFunctions, CanBeStored):
         matching_items = []
         total_quantity = Decimal(str(item.quantity))
 
+        # Match equivalent batches inside the loop while skipping this item.
         for existing in self.__items:
             if existing is item:
                 continue
 
-        if (existing.name.strip().casefold() == item.name.strip().casefold()
-            and existing.unit.strip().casefold() == item.unit.strip().casefold()
-            and existing.purchase_date == item.purchase_date
-            and existing.expiry_date == new_expiry_date
-            and existing.remarks.strip().casefold() == item.remarks.strip().casefold()):
+            if (existing.name.strip().casefold() == item.name.strip().casefold()
+                and existing.unit.strip().casefold() == item.unit.strip().casefold()
+                and existing.purchase_date == item.purchase_date
+                and existing.expiry_date == new_expiry_date
+                and existing.remarks.strip().casefold() == item.remarks.strip().casefold()):
                 matching_items.append(existing)
                 total_quantity += Decimal(str(existing.quantity))
 
