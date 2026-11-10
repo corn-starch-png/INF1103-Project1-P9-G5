@@ -51,13 +51,11 @@ class Fridge(ListFunctions, CanBeStored):
             if existing is item:
                 continue
 
-            if (
-                existing.name.lower() == item.name.lower()
-                and existing.unit == item.unit
-                and existing.purchase_date == item.purchase_date
-                and existing.expiry_date == new_expiry_date
-                and existing.remarks == item.remarks
-            ):
+        if (existing.name.strip().casefold() == item.name.strip().casefold()
+            and existing.unit.strip().casefold() == item.unit.strip().casefold()
+            and existing.purchase_date == item.purchase_date
+            and existing.expiry_date == new_expiry_date
+            and existing.remarks.strip().casefold() == item.remarks.strip().casefold()):
                 matching_items.append(existing)
                 total_quantity += Decimal(str(existing.quantity))
 
