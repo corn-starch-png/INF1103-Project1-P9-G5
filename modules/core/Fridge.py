@@ -162,7 +162,8 @@ class Fridge(ListFunctions, CanBeStored):
         if type(amount) not in (int, float) or amount <= 0:
             raise ValueError(f"Invalid consumption quantity for {item_name}.")
 
-        total_quantity = self.get_item_total(item_name, include_expired=True)
+        # Count available stock only in the requested measurement unit.
+        total_quantity = sum(Decimal(str(item.quantity)) for item in self.__items if item.name.strip().casefold() == item_name.strip().casefold() and item.unit == units)
         if amount > total_quantity:
             raise ValueError(f"Cannot consume {amount}{units} of {item_name};\nonly {total_quantity} available.")
         
@@ -176,7 +177,8 @@ class Fridge(ListFunctions, CanBeStored):
         while amount > 0 and i < len(self.__items):
             item = self.__items[i]
             # Reduce matching batches using exact decimal quantities.
-            if item.name.strip().casefold() == item_name.strip().casefold():
+            # Consume only batches matching both the item name and unit.
+            if (item.name.strip().casefold() == item_name.strip().casefold() and item.unit == units):
                 item_quantity = Decimal(str(item.quantity))
                 # Remove a fully consumed batch and keep the index on the next shifted batch.
                 if item_quantity <= amount:
