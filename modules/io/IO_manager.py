@@ -77,6 +77,8 @@ class IO_manager:
             print(error)
             return
         if merged:
+            # Display the retained cart item containing the merged quantity.
+            cart_item = next(existing for existing in cart.get_items() if existing.name.lower() == cart_item.name.lower() and existing.unit == cart_item.unit)
             print(f"{cart_item.name} is already in your list.\nTotal is now {self.__format_item(cart_item)}.")
         else:
             print(f"Added {self.__format_item(cart_item)}.")
