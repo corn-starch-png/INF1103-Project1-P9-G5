@@ -5,8 +5,8 @@ name: CI pipeline actions #ENABLE REQUIRE STATUS CHECK before merging
 on:
   push: 
      #runs on push to all branches
-  pull_request:
-    branches: [ "main" ]  #runs when PR targeting main is received
+  # pull_request:
+  #   branches: [ "main" ]  #runs when PR targeting main is received
   workflow_dispatch: #enables manual button to run workflow
 
 jobs: #gitub required status checks are expecting job names to pass!
