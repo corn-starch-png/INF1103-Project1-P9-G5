@@ -164,7 +164,8 @@ class Fridge(ListFunctions, CanBeStored):
 
         # Count available stock only in the requested measurement unit.
         total_quantity = sum(Decimal(str(item.quantity)) for item in self.__items if item.name.strip().casefold() == item_name.strip().casefold() and item.unit == units)
-        if amount > total_quantity:
+        # Compare quantities as decimals to avoid float precision errors.
+        if Decimal(str(amount)) > total_quantity:
             raise ValueError(f"Cannot consume {amount}{units} of {item_name};\nonly {total_quantity} available.")
         
         # Consume batches using decimal arithmetic while retaining the requested amount for history.
