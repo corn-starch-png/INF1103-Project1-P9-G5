@@ -26,7 +26,7 @@ class JsonRepository(RepositoryFunctions):
             try:
                 with open(path, encoding="utf-8") as f:
                     rows = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
                 errors.append(f"Could not read {filename}: {e}")
                 continue
             if not isinstance(rows, list):
