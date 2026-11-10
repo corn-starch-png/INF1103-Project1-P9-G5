@@ -9,8 +9,12 @@ class IntRangePrompt(Prompt):
         self.__error_message = error_message
 
     def _validate(self, text):
-        if text.isdecimal() and self.__min <= int(text) <= self.__max:
-            return ""
+        # Reject oversized integer input through the normal validation message.
+        try:
+            if text.isdecimal() and self.__min <= int(text) <= self.__max:
+                return ""
+        except ValueError:
+            pass
         if self.__error_message is not None:
             return self.__error_message
         return f"Please enter a whole number between {self.__min} and {self.__max}."
