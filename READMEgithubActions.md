@@ -5,6 +5,7 @@ The purpose of Quantifresh CI pipeline is to provide automated testing for code 
 ### Pipeline ruleset
 
 The pipeline is configured to run on pushes to any branches AND on PR request targetting the main branch 
+Json configuration for rulsets can be found int he ruleset fodler
 
 _What is blocked?_
 For main branch, any jobs failing results in merge being blocked
