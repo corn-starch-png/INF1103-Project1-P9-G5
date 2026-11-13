@@ -1,3 +1,5 @@
+2
+Smoke Test Household
 Rick
 70
 male
@@ -7,3 +9,5 @@ Morty
 15
 male
 
+no
+3
