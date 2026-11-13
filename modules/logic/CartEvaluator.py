@@ -4,11 +4,13 @@ from .CaloriesSurplusAnalyzer import CaloriesSurplusAnalyzer
 from .RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
 from .UnderBuyAnalyzer import UnderBuyAnalyzer
 from .AnalysisContext import AnalysisContext
+from .CartAnalyzer import CartAnalyzer
+from .ItemAnalyzer import ItemAnalyzer
 
 class CartEvaluator():
     def __init__(self):
-        self.__cart_analyzers = [CaloriesSurplusAnalyzer()]
-        self.__item_analyzers = [RiskOfExpiryAnalyzer(), UnderBuyAnalyzer()]
+        self.__cart_analyzers: list[CartAnalyzer] = [CaloriesSurplusAnalyzer()]
+        self.__item_analyzers: list[ItemAnalyzer] = [RiskOfExpiryAnalyzer(), UnderBuyAnalyzer()]
 
     def evaluate(self, ctx: AnalysisContext) -> list[Finding]:
         # Start each evaluation with fresh findings for the current cart state.
