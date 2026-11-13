@@ -49,16 +49,16 @@ HOUSEHOLD_DATA = [
     {"Person_ID": 3, "Name": "Bob", "Age": 18, "Gender": "Male", "Dietary_Restriction": "none"},
 ]
 HISTORY_DATA = [
-    {"Item_Name": "milk", "Quantity": 1.5, "Unit": "l", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "eggs", "Quantity": 8, "Unit": "pcs", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "rice", "Quantity": 1.0, "Unit": "kg", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "chicken", "Quantity": 0.8, "Unit": "kg", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "bananas", "Quantity": 6, "Unit": "pcs", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "milk", "Quantity": 1.8, "Unit": "l", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "eggs", "Quantity": 10, "Unit": "pcs", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "rice", "Quantity": 1.2, "Unit": "kg", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "chicken", "Quantity": 0.9, "Unit": "kg", "Date_Range": 7, "Remarks": "none"},
-    {"Item_Name": "bananas", "Quantity": 5, "Unit": "pcs", "Date_Range": 7, "Remarks": "none"},
+    {"Item_Name": "milk", "Quantity": 1.5, "Unit": "l", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "eggs", "Quantity": 8, "Unit": "pcs", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "rice", "Quantity": 1.0, "Unit": "kg", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "chicken", "Quantity": 0.8, "Unit": "kg", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "bananas", "Quantity": 6, "Unit": "pcs", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "milk", "Quantity": 1.8, "Unit": "l", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "eggs", "Quantity": 10, "Unit": "pcs", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "rice", "Quantity": 1.2, "Unit": "kg", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "chicken", "Quantity": 0.9, "Unit": "kg", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
+    {"Item_Name": "bananas", "Quantity": 5, "Unit": "pcs", "Date_Range": 7, "Remarks": "none", "Record_Date": "2026-10-06"},
 ]
 GROCERY_LIST = [
     {"Item_Name": "milk", "Quantity": 3, "Unit": "l"},
