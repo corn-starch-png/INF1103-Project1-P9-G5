@@ -2,8 +2,9 @@
 import os
 from copy import deepcopy
 from dotenv import load_dotenv
+from dns.exception import DNSException
 from pymongo import MongoClient, ReturnDocument
-from pymongo.errors import ConnectionFailure, DuplicateKeyError, OperationFailure
+from pymongo.errors import ConfigurationError, ConnectionFailure, DuplicateKeyError, OperationFailure
 from .RepositoryFunctions import RepositoryFunctions
 from .HouseholdDocument import HouseholdDocument as Doc
 from .StorageErrors import CloudUnavailable, HouseholdNotFound, SaveConflict, CloudOperationError
@@ -20,16 +21,23 @@ class MongoDBRepository(RepositoryFunctions):
         name = database_name or os.getenv("MONGODB_DATABASE")
         if not uri or not name:
             raise CloudUnavailable("MONGODB_URI and MONGODB_DATABASE must be configured.")
-        self.client = MongoClient(uri, serverSelectionTimeoutMS=5000,
-                                  connectTimeoutMS=5000, socketTimeoutMS=10000, tz_aware=True)
         try:
+            # SRV discovery can fail during construction, before ping is reached.
+            self.client = MongoClient(uri, serverSelectionTimeoutMS=5000,
+                                      connectTimeoutMS=5000, socketTimeoutMS=10000, tz_aware=True)
             self.client.admin.command("ping")
+        except ConfigurationError as error:
+            self.close()
+            # PyMongo wraps DNS lookup failures; preserve offline recovery without hiding invalid settings.
+            if isinstance(error.__cause__, DNSException):
+                raise CloudUnavailable("MongoDB address lookup failed. Check your internet connection and DNS settings.") from error
+            raise CloudOperationError("MongoDB configuration is invalid. Check the connection settings; local data was retained.") from error
         except ConnectionFailure as error:
-            self.client.close()
+            self.close()
             raise CloudUnavailable("MongoDB cannot be reached.") from error
         # Authentication and authorization failures are recoverable application errors.
         except OperationFailure as error:
-            self.client.close()
+            self.close()
             raise CloudOperationError("MongoDB rejected access. Check database credentials and permissions; local data was retained.") from error
         self.database = self.client[name]
         self.collection = self.database["households"]

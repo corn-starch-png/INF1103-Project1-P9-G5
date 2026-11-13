@@ -1257,3 +1257,97 @@ class TestHouseholdSpaceNavigation:
         with patch('builtins.input', return_value='yes') as input_mock:
             assert IO_manager().confirm_food_replacement(source, 11)
         input_mock.assert_called_once_with(prompt)
+
+# Exercise real repository construction failures without accessing Atlas or changing network settings.
+@pytest.fixture
+def unavailable_mongo_dns(monkeypatch):
+    from dns.exception import Timeout
+    from pymongo.errors import ConfigurationError
+
+    monkeypatch.setenv('MONGODB_URI', 'mongodb+srv://offline.example.test/')
+    monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+
+    def fail_lookup(*args, **kwargs):
+        try:
+            raise Timeout('DNS lookup timed out')
+        except Timeout as error:
+            raise ConfigurationError('DNS lookup timed out') from error
+
+    with patch('modules.repositories.MongoDBRepository.MongoClient', side_effect=fail_lookup) as client:
+        yield client
+
+
+class TestOfflineConnectionStartup:
+    def test_continue_cached_space_after_dns_failure(self, household_environment, unavailable_mongo_dns, capsys):
+        data, repo, ui, documents = household_environment
+        before = data.read_cache()
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir)
+        with patch('builtins.input', return_value='1'):
+            assert fresh.session().start() is not None
+        assert fresh.is_local
+        assert fresh.base['_id'] == data.base['_id']
+        assert fresh.read_cache() == before
+        assert 'Opening only this household' in capsys.readouterr().out
+        unavailable_mongo_dns.assert_called_once()
+
+    def test_create_space_keeps_pending_registration(self, tmp_path, unavailable_mongo_dns, capsys):
+        data = DB_manager(IO_manager(), database_dir=tmp_path)
+        with patch('builtins.input', side_effect=['2', 'Offline Space']):
+            assert data.session().start() is not None
+        bundle = data.read_cache()
+        assert bundle['state']['unregistered']
+        assert bundle['pending']['name'] == 'Offline Space'
+        assert data.read_preferences()['last_household_id'] == bundle['snapshot']['_id']
+        assert data.is_local
+        assert 'saved on this device' in capsys.readouterr().out
+        unavailable_mongo_dns.assert_called_once()
+
+    def test_enter_uncached_id_returns_to_menu(self, tmp_path, unavailable_mongo_dns, capsys):
+        data = DB_manager(IO_manager(), database_dir=tmp_path)
+        with patch('builtins.input', side_effect=['1', 'HS-ABCD-EFGH-JKLM', '3']):
+            assert data.session().start() is None
+        assert data.base is None
+        assert data.read_cache()['snapshot'] is None
+        assert not data.read_preferences()
+        output = capsys.readouterr().out
+        assert 'Cannot switch offline' in output
+        assert output.count('1. Enter Household Space ID') == 2
+        unavailable_mongo_dns.assert_called_once()
+
+    def test_enter_cached_id_opens_local_data(self, household_environment, unavailable_mongo_dns):
+        data, repo, ui, documents = household_environment
+        data.remember()
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir)
+        with patch('builtins.input', side_effect=['1', data.base['_id']]):
+            assert fresh.session().start() is not None
+        assert fresh.is_local
+        assert fresh.base == data.base
+        unavailable_mongo_dns.assert_called_once()
+
+    def test_invalid_configuration_is_not_reported_as_offline(self, monkeypatch):
+        from pymongo.errors import ConfigurationError
+        from modules.repositories.StorageErrors import CloudOperationError
+
+        monkeypatch.setenv('MONGODB_URI', 'invalid-uri')
+        monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+        with patch('modules.repositories.MongoDBRepository.MongoClient', side_effect=ConfigurationError('Invalid URI')):
+            with pytest.raises(CloudOperationError, match='configuration is invalid'):
+                MongoDBRepository()
+
+    @pytest.mark.parametrize('during_construction', [True, False])
+    def test_connection_failure_at_construction_or_ping(self, monkeypatch, during_construction):
+        from pymongo.errors import ConnectionFailure
+        from modules.repositories.StorageErrors import CloudUnavailable
+
+        monkeypatch.setenv('MONGODB_URI', 'mongodb://offline.example.test/')
+        monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+        with patch('modules.repositories.MongoDBRepository.MongoClient') as factory:
+            client = factory.return_value
+            if during_construction:
+                factory.side_effect = ConnectionFailure('Offline')
+            else:
+                client.admin.command.side_effect = ConnectionFailure('Offline')
+            with pytest.raises(CloudUnavailable):
+                MongoDBRepository()
+            if not during_construction:
+                client.close.assert_called_once()
