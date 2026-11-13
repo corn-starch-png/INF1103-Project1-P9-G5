@@ -178,4 +178,3 @@ class HouseholdSession:
         self._data.clear_selection()
         self._ui.send_message("Household Space forgotten. Local files and MongoDB data are retained. You can now enter another Household Space ID.")
         return True
-
