@@ -23,7 +23,7 @@ jobs: #gitub required status checks are expecting job names to pass!
       - name: Checkout repository
         uses: actions/checkout@v6 #clone repo source code
         with:
-          fetch-depth: 1 #currently scanning  full github history
+          fetch-depth: 0 #currently scanning  full github history
 
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v3
