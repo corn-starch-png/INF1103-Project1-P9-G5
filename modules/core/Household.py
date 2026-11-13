@@ -8,8 +8,11 @@ class Household(CanBeStored):
     MIN_PAX = 1
     MAX_PAX = 20
 
-    def __init__(self):
+    # Household identity is independent of the first member's profile.
+    def __init__(self, household_id=None, name=""):
         self.__members = []
+        self.household_id = household_id
+        self.name = name
 
     def add_member(self, person: Person) -> None:
         if not isinstance(person, Person):

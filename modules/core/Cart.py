@@ -23,9 +23,11 @@ class Cart(ListFunctions):
         if not item.validate():
             raise ValueError("Cannot add an invalid item to the cart.")
         
-        #check if item with same name and units exists, then merge the quantites
+        # Use the same name identity as stock/history and prevent incompatible cart units.
         for existing in self.__items:
-            if existing.name.lower() == item.name.lower() and existing.unit == item.unit:
+            if existing.name.strip().casefold() == item.name.strip().casefold():
+                if existing.unit != item.unit:
+                    raise ValueError(f"{item.name} must use {existing.unit} in this cart.")
                 combined_quantity = Decimal(str(existing.quantity)) + Decimal(str(item.quantity))
                 if combined_quantity > CartItem.MAX_QUANTITY:
                     raise ValueError(f"Total quantity cannot exceed {CartItem.MAX_QUANTITY:,}.")

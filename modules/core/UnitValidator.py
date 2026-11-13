@@ -7,6 +7,7 @@ class UnitValidator:
         self.__fridge = fridge
         self.__history = history
 
+    # Match the same normalized name used by stock and history calculations.
     def find_unit(self, item_name: str, other_items: list = None) -> str:
         """
         Return the unit item_name was entered in before, or "" if it is a new item.
@@ -20,6 +21,6 @@ class UnitValidator:
             known_items += [(record["Item_Name"], record["Unit"]) for record in self.__history.to_dicts()]
 
         for name, unit in known_items:
-            if name.lower() == item_name.lower():
+            if name.strip().casefold() == item_name.strip().casefold():
                 return unit
         return ""

@@ -33,21 +33,21 @@ class Person(Record):
         return self.__dietary_restriction
 
     def validate(self) -> bool:
-        #validate ID
+        # validate ID
         if not isinstance(self.__id, int) or self.__id <= 0:
             return False
-        #validate name
+        # validate name
         if not isinstance(self.__name, str) or not self.__name.strip():
             return False
         if len(self.__name) > self.MAX_NAME_LENGTH:
             return False
-        #validate age
+        # validate age
         if type(self.__age) is not int or not self.MIN_AGE <= self.__age <= self.MAX_AGE:
             return False
-        #validate gender
+        # validate gender
         if self.__gender not in self.VALID_GENDERS:
             return False
-        #validate dietary restriction
+        # validate dietary restriction
         if not isinstance(self.__dietary_restriction, str):
             return False
         if len(self.__dietary_restriction) > self.MAX_DIETARY_LENGTH:

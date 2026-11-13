@@ -12,18 +12,14 @@ class Fridge(ListFunctions, CanBeStored):
     def __init__(self):
         self.__items = []
 
+    # Enforce one unit for each normalized food name at the domain boundary.
     def validate(self) -> bool:
-        """should run after every addition or removal of items to ensure the fridge is valid."""
-        item_unit_pairs = list()
+        units = {}
         for item in self.__items:
-            if not item.validate():
+            key = item.name.strip().casefold()
+            if not item.validate() or (key in units and units[key] != item.unit):
                 return False
-            #check for duplicate items with different units
-            if (item.name.strip().casefold()) not in item_unit_pairs:
-                item_unit_pairs.append((item.name.strip().casefold(), item.unit.strip().casefold()))
-            else:
-                if (item.name.strip().casefold(), item.unit.strip().casefold()) in item_unit_pairs:
-                    return False
+            units[key] = item.unit
         return True
 
     def add_item(self, item: FridgeItem) -> bool:
@@ -31,19 +27,26 @@ class Fridge(ListFunctions, CanBeStored):
             raise TypeError("Only FridgeItem objects can be added to the Fridge.")
         if not item.validate():
             raise ValueError("Cannot add an invalid item to the fridge.")
+        # Reject mixed units before mutating stock, including data loaded from storage.
+        for existing in self.__items:
+            if existing.name.strip().casefold() == item.name.strip().casefold() and existing.unit != item.unit:
+                raise ValueError(f"{item.name} must use {existing.unit}; mixed units cannot be combined.")
         self.__items.append(item)
         try:
             merged = self.remove_duplicates()
             return merged
         except ValueError as e:
             self.__items.remove(item)
-            raise ValueError() from e
+            raise ValueError(str(e)) from e
 
     def change_expiry(self, item: FridgeItem, new_expiry_date: str) -> bool:
         """
         Change the expiry date of an item in the fridge. If the new expiry date causes it to match another batch (same name, unit, purchase date, expiry date and remarks), merge them into one batch.
         Returns true if batches were merged. Raises ValueError and reverts the change if the merged quantity would be over MAX_QUANTITY.
         """
+        # Unchanged expiry dates must not trigger merging or quantity updates.
+        if item.expiry_date == new_expiry_date:
+            return False
         matching_items = []
         total_quantity = Decimal(str(item.quantity))
 
@@ -89,7 +92,7 @@ class Fridge(ListFunctions, CanBeStored):
         (same name, unit, purchase date, expiry date, remarks)
         MUST RUN when expiry date changes
         """
-        #check for duplicate items where only the quantity is different 
+        # check for duplicate items where only the quantity is different
         #(same name, unit, purchase date, expiry date, remarks)
         duplicate_found = False
         for item in self.__items:
@@ -99,8 +102,8 @@ class Fridge(ListFunctions, CanBeStored):
                         item.unit.strip().casefold() == other_item.unit.strip().casefold() and
                         item.purchase_date == other_item.purchase_date and
                         item.expiry_date == other_item.expiry_date and
-                        item.remarks.strip().casefold() == other_item.remarks.strip().casefold()): #change this if we are merging remarks again
-                        #merge remarks
+                        item.remarks.strip().casefold() == other_item.remarks.strip().casefold()): # change this if we are merging remarks again
+                        # merge remarks
                         # new_remarks = other_item.remarks
                         # if item.remarks != "none" and item.remarks != new_remarks:
                         #     if new_remarks == "none":
@@ -109,7 +112,7 @@ class Fridge(ListFunctions, CanBeStored):
                         #         new_remarks += ", " + item.remarks
                         # if len(new_remarks) > FridgeItem.MAX_REMARKS_LENGTH:
                         #     raise ValueError(f"Combined remarks cannot exceed {FridgeItem.MAX_REMARKS_LENGTH} characters.")
-                        #merge the two items by adding their quantities
+                        # merge the two items by adding their quantities
                         new_amt = item.quantity + other_item.quantity
                         if new_amt > ItemRecord.MAX_QUANTITY:
                             raise ValueError("Error, item is similar to another and merging them will exceed the max quantity")
@@ -125,7 +128,7 @@ class Fridge(ListFunctions, CanBeStored):
         """
         totals = {}
         for item in self.__items:
-            key = (item.name.lower(), item.unit)
+            key = (item.name.strip().casefold(), item.unit)
             if key in totals:
                 totals[key]["quantity"] += Decimal(str(item.quantity))
             else:

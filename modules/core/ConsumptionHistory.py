@@ -12,6 +12,10 @@ class ConsumptionHistory(CanBeStored):
             raise TypeError("Only ConsumptionRecord objects can be added to the history.")
         if not record.validate():
             raise ValueError("Cannot add an invalid record to the consumption history.")
+        # Reject history that would aggregate incompatible measurement units.
+        for existing in self.__records:
+            if existing.name.strip().casefold() == record.name.strip().casefold() and existing.unit != record.unit:
+                raise ValueError(f"{record.name} must use {existing.unit} in consumption history.")
         self.__records.append(record)
 
     def get_unique_item_names(self) -> list:
@@ -40,6 +44,10 @@ class ConsumptionHistory(CanBeStored):
 
     def to_dicts(self) -> list:
         return [record.to_dict() for record in self.__records]
+
+    # Expose records without exposing the mutable list, preserving storage IDs.
+    def get_records(self) -> list:
+        return list(self.__records)
  
     def load_dicts(self, rows: list) -> list:
         errors = []
