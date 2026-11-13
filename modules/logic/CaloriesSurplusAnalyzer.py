@@ -24,12 +24,12 @@ class CaloriesSurplusAnalyzer(CartAnalyzer):
         for person in family.get_members():
             age = self.__get_age_from_KCAL(person.get_age())
             gender = person.get_gender()
-            daily_total += self.KCAL_TABLE[age][gender] #male + female calorie
+            daily_total += self.KCAL_TABLE[age][gender] # male + female calorie
         return daily_total * days_until_next_visit
     
     # calculating calories surplus
     def analyze(self, ctx: AnalysisContext):   
-        #extract name, gender from household info from Household.py
+        # extract name, gender from household info from Household.py
         family_calorie_until_next_visit = self.__calculate_family_kcal(ctx.next_purchase_date, ctx.household)
 
         app_logger.send_log(f"[LOGIC] Total family calories until next visit: {family_calorie_until_next_visit}")

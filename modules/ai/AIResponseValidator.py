@@ -94,30 +94,22 @@ class AIResponseValidator:
         if not isinstance(recommendations, list):
             return None, "Recommendations_List must be a list."
         # Validate non-negative, finite numeric values
+        # Reject unrepresentable numbers through normal invalid-response retry handling.
         def valid_number(value):
-            return (type(value) in (int, float) and math.isfinite(value) and value >= 0)
+            try:
+                return type(value) in (int, float) and math.isfinite(value) and value >= 0
+            except (OverflowError, ValueError):
+                return False
         # Validate both calorie totals
         for total_field in ("Total_Planned_Estimated_Calories", "Total_Estimated_Calories"):
             if not valid_number(data[total_field]):
                 return None, f"{total_field} must be a non-negative finite number."
         # Required item fields
-        required_item_fields = {
-            "Item_Name",
-            "Planned_Quantity",
-            "Unit",
-            "Recommended_Quantity",
-            "Estimated_Consumption_Rate",
-            "Planned_Estimated_Calories",
-            "Estimated_Calories",
-            "Estimated_Expiration_Days"
-        }
-        numeric_item_fields = (
-            "Planned_Quantity",
-            "Recommended_Quantity",
-            "Estimated_Consumption_Rate",
-            "Planned_Estimated_Calories",
-            "Estimated_Calories"
-        )
+        required_item_fields = {"Item_Name", "Planned_Quantity", "Unit", "Recommended_Quantity",
+                                "Estimated_Consumption_Rate", "Planned_Estimated_Calories",
+                                "Estimated_Calories", "Estimated_Expiration_Days"}
+        numeric_item_fields = ("Planned_Quantity", "Recommended_Quantity", "Estimated_Consumption_Rate",
+                               "Planned_Estimated_Calories", "Estimated_Calories")
         valid_units = {"kg", "g", "l", "ml", "pcs"}
 
         # Validate each recommendation
@@ -140,7 +132,7 @@ class AIResponseValidator:
             recommended_qty = item["Recommended_Quantity"]
             planned_cal = item["Planned_Estimated_Calories"]
             recommended_cal = item["Estimated_Calories"]
-            
+
             # Validate AI quantity limits
             if planned_qty > ItemRecord.MAX_QUANTITY or recommended_qty > ItemRecord.MAX_QUANTITY:
                 return None, (f"{item_name}: quantity exceeds\nthe supported maximum of {ItemRecord.MAX_QUANTITY:,}.")
@@ -174,7 +166,7 @@ class AIResponseValidator:
             calculated = sum(item[item_field] for item in recommendations)
             if not math.isclose(data[total_field], calculated, rel_tol=0, abs_tol=0.01):
                 return None, f"{total_field} does not match the sum of {item_field}."
-            
+
         # Add estimated expiry date after validation
         for item in recommendations:
             expiration_days = item["Estimated_Expiration_Days"]

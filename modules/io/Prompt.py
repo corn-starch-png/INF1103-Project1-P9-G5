@@ -14,7 +14,7 @@ class Prompt(ABC):
                 return self._convert(text)
             print(error)
 
-    #used by Quantity and Quantityunit
+    # used by Quantity and Quantityunit
     def normalize_quantity(self, value):
         try:
             amount = Decimal(str(value))

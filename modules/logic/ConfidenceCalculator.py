@@ -15,7 +15,7 @@ class ConfidenceCalculator:
             raise NotImplementedError("Item must have AI Data for confidence score to be calculated")
         fridge_amt = ctx.fridge.get_item_total(item.name, include_expired=False)
         normalized_daily_consumption = ctx.history.get_normalized_records(item.name)
-        #if no previous consumption, no score can be calculated
+        # if no previous consumption, no score can be calculated
         if normalized_daily_consumption == []:
             return 0.0
 
@@ -41,7 +41,7 @@ class ConfidenceCalculator:
         app_logger.send_log(f"[CONFIDENCE SCORE] bonus_score: {bonus_score}")
         app_logger.send_log(f"[CONFIDENCE SCORE] Final score: {round(min(100, confidence_score + bonus_score), 1)}")
 
-        if confidence_score == 0: #do not add bonus if score is 0 
+        if confidence_score == 0: # do not add bonus if score is 0
             return 0.0
         return round(min(100, confidence_score + bonus_score), 1)
         

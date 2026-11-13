@@ -61,11 +61,13 @@ class IO_manager:
             print(error)
             return
         if merged:
+            # Display the retained merged batch rather than the removed incoming item.
+            item = next(existing for existing in home_items.get_items() if existing.name.strip().casefold() == item.name.strip().casefold() and existing.unit == item.unit and existing.expiry_date == item.expiry_date and existing.purchase_date == item.purchase_date and existing.remarks.strip().casefold() == item.remarks.strip().casefold())
             print(f"{item.name} is already in your home items.\nTotal is now {self.__format_item(item)}.")
         else:
             print(f"Added {self.__format_item(item)} to your home items.")
 
-    #used by enter_grocery_list()
+    # used by enter_grocery_list()
     def __add_cart_item(self, cart, unit_validator):
         item_name, quantity, unit = self.__enter_item(unit_validator, cart.get_items())
 
@@ -78,7 +80,7 @@ class IO_manager:
             return
         if merged:
             # Display the retained cart item containing the merged quantity.
-            cart_item = next(existing for existing in cart.get_items() if existing.name.lower() == cart_item.name.lower() and existing.unit == cart_item.unit)
+            cart_item = next(existing for existing in cart.get_items() if existing.name.strip().casefold() == cart_item.name.strip().casefold() and existing.unit == cart_item.unit)
             print(f"{cart_item.name} is already in your list.\nTotal is now {self.__format_item(cart_item)}.")
         else:
             print(f"Added {self.__format_item(cart_item)}.")
@@ -93,13 +95,14 @@ class IO_manager:
             item.set_quantity(new_qty)
             return False
 
-    #can be used edit Fridge or Cart
+    # can be used edit Fridge or Cart
+    # Reject oversized item numbers without leaving the edit menu.
     def __edit_list(self, item_list: ListFunctions):
         while True:
             item_index = input("\nEnter item number to edit/delete or enter 'exit' to save: ").strip().lower()
             if item_index == "exit":
                 return True
-            elif item_index.isdecimal():
+            elif item_index.isdecimal() and len(item_index) <= 10:
                 if int(item_index) in range(1, len(item_list.get_items()) + 1): # check if option is in the list
                     item = item_list.get_item_at(int(item_index) - 1)
                     delete_item = self.__edit_item(item)
@@ -111,7 +114,7 @@ class IO_manager:
             else:
                 print("Invalid input. Enter item number to edit/delete or enter 'exit' to save")
 
-    #used by initialize_household()
+    # used by initialize_household()
     def __get_person_info(self) -> tuple:
         genders = ", ".join(Person.VALID_GENDERS)
         name = TextPrompt("Please enter name: ", max_length=Person.MAX_NAME_LENGTH).ask()
@@ -218,7 +221,7 @@ class IO_manager:
             user_choice = self.__ask_add_another()
             if user_choice == "1": # add items
                 self.__add_cart_item(cart, unit_validator)
-            elif user_choice == "2": #edit cart
+            elif user_choice == "2": # edit cart
                 while True:
                     self.display_cart(cart)
                     if self.__edit_list(cart):
@@ -229,7 +232,7 @@ class IO_manager:
                 else:
                     break
 
-        app_logger.send_log(f"[IO MANAGER] grocery_list = {[item.to_dict() for item in cart.get_items()]}") #log grocery list for verification
+        app_logger.send_log(f"[IO MANAGER] grocery_list = {[item.to_dict() for item in cart.get_items()]}") # log grocery list for verification
 
     # Ask for optional remarks about this week (e.g. events).
     def get_cart_remarks(self):
@@ -245,12 +248,13 @@ class IO_manager:
         return IntRangePrompt("\nIn how many days do you plan to shop next? (e.g. 7): ", 1, 365).ask()
 
     # Show the returning user's menu and return their choice ("1" or "2").
+    # Keep the active session menu focused on groceries, fridge edits, and save/exit.
     def ask_main_menu_choice(self):
         return ChoicePrompt("\nWhat would you like to do?\n"
                             "  1. Update consumption and plan groceries\n"
                             "  2. Edit expiry dates or delete items from your fridge\n"
-                            "  3. Save database and exit the program\n"
-                            "Enter 1, 2 or 3: ", ["1", "2", "3"], "Please enter 1, 2 or 3.").ask()
+                            "  3. Save/sync and exit the program\n"
+                            "Enter 1-3: ", ["1", "2", "3"], "Please enter 1-3.").ask()
 
     # Let the user edit expiry dates or delete items from their fridge until they are done.
     def update_fridge(self, fridge: Fridge):
@@ -276,8 +280,13 @@ class IO_manager:
 
             if action == "1":
                 selected_item = fridge.get_item_at(number)
-                expiry_date = DatePrompt(f"New expiry date for {selected_item.name} (YYYY-MM-DD): ",
-                                              allow_past=True, purchase_date=selected_item.purchase_date).ask()
+                # Blank/cancel and the existing date are explicit no-op edits.
+                expiry_date = DatePrompt(f"New expiry date for {selected_item.name} (YYYY-MM-DD, blank/cancel to keep): ",
+                                        allow_past=True, purchase_date=selected_item.purchase_date,
+                                        current_date=selected_item.expiry_date).ask()
+                if expiry_date is None or expiry_date == selected_item.expiry_date:
+                    print("Expiry date unchanged.")
+                    continue
                 try:
                     merged = fridge.change_expiry(selected_item, expiry_date)
                 except ValueError as error:
@@ -292,7 +301,7 @@ class IO_manager:
                 fridge.remove_item(removed)
                 print(f"{self.__format_item(removed)} has been removed from your fridge.")
 
-    #displays recommendations made by business logic
+    # displays recommendations made by business logic
     def output_recommendations(self, calories_message, risk_of_expiry_messages, underbuy_messages):
         print(f"\n--------------------------------Recommendations---------------------------------")
         print(f"\n{calories_message[0]}")
@@ -309,7 +318,7 @@ class IO_manager:
                 print(f"  {i+1}. {underbuy_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
 
-    #handles IO for after AI and logic processes
+    # handles IO for after AI and logic processes
     def shopping_cart_conclusion(self, cart: Cart) -> None:
         self.display_cart(cart)
         if self.__ask_yes_no("\nWould you like to change the quantity of items in your grocery cart? ",
@@ -320,6 +329,10 @@ class IO_manager:
                     break
         else:
             print("\nYour grocery cart has been concluded.")
+
+    # Let a rejected purchase return to editing or abandon checkout without losing stock edits.
+    def ask_retry_checkout(self):
+        return ChoicePrompt("Checkout recovery:\n  1. Edit cart and retry\n  2. Cancel purchase and return to main menu\nEnter 1-2: ", ["1", "2"]).ask() == "1"
 
     # Formatting-----------
     def __format_item(self, item):
@@ -338,12 +351,12 @@ class IO_manager:
         if not item_list:
             print(f"\nFridge\n  (empty! add some items to see something)")
             return
-        name_width = max(len("Item name"), max(len(item.name) for item in item_list)) + 2 #align table according to how big item_name is
-        remarks_width = max(len("Remarks"), max(len(item.remarks) for item in item_list)) + 2 #align table according to how big item_name is
+        name_width = max(len("Item name"), max(len(item.name) for item in item_list)) + 2 # align table according to how big item_name is
+        remarks_width = max(len("Remarks"), max(len(item.remarks) for item in item_list)) + 2 # align table according to how big item_name is
         
         header = f"\nFridge\n{'No.':<4}| {'Item name':<{name_width}}| {'Current amt':<12}| {'Purchase date':<14}| {'Expiry date':<12}| {'Remarks':<{remarks_width}}| "
         print(header)
-        #format and print items
+        # format and print items
         for i in range(0,len(item_list)):
             item = item_list[i]
             message = f"{i+1:<4}| {item.name:<{name_width}}| "
@@ -365,13 +378,13 @@ class IO_manager:
         if not item_list:
             print(f"\n{title}\n  (empty! add some items to see something)")
             return
-        #print header
-        name_width = max(len("Item name"), max(len(item.name) for item in item_list)) + 2 #align table according to how big item_name is
+        # print header
+        name_width = max(len("Item name"), max(len(item.name) for item in item_list)) + 2 # align table according to how big item_name is
         header = f"\n{title}\n{'No.':<4}| {'Item name':<{name_width}}| {'Current amt':<12}| "
         if cart.get_ai_enhanced() == True:
             header += f"{'Recommended amt':<16}| {'CS*':<6}| "
         print(header)
-        #print items
+        # print items
         for i in range(0,len(item_list)):
             item = item_list[i]
             cur_amt_formatted = f"{item.quantity:g} {item.unit}"
@@ -412,23 +425,67 @@ class IO_manager:
     def show_welcome(self):
         print("Welcome to the QuantiFresh!")
 
-    # Print the welcome-back message for a returning user (Person_ID 1 is the user).
+    # Separate the selected household welcome from the preceding menu input with a blank line.
     def show_welcome_back(self, household_info):
-        user = household_info.get_members()[0]
-        print(f"Welcome back, {user.get_name()}!")
+        print(f"\nWelcome back, {household_info.name}!\nHousehold Space ID: {household_info.household_id}")
 
-    # Print exit message
+    # Save results explain cloud/local status separately; exit does not claim success.
     def show_exit(self):
-        print(f"Your data has been recorded into the system")
-        print(f"Thank you for using the QuantiFresh!")
+        print("Thank you for using QuantiFresh!")
 
     # Display application status and recovery messages.
     def send_message(self, message):
         print(f"{message}")
 
-    # Ask explicitly before replacing cloud records with pending local changes.
-    def ask_upload_offline_changes(self):
-        return self.__ask_yes_no("You made changes while offline. Upload them to the shared database? This REPLACES the cloud data. ")
+    # Numbered household choices match the main menu; retain word aliases for scripts.
+    def ask_household_access(self, switching=False):
+        # Back returns to selection; the first option opens an existing Household Space.
+        last = "Back" if switching else "Exit the program"
+        print(f"\nChoose your Household Space:\n  1. Enter Household Space ID\n  2. Create Household Space\n  3. {last}")
+        choice = ChoicePrompt("Enter 1-3: ", ["1", "2", "3", "create", "enter", "exit"]).ask()
+        return {"1": "enter", "2": "create", "3": "exit"}.get(choice, choice)
+
+    # Remembered household access uses the same numbered menu convention.
+    def ask_remembered_household(self, name):
+        print(f"\nChoose your Household Space:\n  1. Continue with {name}\n  2. Use another Household Space\n  3. Forget this Household Space on this device\n  4. Exit the program")
+        choice = ChoicePrompt("Enter 1-4: ", ["1", "2", "3", "4", "continue", "switch", "forget", "exit"]).ask()
+        return {"1": "continue", "2": "switch", "3": "forget", "4": "exit"}.get(choice, choice)
+
+    # Household names are display labels and may be shared by different households.
+    def ask_household_name(self):
+        return TextPrompt("Household Space display name: ", max_length=100).ask()
+
+    # The persistence access policy validates the entered household code.
+    def ask_household_id(self):
+        return TextPrompt("Household Space ID (HS-XXXX-XXXX-XXXX): ", max_length=17).ask()
+
+    # Numbered resolution choices distinguish retrying sync from resuming the current home.
+    def ask_switch_resolution(self):
+        print("\nCurrent Household Space has pending edits:\n  1. Sync and continue switching\n  2. Discard edits when switching\n  3. Resume current Household Space")
+        choice = ChoicePrompt("Enter 1-3: ", ["1", "2", "3", "sync", "discard", "cancel"]).ask()
+        return {"1": "sync", "2": "discard", "3": "cancel"}.get(choice, choice)
+
+    # Discard is separate confirmation and does not delete cloud household data.
+    def confirm_discard(self):
+        return self.__ask_yes_no("Discard the current local edits? Unsynced changes will be lost. ")
+
+    # Separate the fridge comparison from the preceding input prompt with a blank line.
+    def show_conflict_review(self, base, draft, cloud):
+        from .ConflictReview import ConflictReview
+        self.send_message("\n" + ConflictReview(base, draft, cloud).render())
+
+    # Offer only comparison and local or cloud replacement in the recovery menu.
+    def ask_save_recovery(self):
+        print("\nHow would you like to resolve the data conflict?\n  1. Compare current and cloud data\n  2. Use local data\n  3. Use cloud data")
+        choice = ChoicePrompt("Enter 1-3: ", ["1", "2", "3", "review", "local", "cloud"]).ask()
+        return {"1": "review", "2": "local", "3": "cloud"}.get(choice, choice)
+
+    # Identify which copy will be replaced without exposing persistence details.
+    def confirm_food_replacement(self, source, version):
+        if source == "local":
+            return self.__ask_yes_no("Replace cloud data with your local data?\nCloud data will be replaced. ")
+        # Use the same general discard confirmation regardless of local profile changes.
+        return self.__ask_yes_no("Replace your local data with the latest cloud data?\nLocal data will be replaced. ")
 
 
 # =====================================================================

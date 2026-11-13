@@ -20,7 +20,7 @@ class CartEvaluator():
         findings: list[Finding] = []
 
         items = ctx.cart.get_items()
-        #run CartAnalyzers
+        # run CartAnalyzers
         for analyzer in self.__cart_analyzers:
             result = analyzer.analyze(ctx)
             findings.append(result)
