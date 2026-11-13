@@ -4,8 +4,10 @@ The purpose of Quantifresh CI pipeline is to provide automated testing for code 
 
 ### Pipeline ruleset
 
-The pipeline is configured to run on pushes to any branches AND on PR request targetting the main branch 
-Json configuration for rulsets can be found in the ruleset fodler
+The pipeline is configured to run on pushes to any branches.
+Main is only writable through a pull request.
+Pull request to main can only merge if the commit in question passes all checks.
+Github checks against the SHA value of the commit. 
 
 _What is blocked?_
 For main branch, any jobs failing results in merge being blocked
