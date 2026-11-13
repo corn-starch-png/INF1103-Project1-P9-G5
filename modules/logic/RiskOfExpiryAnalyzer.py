@@ -32,7 +32,7 @@ class RiskOfExpiryAnalyzer(ItemAnalyzer):
             if ctx.get_total_items(item_name) > consumable_before_expiry:
                 app_logger.send_log(f"[LOGIC] Risk of expiry is True for {item_name}")
                 result = True
-                message = f"{item_quantity}{item_unit} of {item_name} --> estimated expiry: {item_expiry_date}. (avg consumption: {estimated_consumption_rate} {item_unit} a week)"
+                message = f"{item_quantity}{item_unit} of {item_name} --> estimated expiry: {item_expiry_date}. (AI estimated consumption: {estimated_consumption_rate} {item_unit} a week)"
             else:
                 result = False
                 app_logger.send_log(f"[LOGIC] Risk of expiry is False for {item_name}")

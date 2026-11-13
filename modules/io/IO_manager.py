@@ -307,13 +307,14 @@ class IO_manager:
         print(f"\n{calories_message[0]}")
         print(f"\n--------------------------------------------------------------------------------")
         if len(risk_of_expiry_messages) != 0:
-            print(f"\nBased on your consumption history, the following items "
-                  f"\nare likely to expire before your next trip:")
+            print(f"\nBased on your consumption history/AI predictions, "
+                  f"\nthe following items are likely to expire before your next trip:")
             for i in range(len(risk_of_expiry_messages)):
                 print(f"  {i+1}. {risk_of_expiry_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
         if len(underbuy_messages) != 0:
-            print(f"Based on your consumption history, you may run out of the following items and want to buy more:")
+            print(f"Based on your consumption history/AI predictions, "
+                  f"you may run out of the following items and want to buy more:")
             for i in range(len(underbuy_messages)):
                 print(f"  {i+1}. {underbuy_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
@@ -426,8 +427,9 @@ class IO_manager:
         print("Welcome to the QuantiFresh!")
 
     # Separate the selected household welcome from the preceding menu input with a blank line.
-    def show_welcome_back(self, household_info):
-        print(f"\nWelcome back, {household_info.name}!\nHousehold Space ID: {household_info.household_id}")
+    def show_welcome_back(self, household_info: Household):
+        main_user = household_info.get_members()[0]
+        print(f"\nWelcome back, {main_user.get_name()}!\nHousehold Space ID: {household_info.household_id}")
 
     # Save results explain cloud/local status separately; exit does not claim success.
     def show_exit(self):
