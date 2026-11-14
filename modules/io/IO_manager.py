@@ -180,7 +180,7 @@ class IO_manager:
     def get_consumption(self, fridge: Fridge, history: ConsumptionHistory) -> None:
         total_items = fridge.get_fridge_totals()
         total_records = []
-        if len(total_items) == 0:
+        if len(history.get_records()) == 0:
             return
         else:
             last_used_days = self.ask_last_use_days()
