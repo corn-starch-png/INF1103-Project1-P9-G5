@@ -428,8 +428,7 @@ class IO_manager:
 
     # Separate the selected household welcome from the preceding menu input with a blank line.
     def show_welcome_back(self, household_info: Household):
-        main_user = household_info.get_members()[0]
-        print(f"\nWelcome back, {main_user.get_name()}!\nHousehold Space ID: {household_info.household_id}")
+        print(f"\nWelcome back, {household_info.name}!\nHousehold Space ID: {household_info.household_id}")
 
     # Save results explain cloud/local status separately; exit does not claim success.
     def show_exit(self):
@@ -499,7 +498,11 @@ if __name__ == "__main__":
     from modules.core.AIRecData import AIRecData
 
     ui = IO_manager()
-    household_info = Household()      # add Person(1, "Test", 20, "Male", "none") to test a returning user
+    household_info = Household(
+        household_id="HS-AAAA-BBBB-CCCC",
+        name="Demo Household Space",
+    )
+    # Add Person(1, "Test", 20, "Male", "none") to test a returning user.
     fridge = Fridge()                 # e.g. fridge.add_item(FridgeItem("Milk", 2, "l", "2026-09-21", "2026-12-05", "none"))
     history = ConsumptionHistory()
     remaining_items = []

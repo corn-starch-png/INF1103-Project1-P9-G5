@@ -680,7 +680,7 @@ class TestLogicManagerIntegration:
         messages = manager.get_recommedations("RiskOfExpiry", True)
 
         if expected_count:
-            expected_message = f"3l of milk --> estimated expiry: {item.ai_data.est_expiry_date}. (avg consumption: 7 l a week)"
+            expected_message = f"3l of milk --> estimated expiry: {item.ai_data.est_expiry_date}. (AI estimated consumption: 7 l a week)"
             assert messages == [expected_message]
         else:
             assert messages == []
@@ -1342,7 +1342,8 @@ class TestHouseholdSpaceNavigation:
         with patch('builtins.input', side_effect=['1', '3']):
             Application(actual_ui, fresh, MagicMock(), MagicMock()).run()
         output = capsys.readouterr().out
-        assert '\nWelcome back, Test Space!' in output
+        assert f'\nWelcome back, Test Space!\nHousehold Space ID: {data.base["_id"]}' in output
+        assert 'Welcome back, Zi!' not in output
         assert output.count('Thank you for using QuantiFresh!') == 1
         repo.save.assert_not_called()
 
