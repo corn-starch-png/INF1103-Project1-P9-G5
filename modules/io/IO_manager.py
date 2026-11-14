@@ -177,9 +177,14 @@ class IO_manager:
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
     # Asked once, then added to every item
-    def get_consumption(self, fridge: Fridge, history: ConsumptionHistory, last_used_days: int, consumption_remarks: str) -> None:
+    def get_consumption(self, fridge: Fridge, history: ConsumptionHistory) -> None:
         total_items = fridge.get_fridge_totals()
         total_records = []
+        if len(total_items) == 0:
+            return
+        else:
+            last_used_days = self.ask_last_use_days()
+            consumption_remarks = self.get_consumption_remarks()
         for combined_item in total_items:
             consumed_amount = QuantityPrompt(f"How much {combined_item['item_name']} did you consume? (you have {combined_item['quantity']} {combined_item['units']}): ",
                                     max_value=combined_item['quantity'], allow_zero=True, whole_number=(combined_item['units'] == "pcs"),

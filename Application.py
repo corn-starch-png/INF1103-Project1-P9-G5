@@ -46,9 +46,7 @@ class Application:
             self.ui.show_welcome_back(household)
             choice = self.ui.ask_main_menu_choice()
             if choice == "1":
-                days = self.ui.ask_last_use_days()
-                remarks = self.ui.get_consumption_remarks()
-                self.ui.get_consumption(fridge, history, days, remarks)
+                self.ui.get_consumption(fridge, history)
                 if self._plan_groceries(fridge, household, history):
                     self.ui.show_exit()
                     return
