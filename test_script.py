@@ -1342,8 +1342,8 @@ class TestHouseholdSpaceNavigation:
         with patch('builtins.input', side_effect=['1', '3']):
             Application(actual_ui, fresh, MagicMock(), MagicMock()).run()
         output = capsys.readouterr().out
-        assert f'\nWelcome back, Test Space!\nHousehold Space ID: {data.base["_id"]}' in output
-        assert 'Welcome back, Zi!' not in output
+        assert f'\nWelcome back to the Test Space household!\nHousehold Space ID: {data.base["_id"]}' in output
+        assert 'Welcome back to the Zi household!' not in output
         assert output.count('Thank you for using QuantiFresh!') == 1
         repo.save.assert_not_called()
 

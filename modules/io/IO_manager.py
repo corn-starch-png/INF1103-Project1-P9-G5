@@ -428,7 +428,7 @@ class IO_manager:
 
     # Separate the selected household welcome from the preceding menu input with a blank line.
     def show_welcome_back(self, household_info: Household):
-        print(f"\nWelcome back, {household_info.name}!\nHousehold Space ID: {household_info.household_id}")
+        print(f"\nWelcome back to the {household_info.name} household!\nHousehold Space ID: {household_info.household_id}")
 
     # Save results explain cloud/local status separately; exit does not claim success.
     def show_exit(self):
