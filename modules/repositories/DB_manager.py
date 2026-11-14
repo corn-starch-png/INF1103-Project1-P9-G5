@@ -90,7 +90,7 @@ class DB_manager:
                 self._is_local = False
             except CloudUnavailable:
                 if not same:
-                    raise CloudUnavailable("Cannot switch offline. Only the current cached household is available.")
+                    raise CloudUnavailable("Cannot switch household while offline. Only the current cached household is available.")
                 self._is_local = True
                 if discard:
                     raise CloudUnavailable("Cannot reload cloud data while offline; your draft was retained.")

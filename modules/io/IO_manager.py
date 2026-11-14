@@ -318,8 +318,8 @@ class IO_manager:
                 print(f"  {i+1}. {risk_of_expiry_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
         if len(underbuy_messages) != 0:
-            print(f"Based on your consumption history/AI predictions, "
-                  f"you may run out of the following items and want to buy more:")
+            print(f"\nBased on your consumption history/AI predictions, "
+                  f"\nyou may run out of the following items and want to buy more:")
             for i in range(len(underbuy_messages)):
                 print(f"  {i+1}. {underbuy_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")

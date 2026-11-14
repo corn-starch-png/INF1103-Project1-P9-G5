@@ -1425,7 +1425,7 @@ class TestOfflineConnectionStartup:
         assert data.read_cache()['snapshot'] is None
         assert not data.read_preferences()
         output = capsys.readouterr().out
-        assert 'Cannot switch offline' in output
+        assert 'Cannot switch household while offline' in output
         assert output.count('1. Enter Household Space ID') == 2
         unavailable_mongo_dns.assert_called_once()
 
