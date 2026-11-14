@@ -177,9 +177,14 @@ class IO_manager:
     # For returning users: Ask how much of each item they consumed since last visit.
     # Batches of the same item are combined into one question.
     # Asked once, then added to every item
-    def get_consumption(self, fridge: Fridge, history: ConsumptionHistory, last_used_days: int, consumption_remarks: str) -> None:
+    def get_consumption(self, fridge: Fridge, history: ConsumptionHistory) -> None:
         total_items = fridge.get_fridge_totals()
         total_records = []
+        if len(history.get_records()) == 0:
+            return
+        else:
+            last_used_days = self.ask_last_use_days()
+            consumption_remarks = self.get_consumption_remarks()
         for combined_item in total_items:
             consumed_amount = QuantityPrompt(f"How much {combined_item['item_name']} did you consume? (you have {combined_item['quantity']} {combined_item['units']}): ",
                                     max_value=combined_item['quantity'], allow_zero=True, whole_number=(combined_item['units'] == "pcs"),
@@ -208,7 +213,7 @@ class IO_manager:
     # Tell the user there are no recommended items, before the normal grocery list.
     def show_no_recommendations(self):
         print("\nNo items to recommend right now. There may not be enough recent consumption history,"
-              "\nor you still have enough in your fridge of the items you usually use.")
+              "\nor you still have enough items in your fridge.")
 
     # Collect the groceries the user plans to buy, until they say they are done.
     def enter_grocery_list(self, cart: Cart, fridge: Fridge, history: ConsumptionHistory) -> None:
@@ -313,8 +318,8 @@ class IO_manager:
                 print(f"  {i+1}. {risk_of_expiry_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
         if len(underbuy_messages) != 0:
-            print(f"Based on your consumption history/AI predictions, "
-                  f"you may run out of the following items and want to buy more:")
+            print(f"\nBased on your consumption history/AI predictions, "
+                  f"\nyou may run out of the following items and want to buy more:")
             for i in range(len(underbuy_messages)):
                 print(f"  {i+1}. {underbuy_messages[i]}")
             print(f"\n--------------------------------------------------------------------------------")
@@ -428,7 +433,7 @@ class IO_manager:
 
     # Separate the selected household welcome from the preceding menu input with a blank line.
     def show_welcome_back(self, household_info: Household):
-        print(f"\nWelcome back, {household_info.name}!\nHousehold Space ID: {household_info.household_id}")
+        print(f"\nWelcome back to the {household_info.name} household!\nHousehold Space ID: {household_info.household_id}")
 
     # Save results explain cloud/local status separately; exit does not claim success.
     def show_exit(self):

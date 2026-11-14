@@ -1342,8 +1342,8 @@ class TestHouseholdSpaceNavigation:
         with patch('builtins.input', side_effect=['1', '3']):
             Application(actual_ui, fresh, MagicMock(), MagicMock()).run()
         output = capsys.readouterr().out
-        assert f'\nWelcome back, Test Space!\nHousehold Space ID: {data.base["_id"]}' in output
-        assert 'Welcome back, Zi!' not in output
+        assert f'\nWelcome back to the Test Space household!\nHousehold Space ID: {data.base["_id"]}' in output
+        assert 'Welcome back to the Zi household!' not in output
         assert output.count('Thank you for using QuantiFresh!') == 1
         repo.save.assert_not_called()
 
@@ -1425,7 +1425,7 @@ class TestOfflineConnectionStartup:
         assert data.read_cache()['snapshot'] is None
         assert not data.read_preferences()
         output = capsys.readouterr().out
-        assert 'Cannot switch offline' in output
+        assert 'Cannot switch household while offline' in output
         assert output.count('1. Enter Household Space ID') == 2
         unavailable_mongo_dns.assert_called_once()
 
