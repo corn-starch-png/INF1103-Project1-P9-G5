@@ -91,9 +91,9 @@ These models form the recommended configuration deployment, however they remain 
 **3. Build and run the application.**
 ```bash
 docker compose build
-docker compose run --rm quantifresh
+docker compose run --build --rm quantifresh
 ```
-The Compose configuration mounts `./database` and `./logs`, so data and logs remain on host after the container exits, allowing persistent storage. Follow the interactive prompts in the terminal to start using the cli application.
+The Compose configuration mounts `./app_data/database` and `./app_data/logs`, so household data, remembered access, and logs remain on the host after the container exits. Follow the interactive household creation/access prompts.
 
 ## Run without Docker
 After creating and configuring `.env`, please run the following commands:
@@ -117,9 +117,9 @@ The test suite will need to cover output structure, preservation of grocery list
 
 ## Data, privacy and configuration
 - `.env` contains an API credential. **Never commit it to Git.** Commit only the placeholder `.env.example` file.
-- `database/db.json` stores household and food-inventory information; log files may also contain household data. Do not commit personal data.
+- MongoDB stores one document per household in `households`. Local files under `app_data/database` retain only the current household snapshot and optional pending draft. Do not commit personal data.
 - Ensure `.gitignore` excludes `.env`, runtime database JSON, `logs/`, Python caches and local virtual environments.
-- The application stores information locally in a JSON file. It does not provide multi-user authentication or encrypted storage.
+- Household Space access uses a generated shared ID without passwords. The application remembers the selected space on this device automatically.
 
 ## Known limitations
 - AI-generated nutrition, consumption and expiration estimates are approximate and should be reviewed by the user.
@@ -134,7 +134,7 @@ The test suite will need to cover output structure, preservation of grocery list
 | API authentication error | Check `API_KEY` and the configured API URLs, is not empty or malform. |
 | Model request rejected | Verify the model exists and supports `json_schema`. |
 | Slow or failed AI request | Check network connectivity, rate limits, retries and the backup model. |
-| Database does not persist | Check the `./database:/app/database` volume mapping. |
+| Database does not persist | Check the `./app_data/database:/app/app_data/database` volume mapping. |
 | Tests not found | Ensure `test_script.py` is present in the project root folder. |
 
 ## Development and DevOps

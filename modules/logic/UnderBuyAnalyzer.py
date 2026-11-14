@@ -17,7 +17,7 @@ class UnderBuyAnalyzer(ItemAnalyzer):
             item_name = item.name
             item_quantity= item.quantity
             item_unit = item.unit
-            ai_data = item.get_ai_data #getting ai data instance from CartItem(ItemRecord)
+            ai_data = item.get_ai_data # getting ai data instance from CartItem(ItemRecord)
             estimated_consumption_rate = ai_data.consumption_rate
             
         # processing dates and calculating new variable with them

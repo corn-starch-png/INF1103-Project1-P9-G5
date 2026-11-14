@@ -11,7 +11,7 @@ class ItemRecord(Record):
     """
 
     MAX_NAME_LENGTH = 50
-    MAX_REMARKS_LENGTH = 500 #not checked in this class, but every child class has some form of remarks that should have the same max length
+    MAX_REMARKS_LENGTH = 500
     MAX_QUANTITY = 1_000_000
     QUANTITY_STEP = Decimal("0.0001")
     VALID_UNITS = ("kg", "g", "l", "ml", "pcs")

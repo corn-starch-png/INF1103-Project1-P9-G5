@@ -17,7 +17,7 @@ class Application:
         self.ai_manager = ai_manager if ai_manager is not None else AIManager(OpenRouterProvider())
         self.logic_manager = logic_manager if logic_manager is not None else Logic_manager()
 
-    # Run startup, user input, AI analysis and confirmed checkout.
+    # Select a household first and rebind its stores after switches or conflict reloads.
     def run(self):
         # Load configuration only when the application is explicitly started.
         load_dotenv()
@@ -25,35 +25,43 @@ class Application:
         if self.data_manager is None:
             self.data_manager = DB_manager(self.ui, use_mongo=os.getenv("USE_MONGO", "1") == "1")
 
-        stores = self.data_manager.start()
-        fridge = stores["fridge"]
-        household = stores["household"]
-        history = stores["consumption_history"]
-
         self.ui.show_welcome()
-
-        # Register a new household or process a returning user's menu choice.
-        if not household.get_members():
-            self.ui.initialize_household(household)
-            self.ui.show_profile(household)
-            self.ui.initialize_fridge(fridge)
-            self.ui.display_fridge(fridge)
-        else:
+        # The session controller owns startup and recovery menus; the data manager owns storage.
+        self.session = self.data_manager.session()
+        stores = self.session.start()
+        while stores is not None:
+            fridge = stores["fridge"]
+            household = stores["household"]
+            history = stores["consumption_history"]
+            if not household.get_members():
+                self.ui.send_message(f"Complete setup for {household.name} ({household.household_id}).")
+                self.ui.initialize_household(household)
+                self.ui.show_profile(household)
+                self.ui.initialize_fridge(fridge)
+                self.ui.display_fridge(fridge)
+                # Let the session report setup completion according to the actual save outcome.
+                self.session.save_setup()
+                stores = self.data_manager.stores
+                continue
             self.ui.show_welcome_back(household)
-            while True:
-                choice = self.ui.ask_main_menu_choice()
-                if choice == "1":
-                    days = self.ui.ask_last_use_days()
-                    remarks = self.ui.get_consumption_remarks()
-                    self.ui.get_consumption(fridge, history, days, remarks)
-                    break
-                elif choice == "2":
-                    self.ui.update_fridge(fridge)
-                else:
-                    self.data_manager.save()
+            choice = self.ui.ask_main_menu_choice()
+            if choice == "1":
+                days = self.ui.ask_last_use_days()
+                remarks = self.ui.get_consumption_remarks()
+                self.ui.get_consumption(fridge, history, days, remarks)
+                if self._plan_groceries(fridge, household, history):
                     self.ui.show_exit()
                     return
+            elif choice == "2":
+                self.ui.update_fridge(fridge)
+            elif choice == "3":
+                if self.session.save_interactive():
+                    self.ui.show_exit()
+                    return
+            stores = self.data_manager.stores
 
+    # Grocery logic receives only the selected household's objects.
+    def _plan_groceries(self, fridge, household, history):
         # Offer the initial history based cart before collecting planned purchases.
         days_until_next = self.ui.ask_days_until_next()
         cart = Cart()
@@ -74,7 +82,9 @@ class Application:
 
         if error or result is None:
             # Preserve completed edits but do not check out the unconfirmed cart.
-            self.data_manager.save()
+            # Offer recovery before exiting so a failed save cannot silently lose edits.
+            if not self.session.save_interactive():
+                return False
             raise RuntimeError(f"AI recommendation failed: {error or 'No response returned.'}")
 
         cart.set_ai_enhanced(True)
@@ -94,6 +104,15 @@ class Application:
 
         # Add only the user's confirmed cart to the fridge, then persist the result.
         self.ui.shopping_cart_conclusion(cart)
-        cart.checkout(fridge)
-        self.data_manager.save()
-        self.ui.show_exit()
+        # A rejected checkout leaves stock intact and returns the user to cart editing.
+        while True:
+            try:
+                cart.checkout(fridge)
+                break
+            except ValueError as error:
+                self.ui.send_message(f"Checkout not completed: {error}")
+                if not self.ui.ask_retry_checkout():
+                    return False
+                self.ui.shopping_cart_conclusion(cart)
+        # Return to the main menu when a draft needs review instead of claiming success.
+        return self.session.save_interactive()

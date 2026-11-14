@@ -1,4 +1,4 @@
-#region Imports
+# region Imports
 import copy
 import json
 import subprocess
@@ -37,11 +37,15 @@ from modules.logic.Logic_manager import Logic_manager
 from modules.logic.RiskOfExpiryAnalyzer import RiskOfExpiryAnalyzer
 from modules.logic.UnderBuyAnalyzer import UnderBuyAnalyzer
 from modules.repositories.AppPaths import AppPaths
-from modules.repositories.JsonRepository import JsonRepository
 from modules.repositories.MongoDBRepository import MongoDBRepository
-#endregion
+from modules.repositories.HouseholdDocument import HouseholdDocument as Doc
+from modules.repositories.RepositoryFunctions import RepositoryFunctions
+from modules.repositories.StorageErrors import SaveConflict, LocalConflict
+from modules.HouseholdSession import SaveOutcome
+from modules.io.IO_manager import IO_manager
+# endregion
 
-#region Test Data
+# region Test Data
 CAPTURE_DATE = date(2026, 10, 13)
 HOUSEHOLD_DATA = [
     {"Person_ID": 1, "Name": "TestUser", "Age": 23, "Gender": "Male", "Dietary_Restriction": "none"},
@@ -84,14 +88,14 @@ RAW_AI_RESPONSE = {
 
 EXPECTED_TOP_FIELDS = {"Recommendations_List", "Total_Planned_Estimated_Calories", "Total_Estimated_Calories"}
 EXPECTED_ITEM_FIELDS = {"Item_Name", "Planned_Quantity", "Unit", "Recommended_Quantity", "Estimated_Consumption_Rate", "Planned_Estimated_Calories", "Estimated_Calories", "Estimated_Expiration_Days", "Estimated_Expiry_Date", "Expiry_Date_Is_Default"}
-#endregion
+# endregion
 
 # =========================================================
 # SHARED FIXTURES
 # Input: Temporary paths, mocked services and domain objects.
 # Expected: Repeatable tests without changing real user data.
 # =========================================================
-#region Shared Fixtures
+# region Shared Fixtures
 # Redirect application log writes into a temporary file for each test.
 @pytest.fixture(autouse=True)
 def isolate_test_logs(tmp_path, monkeypatch):
@@ -164,54 +168,7 @@ def provider_client(monkeypatch):
     monkeypatch.setattr(provider, "_get_ai_model", lambda name: "primary-model" if name == "AI_MODEL" else "backup-model")
     monkeypatch.setenv("MAX_RETRIES", "0")
     return provider, client
-# Populate a temporary JSON repository using real domain objects.
-@pytest.fixture
-def populated_json_repository(tmp_path, make_context):
-    _, ctx = make_context()
-    folder = tmp_path / "database"
-    repository = JsonRepository(folder=folder)
-    errors, stores = repository.load()
-    assert errors == []
-    stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
-    expected = {name: store.to_dicts() for name, store in stores.items()}
-    return repository, folder, expected
-# Construct MongoDBRepository only after replacing its client with a mock.
-@pytest.fixture
-def mongo_repository(monkeypatch):
-    monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
-    monkeypatch.setenv("MONGODB_DATABASE", "test_database")
-    with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
-        client = client_class.return_value
-        database = client.__getitem__.return_value
-        collections = {name: MagicMock() for name in ("fridge", "household", "consumption_history")}
-        database.__getitem__.side_effect = collections.__getitem__
-        for collection in collections.values():
-            collection.find.return_value = []
-        repository = MongoDBRepository()
-        yield repository, client, collections
-# Create a fake cloud repository with real domain objects and a shared store dictionary.
-@pytest.fixture
-def recovery_cloud(make_context):
-    _, ctx = make_context(quantity=3, fridge_quantity=1)
-    stores = {"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history}
-    repository = MagicMock()
-    repository.load.return_value = ([], stores)
-    return repository, stores
-# Create a complete pending local dataset that differs from the cloud dataset.
-@pytest.fixture
-def pending_local_changes(tmp_path, make_context):
-    _, ctx = make_context(quantity=3, fridge_quantity=2)
-    repository = JsonRepository(folder=tmp_path)
-    errors, stores = repository.load()
-    assert errors == []
-    stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
-    repository.save()
-
-    marker = tmp_path / ".offline_changes"
-    marker.touch()
-    expected = {name: store.to_dicts() for name, store in stores.items()}
-    return marker, expected
-#endregion
+# endregion
 
 # =========================================================
 # 1. AI TESTS
@@ -219,9 +176,9 @@ def pending_local_changes(tmp_path, make_context):
 # Expected: Validate responses, handle failures and attach
 # AI data before business-rule evaluation.
 # =========================================================
-#region AI Tests
+# region AI Tests
 
-#region AI Response Validation
+# region AI Response Validation
 class TestAIResponseValidator:
     # Test 1 - Verify the complete structure of processed AI output.
     # Expected: Exact top-level fields and ten fields per recommendation.
@@ -334,9 +291,9 @@ class TestAIResponseValidator:
         item = result["Recommendations_List"][0]
         assert item["Estimated_Expiry_Date"] == (CAPTURE_DATE + timedelta(days=365)).isoformat()
         assert item["Expiry_Date_Is_Default"] is True
-#endregion
+# endregion
 
-#region AI Provider
+# region AI Provider
 class TestAIProvider:
     # Test 14 - Prevent direct construction of the abstract provider.
     # Expected: AIProvider cannot be instantiated without implementing its contract.
@@ -383,9 +340,9 @@ class TestAIProvider:
         assert result is None
         assert "Both AI models failed" in error
         assert [call.kwargs["model"] for call in client.chat.completions.create.call_args_list] == ["primary-model", "backup-model"]
-#endregion
+# endregion
 
-#region AI Manager
+# region AI Manager
 class TestAIManager:
     # Test 18 - Process a complete recommendation request using a mock provider.
     # Expected: Original grocery data is preserved and every item receives AI data.
@@ -446,9 +403,9 @@ class TestAIManager:
         assert supplied_data["fridge_stock"] == usable_stock
         notify.assert_called_once()
         assert "expired" in notify.call_args.args[0].lower()
-#endregion
+# endregion
 
-#region AI Pipeline Integration
+# region AI Pipeline Integration
 class TestAIPipelineIntegration:
     # Test 21 - Verify AI consumption estimates influence the final business decision.
     # Expected: The same cart is sufficient at seven litres/week but insufficient at fourteen.
@@ -479,8 +436,8 @@ class TestAIPipelineIntegration:
         assert [finding.analyzer_name for finding in findings] == ["CaloriesSurplus", "RiskOfExpiry", "UnderBuy"]
         assert next(finding.result for finding in findings if finding.analyzer_name == "RiskOfExpiry") is False
         assert next(finding.result for finding in findings if finding.analyzer_name == "UnderBuy") is expected_underbuy
-#endregion
-#endregion
+# endregion
+# endregion
 
 # =========================================================
 # 2. BUSINESS LOGIC TESTS
@@ -488,8 +445,8 @@ class TestAIPipelineIntegration:
 # Expected: Correct totals, calories, expiry, under-buy,
 # confidence scoring and coordinated analysis.
 # =========================================================
-#region Business Logic Tests
-#region Analysis Context
+# region Business Logic Tests
+# region Analysis Context
 class TestAnalysisContext:
     # Test 22 - Combine usable fridge and cart quantities.
     # Expected: Both sources contribute to the total.
@@ -532,9 +489,9 @@ class TestAnalysisContext:
         today = date.today()
         ctx.fridge.add_item(FridgeItem("milk", 2, "l", (today - timedelta(days=2)).isoformat(), (today - timedelta(days=1)).isoformat(), "none"))
         assert ctx.get_total_items("milk") == pytest.approx(3)
-#endregion
+# endregion
 
-#region Calories Surplus
+# region Calories Surplus
 class TestCaloriesSurplusAnalyzer:
     # Test 27 - Verify age categories at their boundaries.
     # Expected: Ages map to the correct calorie-table entries.
@@ -560,9 +517,9 @@ class TestCaloriesSurplusAnalyzer:
         assert finding.analyzer_name == "CaloriesSurplus"
         assert finding.result is expected
         assert "kcal" in finding.message
-#endregion
+# endregion
 
-#region Risk Of Expiry
+# region Risk Of Expiry
 class TestRiskOfExpiryAnalyzer:
     # Test 30 - Evaluate normal and fractional consumption boundaries.
     # Expected: Exact consumption capacity is safe; quantities exceeding it are risky.
@@ -599,9 +556,9 @@ class TestRiskOfExpiryAnalyzer:
         finding = RiskOfExpiryAnalyzer().analyze(item, ctx)
         assert finding.result is True
         assert finding.item_name == item.name
-#endregion
+# endregion
 
-#region Under Buy
+# region Under Buy
 class TestUnderBuyAnalyzer:
     # Test 33 - Apply both calorie and expiry conditions before recommending more stock.
     # Expected: Under-buy is evaluated only when neither blocking condition is true.
@@ -643,9 +600,9 @@ class TestUnderBuyAnalyzer:
         ctx.cart.add_item(rice)
         ctx.update_findings([Finding("CaloriesSurplus", False, "No surplus"), Finding("RiskOfExpiry", True, message, item_name=warning_item)])
         assert UnderBuyAnalyzer().analyze(rice, ctx).result is expected
-#endregion
+# endregion
 
-#region Confidence
+# region Confidence
 class TestConfidenceCalculator:
     # Test 37 - Handle items without consumption history.
     # Expected: Confidence is zero when historical evidence is unavailable.
@@ -696,9 +653,9 @@ class TestConfidenceCalculator:
     # Expected: Consistency is zero instead of a division-by-zero error.
     def test_zero_mean_consistency(self):
         assert ConfidenceMetrics().consistency_score([0.0, 0.0]) == 0.0
-#endregion
+# endregion
 
-#region Logic Integration
+# region Logic Integration
 class TestLogicManagerIntegration:
     # Test 44 - Produce cart-level and item-level findings for multiple items.
     # Expected: One calorie finding per cart and two findings per item.
@@ -723,7 +680,7 @@ class TestLogicManagerIntegration:
         messages = manager.get_recommedations("RiskOfExpiry", True)
 
         if expected_count:
-            expected_message = f"3l of milk --> estimated expiry: {item.ai_data.est_expiry_date}. (avg consumption: 7 l a week)"
+            expected_message = f"3l of milk --> estimated expiry: {item.ai_data.est_expiry_date}. (AI estimated consumption: 7 l a week)"
             assert messages == [expected_message]
         else:
             assert messages == []
@@ -758,8 +715,8 @@ class TestLogicManagerIntegration:
         assert ctx.findings == second
         assert next(f.result for f in second if f.analyzer_name == "RiskOfExpiry") is False
         assert next(f.result for f in second if f.analyzer_name == "UnderBuy") is True
-#endregion
-#endregion
+# endregion
+# endregion
 
 # =========================================================
 # 3. CART RECOMMENDATION TESTS
@@ -767,7 +724,7 @@ class TestLogicManagerIntegration:
 # Expected: Recommend shortages using the current historical
 # shopping-period calculation without changing source data.
 # =========================================================
-#region Cart Recommendation Tests
+# region Cart Recommendation Tests
 class TestCartRecommender:
     # Test 48 - Handle missing history and recorded zero consumption.
     # Expected: Neither situation produces an initial recommendation.
@@ -852,7 +809,7 @@ class TestCartRecommender:
         items = CartRecommender(fridge, history).generate_recommendation().get_items()
         assert len(items) == 1
         assert items[0].quantity == pytest.approx(10.5)
-#endregion
+# endregion
 
 # =========================================================
 # 4. FRIDGE CONSUMPTION TESTS
@@ -860,7 +817,7 @@ class TestCartRecommender:
 # Expected: Correct stock reduction without rounding errors
 # or loops that fail to advance.
 # =========================================================
-#region Fridge Consumption Tests
+# region Fridge Consumption Tests
 class TestFridgeConsumption:
     # Test 55 - Consume the exact quantity across separate decimal batches.
     # Expected: Both batches are removed and a valid consumption record is returned.
@@ -910,206 +867,16 @@ assert fridge.get_item_total("eggs", include_expired=True) == 2
         except subprocess.TimeoutExpired:
             pytest.fail("Fridge.consume() did not advance past an unrelated item.")
         assert result.returncode == 0, result.stderr
-#endregion
+# endregion
 
 # =========================================================
-# 5. PERSISTENCE TESTS
-# Input: Temporary JSON storage and a mocked MongoDB client.
-# Expected: Data survives saves and loads, failures are
-# reported and real user storage remains untouched.
-# =========================================================
-#region Persistence Tests
-#region JSON Repository
-class TestJsonRepository:
-    # Test 58 - Initialize storage when the directory and files are missing.
-    # Expected: Empty stores load without errors and the directory is created.
-    def test_missing_directory_and_files(self, tmp_path):
-        folder = tmp_path / "nested" / "database"
-        errors, stores = JsonRepository(folder=folder).load()
-        assert errors == []
-        assert folder.is_dir()
-        assert set(stores) == {"fridge", "household", "consumption_history"}
-        assert all(store.to_dicts() == [] for store in stores.values())
-
-    # Test 59 - Reload saved data using a fresh repository instance.
-    # Expected: Household, fridge and history records survive a round trip.
-    def test_save_load_round_trip(self, populated_json_repository):
-        repository, folder, expected = populated_json_repository
-        repository.save()
-        errors, loaded = JsonRepository(folder=folder).load()
-        assert errors == []
-        assert {name: store.to_dicts() for name, store in loaded.items()} == expected
-
-    # Test 60 - Report malformed JSON and incorrect top-level structures.
-    # Expected: A damaged file does not prevent the other stores from loading.
-    @pytest.mark.parametrize("content", ["{invalid json}", "{}"])
-    def test_bad_file_does_not_block_other_stores(self, populated_json_repository, content):
-        repository, folder, expected = populated_json_repository
-        repository.save()
-        (folder / "fridge.json").write_text(content, encoding="utf-8")
-
-        errors, stores = JsonRepository(folder=folder).load()
-        assert any("fridge" in error for error in errors)
-        assert stores["fridge"].to_dicts() == []
-        assert stores["household"].to_dicts() == expected["household"]
-        assert stores["consumption_history"].to_dicts() == expected["consumption_history"]
-
-    # Test 61 - Skip invalid rows without discarding valid records.
-    # Expected: The valid fridge record loads and the invalid row produces an error.
-    def test_invalid_row_preserves_valid_rows(self, populated_json_repository):
-        repository, folder, expected = populated_json_repository
-        repository.save()
-        (folder / "fridge.json").write_text(json.dumps(expected["fridge"] + [{}]), encoding="utf-8")
-
-        errors, stores = JsonRepository(folder=folder).load()
-        assert len(errors) == 1
-        assert stores["fridge"].to_dicts() == expected["fridge"]
-
-    # Test 62 - Save valid JSON for empty stores.
-    # Expected: Each storage file contains an empty list.
-    def test_save_empty_stores(self, tmp_path):
-        JsonRepository(folder=tmp_path).save()
-        for name in ("fridge", "household", "consumption_history"):
-            assert json.loads((tmp_path / f"{name}.json").read_text(encoding="utf-8")) == []
-
-    # Test 63 - Preserve the destination file when replacement fails.
-    # Expected: A pending update cannot overwrite the original file after an error.
-    def test_failed_replace_preserves_existing_file(self, populated_json_repository):
-        repository, folder, _ = populated_json_repository
-        repository.save()
-
-        # Make the old destination differ from the populated data about to be saved.
-        destination = folder / "fridge.json"
-        destination.write_text("[]", encoding="utf-8")
-        original = destination.read_bytes()
-
-        with patch("modules.repositories.JsonRepository.os.replace", side_effect=OSError("replacement failed")) as replace:
-            with pytest.raises(OSError, match="replacement failed") as captured:
-                repository.save()
-            print(f"Expected error: {captured.value}")
-            replace.assert_called_once()
-
-        assert destination.read_bytes() == original
-
-    # Test 64 - Respect an explicitly supplied storage directory.
-    # Expected: Changing the working directory does not redirect the selected storage.
-    def test_custom_directory_after_working_directory_change(self, tmp_path, monkeypatch):
-        folder = tmp_path / "chosen_database"
-        elsewhere = tmp_path / "elsewhere"
-        elsewhere.mkdir()
-        monkeypatch.chdir(elsewhere)
-
-        JsonRepository(folder=folder).save()
-        assert (folder / "fridge.json").is_file()
-        assert not (elsewhere / "database").exists()
-        assert not (elsewhere / "app_data").exists()
-#endregion
-
-#region MongoDB Repository
-class TestMongoDBRepository:
-    # Test 65 - Reject missing MongoDB configuration before connecting.
-    # Expected: The missing setting is identified and no client is constructed.
-    @pytest.mark.parametrize("missing_variable", ["MONGODB_URI", "MONGODB_DATABASE"])
-    def test_missing_configuration(self, monkeypatch, missing_variable):
-        monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
-        monkeypatch.setenv("MONGODB_DATABASE", "test_database")
-        monkeypatch.delenv(missing_variable, raising=False)
-
-        with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
-            with pytest.raises(ValueError, match=missing_variable) as captured:
-                MongoDBRepository()
-            print(f"Expected error: {captured.value}")
-            client_class.assert_not_called()
-
-    # Test 66 - Surface connection failures for application-level fallback.
-    # Expected: A failed ping raises an error rather than reporting success.
-    def test_ping_failure_is_reported(self, monkeypatch):
-        monkeypatch.setenv("MONGODB_URI", "mongodb://test.invalid")
-        monkeypatch.setenv("MONGODB_DATABASE", "test_database")
-
-        with patch("modules.repositories.MongoDBRepository.MongoClient") as client_class:
-            client_class.return_value.admin.command.side_effect = OSError("database unavailable")
-            with pytest.raises(OSError, match="database unavailable") as captured:
-                MongoDBRepository()
-            print(f"Expected error: {captured.value}")
-
-    # Test 67 - Convert loaded records into domain objects and report invalid rows.
-    # Expected: Valid data is retained and each collection is queried correctly.
-    def test_load_valid_and_invalid_records(self, mongo_repository, make_context):
-        repository, client, collections = mongo_repository
-        _, ctx = make_context()
-        collections["fridge"].find.return_value = ctx.fridge.to_dicts() + [{}]
-        collections["household"].find.return_value = ctx.household.to_dicts()
-        collections["consumption_history"].find.return_value = ctx.history.to_dicts()
-
-        errors, stores = repository.load()
-        assert len(errors) == 1
-        assert stores["fridge"].to_dicts() == ctx.fridge.to_dicts()
-        assert stores["household"].to_dicts() == ctx.household.to_dicts()
-        assert stores["consumption_history"].to_dicts() == ctx.history.to_dicts()
-        client.admin.command.assert_called_once_with("ping")
-        for collection in collections.values():
-            collection.find.assert_called_once_with({}, {"_id": 0})
-
-    # Test 68 - Save populated domain stores into their matching collections.
-    # Expected: Each collection receives the correct serialized records.
-    def test_save_populated_stores(self, mongo_repository, make_context):
-        repository, _, collections = mongo_repository
-        _, ctx = make_context()
-        _, stores = repository.load()
-        stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
-
-        repository.save()
-        for name, collection in collections.items():
-            collection.delete_many.assert_called_once_with({})
-            collection.insert_many.assert_called_once_with(stores[name].to_dicts())
-
-    # Test 69 - Reflect quantity changes and deletions in saved records.
-    # Expected: Updated quantities are sent and deleted items are not reinserted.
-    def test_updates_and_deletions_are_saved(self, mongo_repository, make_context):
-        repository, _, collections = mongo_repository
-        _, ctx = make_context()
-        _, stores = repository.load()
-        stores["fridge"] = ctx.fridge
-        item = ctx.fridge.get_items()[0]
-
-        item.set_quantity(2)
-        repository.save()
-        assert collections["fridge"].insert_many.call_args.args[0][0]["Quantity"] == 2
-
-        for collection in collections.values():
-            collection.reset_mock()
-        ctx.fridge.remove_item(item)
-        repository.save()
-        collections["fridge"].delete_many.assert_called_once_with({})
-        collections["fridge"].insert_many.assert_not_called()
-
-    # Test 70 - Save empty stores without inserting an empty document list.
-    # Expected: Collections are cleared and insert_many is not called.
-    def test_save_empty_stores(self, mongo_repository):
-        repository, _, collections = mongo_repository
-        repository.save()
-        for collection in collections.values():
-            collection.delete_many.assert_called_once_with({})
-            collection.insert_many.assert_not_called()
-
-    # Test 71 - Release the database client through the repository.
-    # Expected: Closing the repository closes its client.
-    def test_close_client(self, mongo_repository):
-        repository, client, _ = mongo_repository
-        repository.close()
-        client.close.assert_called_once_with()
-#endregion
-#endregion
-
-# =========================================================
-# 6. STORAGE PATH AND LOGGER TESTS
+# 5. STORAGE PATH AND LOGGER TESTS
 # Input: Shared application paths and temporary log files.
 # Expected: Stable storage configuration and preserved logs.
 # =========================================================
-#region Storage Paths And Logging
+# region Storage Paths And Logging
 class TestStoragePathsAndLogger:
-    # Test 72 - Anchor application storage paths to the project directory.
+    # Test 58 - Anchor application storage paths to the project directory.
     # Expected: Changing the working directory does not change the configured paths.
     def test_paths_are_project_relative(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -1119,7 +886,7 @@ class TestStoragePathsAndLogger:
         assert AppPaths.LOGS_DIR == project_root / "app_data" / "logs"
         assert AppPaths.OFFLINE_MARKER == AppPaths.DATABASE_DIR / ".offline_changes"
 
-    # Test 73 - Append log messages without overwriting earlier messages.
+    # Test 59 - Append log messages without overwriting earlier messages.
     # Expected: Both messages remain in the selected temporary log file.
     def test_logger_preserves_messages(self, tmp_path):
         log_dir = tmp_path / "logs"
@@ -1128,198 +895,16 @@ class TestStoragePathsAndLogger:
         logger.send_log("Second message")
         assert log_dir.is_dir()
         assert Path(logger.filename).read_text(encoding="utf-8").splitlines() == ["First message", "Second message"]
-#endregion
+# endregion
 
 # =========================================================
-# 7. APPLICATION STARTUP AND SAVE RECOVERY TESTS
-# Input: Mocked cloud failures, temporary local storage,
-# simulated user choices and an unavailable AI provider.
-# Expected: Safe startup, preserved changes and accurate
-# success/failure reporting without live services.
+# 6. APPLICATION ENTRY POINT TESTS
+# Input: Simulated imports and unavailable dependencies.
+# Expected: Safe imports and clear startup error messages.
 # =========================================================
-#region Application Startup And Save Recovery Tests
-class TestApplicationStartupAndRecovery:
-    # Test 74 - Select local JSON when cloud startup fails.
-    # Expected: Existing local records load and the user is informed of the fallback.
-    def test_cloud_startup_failure_uses_json(self, tmp_path, pending_local_changes):
-        _, expected = pending_local_changes
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        cloud_factory = MagicMock(side_effect=OSError("Cloud unavailable"))
-        manager = DB_manager(ui, database_dir=tmp_path, use_mongo=True, mongo_factory=cloud_factory)
-
-        stores = manager.start()
-
-        cloud_factory.assert_called_once_with()
-        assert manager.is_local is True
-        assert isinstance(manager.repository, JsonRepository)
-        assert {name: store.to_dicts() for name, store in stores.items()} == expected
-        assert manager.offline_marker.exists()
-        assert any("Using local JSON" in call.args[0] for call in ui.send_message.call_args_list)
-        ui.ask_upload_offline_changes.assert_not_called()
-
-    # Test 75 - Save the latest objects locally when a cloud save fails.
-    # Expected: Local data reflects the latest edits and a pending-upload marker is created.
-    def test_cloud_save_failure_preserves_latest_data(self, tmp_path, recovery_cloud):
-        cloud, stores = recovery_cloud
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
-        manager.start()
-
-        # Change data after startup so the test verifies the latest state is saved.
-        stores["fridge"].get_items()[0].set_quantity(4)
-        cloud.save.side_effect = OSError("Connection lost")
-        manager.save()
-
-        errors, local = JsonRepository(folder=tmp_path).load()
-        assert errors == []
-        assert local["fridge"].get_item_total("milk", include_expired=True) == pytest.approx(4)
-        assert local["household"].to_dicts() == stores["household"].to_dicts()
-        assert local["consumption_history"].to_dicts() == stores["consumption_history"].to_dicts()
-        assert manager.offline_marker.exists()
-        assert any("Changes saved locally" in call.args[0] for call in ui.send_message.call_args_list)
-
-    # Test 76 - Report failure when both cloud and local fallback saving fail.
-    # Expected: No success message or new upload marker is produced.
-    def test_local_fallback_failure_is_reported(self, tmp_path, recovery_cloud):
-        cloud, _ = recovery_cloud
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
-        manager.start()
-        ui.reset_mock()
-
-        # Simulate failure of both cloud saving and the local JSON fallback.
-        cloud.save.side_effect = OSError("Cloud save failed")
-        with patch.object(JsonRepository, "save", side_effect=OSError("Disk unavailable")) as local_save:
-            # Verify the application reports that neither destination could save.
-            with pytest.raises(RuntimeError, match="Could not save the local fallback") as captured:
-                manager.save()
-            # Confirm the local fallback was actually attempted.
-            local_save.assert_called_once_with()
-
-        print(f"Expected error: {captured.value}")
-
-        assert not manager.offline_marker.exists()
-        assert not any("Changes saved locally" in call.args[0] for call in ui.send_message.call_args_list)
-
-    # Test 77 - Preserve the marker and local files when offline upload fails.
-    # Expected: Pending changes remain available and startup does not overwrite them.
-    def test_failed_offline_upload_preserves_pending_changes(self, tmp_path, recovery_cloud, pending_local_changes):
-        cloud, cloud_stores = recovery_cloud
-        marker, expected_local = pending_local_changes
-        original_cloud_fridge = cloud_stores["fridge"]
-        original_files = {name: (tmp_path / f"{name}.json").read_bytes() for name in expected_local}
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        ui.ask_upload_offline_changes.return_value = True
-        cloud.save.side_effect = OSError("Upload interrupted")
-        manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
-
-        with pytest.raises(RuntimeError, match="Offline upload failed") as captured:
-            manager.start()
-        print(f"Expected error: {captured.value}")
-
-        assert marker.exists()
-        assert cloud_stores["fridge"] is original_cloud_fridge
-        for name, content in original_files.items():
-            assert (tmp_path / f"{name}.json").read_bytes() == content
-        assert not any("Offline changes uploaded" in call.args[0] for call in ui.send_message.call_args_list)
-
-    # Test 78 - Remove the pending marker only after a successful upload.
-    # Expected: The cloud repository receives local data while the marker still exists.
-    def test_successful_offline_upload_removes_marker_after_save(self, tmp_path, recovery_cloud, pending_local_changes):
-        cloud, cloud_stores = recovery_cloud
-        marker, expected_local = pending_local_changes
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        ui.ask_upload_offline_changes.return_value = True
-
-        # Inspect the state at the exact moment cloud saving is attempted.
-        def verify_upload():
-            assert marker.exists()
-            assert {name: store.to_dicts() for name, store in cloud_stores.items()} == expected_local
-
-        cloud.save.side_effect = verify_upload
-        manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
-        manager.start()
-
-        cloud.save.assert_called_once_with()
-        assert not marker.exists()
-        assert any("Offline changes uploaded" in call.args[0] for call in ui.send_message.call_args_list)
-
-    # Test 79 - Prevent incomplete pending data from replacing cloud records.
-    # Expected: Missing local files stop the upload and preserve the marker.
-    def test_missing_pending_file_stops_upload(self, tmp_path, recovery_cloud, pending_local_changes):
-        cloud, _ = recovery_cloud
-        marker, _ = pending_local_changes
-        (tmp_path / "household.json").unlink()
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        ui.ask_upload_offline_changes.return_value = True
-        manager = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: cloud)
-
-        with pytest.raises(RuntimeError, match="local database file is missing") as captured:
-            manager.start()
-        print(f"Expected error: {captured.value}")
-
-        cloud.save.assert_not_called()
-        assert marker.exists()
-
-    # Test 80 - Save completed consumption edits when AI generation fails.
-    # Expected: Consumption is persisted without checking out the planned cart.
-    def test_ai_failure_saves_edits_without_checkout(self, tmp_path, make_context):
-        _, ctx = make_context(fridge_quantity=2, history_quantities=())
-        repository = JsonRepository(folder=tmp_path)
-        _, stores = repository.load()
-        stores.update({"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history})
-        repository.save()
-
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        ui.ask_main_menu_choice.return_value = "1"
-        ui.ask_last_use_days.return_value = 7
-        ui.get_consumption_remarks.return_value = "none"
-        ui.ask_days_until_next.return_value = 7
-        ui.ask_use_recommended_cart.return_value = False
-        ui.get_cart_remarks.return_value = "none"
-
-        # Simulate a real consumption update through the existing domain methods.
-        def record_consumption(fridge, history, days, remarks):
-            history.add_record(fridge.consume("milk", 1, "l", days, remarks))
-
-        ui.get_consumption.side_effect = record_consumption
-
-        # Simulate a planned purchase that must not enter the fridge after AI failure.
-        def enter_cart(cart, fridge, history):
-            cart.add_item(CartItem("milk", 3, "l"))
-
-        ui.enter_grocery_list.side_effect = enter_cart
-        ai_manager = MagicMock()
-        ai_manager.get_ai_recommendations.return_value = (None, "AI unavailable")
-        logic_manager = MagicMock()
-        data_manager = DB_manager(ui, database_dir=tmp_path, use_mongo=False)
-        application = Application(ui=ui, data_manager=data_manager, ai_manager=ai_manager, logic_manager=logic_manager)
-
-        with patch.object(Cart, "checkout") as checkout:
-            with pytest.raises(RuntimeError, match="AI recommendation failed: AI unavailable") as captured:
-                application.run()
-            print(f"Expected error: {captured.value}")
-            checkout.assert_not_called()
-
-        errors, saved = JsonRepository(folder=tmp_path).load()
-        assert errors == []
-        assert saved["fridge"].get_item_total("milk", include_expired=True) == pytest.approx(1)
-        records = saved["consumption_history"].to_dicts()
-        assert len(records) == 1
-        assert records[0]["Quantity"] == 1
-        assert data_manager.offline_marker.exists()
-        logic_manager.process_recommendations.assert_not_called()
-        ui.shopping_cart_conclusion.assert_not_called()
-        ui.show_exit.assert_not_called()
-
-    # Test 81 - Import the entry point without starting the interactive workflow.
+# region Application Entry Point Tests
+class TestApplicationEntryPoint:
+    # Test 60 - Import the entry point without starting the interactive workflow.
     # Expected: Import-style execution does not run the application or request input.
     def test_main_import_does_not_start_application(self):
         with patch("Application.Application") as application_class:
@@ -1329,28 +914,7 @@ class TestApplicationStartupAndRecovery:
         application_class.assert_not_called()
         user_input.assert_not_called()
 
-    # Test 82 - Start and exit through the returning-user menu.
-    # Expected: The application loads data, saves on exit and does not request AI output.
-    def test_startup_and_save_exit(self, make_context):
-        _, ctx = make_context()
-        ui = MagicMock()
-        ui.send_message.side_effect = print
-        ui.ask_main_menu_choice.return_value = "3"
-        data_manager = MagicMock()
-        data_manager.start.return_value = {"fridge": ctx.fridge, "household": ctx.household, "consumption_history": ctx.history}
-        ai_manager = MagicMock()
-        application = Application(ui=ui, data_manager=data_manager, ai_manager=ai_manager, logic_manager=MagicMock())
-
-        application.run()
-
-        data_manager.start.assert_called_once_with()
-        ui.show_welcome.assert_called_once_with()
-        ui.show_welcome_back.assert_called_once_with(ctx.household)
-        data_manager.save.assert_called_once_with()
-        ui.show_exit.assert_called_once_with()
-        ai_manager.get_ai_recommendations.assert_not_called()
-
-    # Test 83 - Simulate a missing dependency during application startup.
+    # Test 61 - Simulate a missing dependency during application startup.
     # Expected: Display a useful error and exit without starting the application.
     def test_startup_reports_missing_module(self):
         original_import = __import__
@@ -1372,7 +936,7 @@ class TestApplicationStartupAndRecovery:
         assert "python_dependencies.txt" in message
         print(f"\nSimulated missing AI dependency:\n{message}")
 
-    # Test 84 - Simulate an unavailable AIManager class during application startup.
+    # Test 62 - Simulate an unavailable AIManager class during application startup.
     # Expected: Report the AI import problem and exit without starting the workflow.
     def test_startup_reports_invalid_import(self):
         original_import = __import__
@@ -1394,4 +958,517 @@ class TestApplicationStartupAndRecovery:
         assert "cannot import name 'AIManager'" in message
         assert "modules.ai.AI_manager" in message
         print(f"\nSimulated AI module import failure:\n{message}")
-#endregion
+# endregion
+# =========================================================
+# 7. HOUSEHOLD PERSISTENCE, SYNC AND CONFLICT RECOVERY
+# Temporary device storage and a versioned cloud double keep
+# these tests independent of Atlas and real household data.
+# =========================================================
+@pytest.fixture
+def household_environment(tmp_path):
+    documents = {}
+    repository = MagicMock(spec=RepositoryFunctions)
+
+    def create(document):
+        assert document['_id'] not in documents
+        documents[document['_id']] = copy.deepcopy(document)
+        return copy.deepcopy(document)
+
+    def load(household_id):
+        return copy.deepcopy(documents[household_id])
+
+    def save(document, version):
+        current = documents[document['_id']]
+        if current['version'] != version:
+            raise SaveConflict('Cloud data changed')
+        saved = copy.deepcopy(document)
+        saved['version'] = version + 1
+        documents[saved['_id']] = saved
+        return copy.deepcopy(saved)
+
+    repository.create.side_effect = create
+    repository.load.side_effect = load
+    repository.save.side_effect = save
+    ui = MagicMock(spec=IO_manager)
+    data = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: repository)
+    data.create_household('Test Space')
+    data.remember(data.base)
+    repository.reset_mock()
+    ui.reset_mock()
+    return data, repository, ui, documents
+
+# Use actual domain objects so persistence tests exercise serialization as well as saves.
+def add_test_food(data):
+    today = date.today()
+    data.stores['fridge'].add_item(FridgeItem('Milk', 2, 'l', today.isoformat(),
+        (today + timedelta(days=7)).isoformat(), 'none'))
+    data.stores['consumption_history'].add_record(ConsumptionRecord('Milk', 1, 'l', 7, 'none'))
+
+class TestHouseholdPersistence:
+    # Test 63 - Create a Household Space and save without edits.
+    # Expected: The cloud matches local data; no extra write or pending draft is created.
+    def test_create_and_unchanged_save(self, household_environment):
+        data, repo, ui, documents = household_environment
+        assert data.base == documents[data.base['_id']]
+        assert data.save() == 'unchanged'
+        repo.save.assert_not_called()
+        repo.create.assert_not_called()
+        assert data.read_cache()['pending'] is None
+
+    # Test 64 - Save food data and reopen the Household Space.
+    # Expected: The version increases and fridge and history records survive reopening.
+    def test_save_and_reopen_round_trip(self, household_environment):
+        data, repo, ui, documents = household_environment
+        add_test_food(data)
+        original_version = data.base['version']
+        assert data.save() == 'saved'
+        assert data.base['version'] == original_version + 1
+        fresh = DB_manager(ui, database_dir=data.database_dir, mongo_factory=lambda: repo)
+        fresh.open_household(data.base['_id'])
+        assert fresh.stores['fridge'].to_dicts() == data.stores['fridge'].to_dicts()
+        assert fresh.stores['consumption_history'].to_dicts() == data.stores['consumption_history'].to_dicts()
+        assert fresh.read_cache()['pending'] is None
+
+    # Test 65 - Restart with pending offline edits and reconnect.
+    # Expected: The draft survives restart and syncs without losing fridge data.
+    def test_offline_draft_survives_restart_and_sync(self, household_environment):
+        data, repo, ui, documents = household_environment
+        add_test_food(data)
+        data.use_mongo = False
+        assert data.save() == 'offline'
+        pending = data.read_cache()['pending']
+        fresh = DB_manager(ui, database_dir=data.database_dir, mongo_factory=lambda: repo)
+        fresh.open_household(data.base['_id'])
+        assert fresh.read_cache()['pending'] == pending
+        assert fresh.save() == 'saved'
+        assert documents[data.base['_id']]['fridge'] == pending['fridge']
+        assert fresh.read_cache()['pending'] is None
+
+    # Test 66 - Create offline and register when cloud access returns.
+    # Expected: Registration succeeds and pending and unregistered states are cleared.
+    def test_offline_creation_registers_on_sync(self, tmp_path):
+        repo = MagicMock(spec=RepositoryFunctions)
+        repo.create.side_effect = copy.deepcopy
+        data = DB_manager(MagicMock(), database_dir=tmp_path, use_mongo=False, mongo_factory=lambda: repo)
+        data.create_household('Offline Space')
+        assert data.read_cache()['state']['unregistered'] is True
+        repo.create.assert_not_called()
+        data.use_mongo = True
+        assert data.save() == 'saved'
+        repo.create.assert_called_once()
+        assert data.read_cache()['pending'] is None
+        assert data.read_cache()['state']['unregistered'] is False
+
+    # Test 67 - Sync an offline Household Space whose ID already exists in the cloud.
+    # Expected: A new ID preserves local data and remembered access without overwriting the existing cloud record.
+    def test_offline_id_collision_preserves_local_and_cloud_data(self, tmp_path):
+        from pymongo.errors import DuplicateKeyError
+
+        old_id = 'HS-AAAA-BBBB-CCCC'
+        new_id = 'HS-DDDD-EEEE-FFFF'
+        existing = Doc.new('Existing Cloud Space')
+        existing['_id'] = old_id
+        existing['created_at'] = '2025-01-01T00:00:00.000Z'
+        cloud_documents = {old_id: Doc.to_cloud(existing)}
+        original_cloud = copy.deepcopy(cloud_documents[old_id])
+        insert_ids = []
+        collection = MagicMock()
+
+        # Enforce MongoDB uniqueness and version checks in an isolated collection double.
+        def insert(document):
+            insert_ids.append(document['_id'])
+            if document['_id'] in cloud_documents:
+                raise DuplicateKeyError('Duplicate household ID')
+            cloud_documents[document['_id']] = copy.deepcopy(document)
+
+        def update(query, changes, **kwargs):
+            current = cloud_documents[query['_id']]
+            assert current['version'] == query['version']
+            assert kwargs['upsert'] is False
+            current.update(copy.deepcopy(changes['$set']))
+            current['version'] += changes['$inc']['version']
+            return copy.deepcopy(current)
+
+        collection.insert_one.side_effect = insert
+        collection.find_one.side_effect = lambda query: copy.deepcopy(cloud_documents.get(query['_id']))
+        collection.find_one_and_update.side_effect = update
+        repository = MongoDBRepository(collection=collection)
+        ui = MagicMock(spec=IO_manager)
+        data = DB_manager(ui, database_dir=tmp_path, use_mongo=False, mongo_factory=lambda: repository)
+        with patch.object(Doc, 'generate_id', return_value=old_id):
+            data.create_household('Offline Space')
+        data.stores['household'].add_member(Person(1, 'Zi', 22, 'Male', 'none'))
+        add_test_food(data)
+        data.remember(data.base)
+        assert data.save() == 'offline'
+        draft = copy.deepcopy(data.read_cache()['pending'])
+        collection.insert_one.assert_not_called()
+
+        # Restart with the saved offline draft, then reconnect and collide on registration.
+        fresh = DB_manager(ui, database_dir=tmp_path, mongo_factory=lambda: repository)
+        fresh.open_household(old_id)
+        with patch.object(Doc, 'generate_id', return_value=new_id) as generate_id:
+            assert fresh.save() == 'saved'
+        generate_id.assert_called_once()
+        assert insert_ids == [old_id, new_id]
+        assert cloud_documents[old_id] == original_cloud
+        assert set(cloud_documents) == {old_id, new_id}
+        assert Doc.editable(Doc.from_cloud(cloud_documents[new_id])) == Doc.editable(draft)
+        assert Doc.editable(fresh.base) == Doc.editable(draft)
+        assert fresh.base['_id'] == new_id
+        assert fresh.stores['household'].household_id == new_id
+        assert fresh.read_preferences()['last_household_id'] == new_id
+        cache = fresh.read_cache()
+        assert cache['snapshot'] == fresh.base
+        assert cache['pending'] is None
+        assert cache['state']['unregistered'] is False
+        assert collection.find_one_and_update.call_args.args[0]['_id'] == new_id
+        ui.send_message.assert_any_call(f'Household ID collision: your new ID is {new_id}.')
+
+    # Test 68 - Switch to a different Household Space.
+    # Expected: Only the selected ID is loaded and the previous cloud record is unchanged.
+    def test_switch_loads_only_selected_household(self, household_environment):
+        data, repo, ui, documents = household_environment
+        old = copy.deepcopy(data.base)
+        other = Doc.new('Other Space')
+        documents[other['_id']] = other
+        data.open_household(other['_id'])
+        repo.load.assert_called_once_with(other['_id'])
+        assert data.read_cache()['snapshot']['_id'] == other['_id']
+        assert documents[old['_id']] == old
+
+    # Test 69 - Select another space while the current space has pending edits.
+    # Expected: Switching is blocked and subsequent saving updates only the draft owner.
+    def test_pending_draft_cannot_be_saved_to_another_household(self, household_environment):
+        data, repo, ui, documents = household_environment
+        owner = data.base['_id']
+        add_test_food(data)
+        data.use_mongo = False
+        data.save()
+        pending = data.read_cache()['pending']
+        other = Doc.new('Other Space')
+        documents[other['_id']] = copy.deepcopy(other)
+        data.remember(other)
+        with pytest.raises(SaveConflict):
+            data.open_household(other['_id'])
+        data.use_mongo = True
+        assert data.save() == 'saved'
+        assert documents[owner]['fridge'] == pending['fridge']
+        assert documents[other['_id']] == other
+
+    # Test 70 - Save from a stale session after another session updates the cache.
+    # Expected: LocalConflict prevents the stale session from overwriting cloud data.
+    def test_stale_device_session_cannot_overwrite_cache(self, household_environment):
+        data, repo, ui, documents = household_environment
+        fresh = DB_manager(ui, database_dir=data.database_dir, mongo_factory=lambda: repo)
+        fresh.open_household(data.base['_id'])
+        add_test_food(data)
+        data.save()
+        add_test_food(fresh)
+        before = copy.deepcopy(documents)
+        with pytest.raises(LocalConflict):
+            fresh.save()
+        assert documents == before
+
+    # Test 71 - Attempt a MongoDB save with an unmatched version.
+    # Expected: The update filters by ID and version, disables upsert and raises SaveConflict.
+    def test_mongodb_update_is_atomic_and_scoped(self):
+        document = Doc.new('Atomic Save')
+        collection = MagicMock()
+        collection.find_one_and_update.return_value = None
+        repository = MongoDBRepository(collection=collection)
+        with pytest.raises(SaveConflict):
+            repository.save(document, document['version'])
+        args, kwargs = collection.find_one_and_update.call_args
+        assert args[0] == {'_id': document['_id'], 'version': document['version']}
+        assert args[1]['$inc'] == {'version': 1}
+        assert kwargs['upsert'] is False
+
+class TestHouseholdConflictRecovery:
+    # Create a real stale draft with different food contents on each side.
+    @staticmethod
+    def prepare(environment):
+        data, repo, ui, documents = environment
+        add_test_food(data)
+        cloud = documents[data.base['_id']]
+        cloud['version'] += 1
+        cloud['name'] = 'Cloud Display Name'
+        with pytest.raises(SaveConflict):
+            data.save()
+        return copy.deepcopy(cloud), copy.deepcopy(data.read_cache()['pending'])
+
+    # Test 72 - Resolve a conflict using local or cloud data.
+    # Expected: The selected contents are applied safely; the table appears only on explicit review.
+    @pytest.mark.parametrize('source', ['local', 'cloud'])
+    def test_replacement_contents_and_no_automatic_table(self, household_environment, source):
+        data, repo, ui, documents = household_environment
+        cloud, draft = self.prepare(household_environment)
+        repo.reset_mock()
+        ui.reset_mock()
+        ui.confirm_food_replacement.return_value = True
+        assert data.session().resolve_food_conflict(source)
+        ui.show_conflict_review.assert_not_called()
+        ui.show_exit.assert_not_called()
+        assert data.read_cache()['pending'] is None
+        if source == 'local':
+            assert data.base['fridge'] == draft['fridge']
+            assert data.base['consumption_history'] == draft['consumption_history']
+            assert data.base['name'] == cloud['name']
+            assert data.base['version'] == cloud['version'] + 1
+            assert documents[cloud['_id']] == data.base
+        else:
+            assert data.base == cloud
+            assert documents[cloud['_id']] == cloud
+            repo.save.assert_not_called()
+        data.session().review()
+        ui.show_conflict_review.assert_called_once()
+
+    # Test 73 - Cancel confirmation of cloud replacement.
+    # Expected: The pending draft and cloud contents remain unchanged.
+    def test_cancel_preserves_draft(self, household_environment):
+        data, repo, ui, documents = household_environment
+        cloud, draft = self.prepare(household_environment)
+        ui.confirm_food_replacement.return_value = False
+        assert data.session().resolve_food_conflict('cloud') is False
+        assert data.read_cache()['pending'] == draft
+        assert documents[cloud['_id']] == cloud
+
+    # Test 74 - Change the cloud version during replacement confirmation.
+    # Expected: Both replacement choices reject the stale proposal and preserve food data.
+    @pytest.mark.parametrize('source', ['local', 'cloud'])
+    def test_concurrent_cloud_write_during_confirmation_is_rejected(self, household_environment, source):
+        data, repo, ui, documents = household_environment
+        cloud, draft = self.prepare(household_environment)
+        def confirm(*args):
+            documents[cloud['_id']]['version'] += 1
+            return True
+        ui.confirm_food_replacement.side_effect = confirm
+        ui.reset_mock()
+        with pytest.raises(SaveConflict):
+            data.session().resolve_food_conflict(source)
+        assert documents[cloud['_id']]['fridge'] == cloud['fridge']
+        assert data.read_cache()['pending']['fridge'] == draft['fridge']
+        ui.send_message.assert_not_called()
+
+    # Test 75 - Choose cloud data through save recovery.
+    # Expected: The session returns CLOUD_ADOPTED rather than treating the local draft as saved.
+    def test_cloud_selection_returns_distinct_outcome(self, household_environment):
+        data, repo, ui, documents = household_environment
+        self.prepare(household_environment)
+        ui.ask_save_recovery.return_value = 'cloud'
+        ui.confirm_food_replacement.return_value = True
+        assert data.session().save_outcome() == SaveOutcome.CLOUD_ADOPTED
+
+    # Test 76 - Display the conflict comparison.
+    # Expected: Only the fridge table appears, with no consumption history or separator rules.
+    def test_review_shows_only_fridge(self, household_environment, capsys):
+        data, repo, ui, documents = household_environment
+        cloud, draft = self.prepare(household_environment)
+        IO_manager().show_conflict_review(data.base, draft, cloud)
+        output = capsys.readouterr().out
+        assert output.startswith('\nFridge Data Differences\n')
+        assert 'Milk' in output and 'Your amount' in output and 'Cloud expiry' in output
+        assert 'Consumption History' not in output and '----+' not in output
+
+# =========================================================
+# 8. HOUSEHOLD SPACE NAVIGATION AND RECOVERY PROMPTS
+# =========================================================
+class TestHouseholdSpaceNavigation:
+    # Test 77 - Select each Household Space access option.
+    # Expected: Numbered choices map to enter, create and exit actions.
+    @pytest.mark.parametrize('answer,action', [('1', 'enter'), ('2', 'create'), ('3', 'exit')])
+    def test_access_menu(self, answer, action, capsys):
+        with patch('builtins.input', return_value=answer):
+            assert IO_manager().ask_household_access() == action
+        output = capsys.readouterr().out
+        assert '1. Enter Household Space ID' in output
+        assert '2. Create Household Space' in output
+        assert '3. Exit the program' in output
+
+    # Test 78 - Choose Back while switching Household Spaces.
+    # Expected: The selection menu reappears without loading or activating a space.
+    def test_back_returns_to_selection_without_login(self, household_environment, capsys):
+        data, repo, ui, documents = household_environment
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir, mongo_factory=lambda: repo)
+        with patch('builtins.input', side_effect=['2', '3', '4']):
+            assert fresh.session().start() is None
+        repo.load.assert_not_called()
+        assert fresh.base is None
+        assert capsys.readouterr().out.count('Continue with Test Space') == 2
+
+    # Test 79 - Enter a valid Household Space ID.
+    # Expected: The ID is remembered automatically without a remember prompt.
+    def test_enter_remembers_without_prompt(self, household_environment, capsys):
+        data, repo, ui, documents = household_environment
+        data.remember()
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir, mongo_factory=lambda: repo)
+        with patch('builtins.input', side_effect=['1', data.base['_id']]):
+            fresh.session().start()
+        assert fresh.read_preferences()['last_household_id'] == data.base['_id']
+        assert 'Remember this' not in capsys.readouterr().out
+
+    # Test 80 - Forget a space with pending food edits while online.
+    # Expected: Edits sync and remembered access clears while cache and cloud data remain.
+    def test_forget_syncs_then_keeps_cache_and_cloud(self, household_environment):
+        data, repo, ui, documents = household_environment
+        add_test_food(data)
+        household_id = data.base['_id']
+        assert data.session().forget_household() is True
+        assert not data.read_preferences()
+        assert data.base is None
+        assert data.read_cache()['snapshot']['_id'] == household_id
+        assert data.read_cache()['pending'] is None
+        assert documents[household_id]['fridge']
+
+    # Test 81 - Attempt to forget a space with offline edits.
+    # Expected: Forgetting is refused and remembered access and pending data remain.
+    def test_forget_does_not_drop_offline_edits(self, household_environment):
+        data, repo, ui, documents = household_environment
+        add_test_food(data)
+        data.use_mongo = False
+        assert data.session().forget_household() is False
+        assert data.read_preferences()
+        assert data.read_cache()['pending'] is not None
+
+    # Test 82 - Continue a saved space and exit without food edits.
+    # Expected: The welcome appears, the farewell appears once and no cloud update occurs.
+    def test_application_save_exit_farewell(self, household_environment, capsys):
+        data, repo, ui, documents = household_environment
+        data.stores['household'].add_member(Person(1, 'Zi', 22, 'Male', 'none'))
+        data.save()
+        actual_ui = IO_manager()
+        fresh = DB_manager(actual_ui, database_dir=data.database_dir, mongo_factory=lambda: repo)
+        repo.reset_mock()
+        with patch('builtins.input', side_effect=['1', '3']):
+            Application(actual_ui, fresh, MagicMock(), MagicMock()).run()
+        output = capsys.readouterr().out
+        assert f'\nWelcome back, Test Space!\nHousehold Space ID: {data.base["_id"]}' in output
+        assert 'Welcome back, Zi!' not in output
+        assert output.count('Thank you for using QuantiFresh!') == 1
+        repo.save.assert_not_called()
+
+    # Test 83 - Enter removed recovery options before a valid choice.
+    # Expected: Invalid choices are rejected and only supported recovery actions are displayed.
+    def test_recovery_menu_rejects_removed_choices(self, capsys):
+        with patch('builtins.input', side_effect=['4', '5', 'retry', 'keep', '1']):
+            assert IO_manager().ask_save_recovery() == 'review'
+        output = capsys.readouterr().out
+        assert 'How would you like to resolve the data conflict?' in output
+        assert 'Retry save' not in output and 'Keep editing' not in output
+
+    # Test 84 - Request confirmation for local and cloud replacements.
+    # Expected: Each choice displays its exact replacement and data-loss prompt.
+    @pytest.mark.parametrize('source,prompt', [
+        ('local', 'Replace cloud data with your local data?\nCloud data will be replaced. (yes/no): '),
+        ('cloud', 'Replace your local data with the latest cloud data?\nLocal data will be replaced. (yes/no): '),
+    ])
+    def test_confirmation_wording(self, source, prompt):
+        with patch('builtins.input', return_value='yes') as input_mock:
+            assert IO_manager().confirm_food_replacement(source, 11)
+        input_mock.assert_called_once_with(prompt)
+
+# Exercise real repository construction failures without accessing Atlas or changing network settings.
+@pytest.fixture
+def unavailable_mongo_dns(monkeypatch):
+    from dns.exception import Timeout
+    from pymongo.errors import ConfigurationError
+
+    monkeypatch.setenv('MONGODB_URI', 'mongodb+srv://offline.example.test/')
+    monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+
+    def fail_lookup(*args, **kwargs):
+        try:
+            raise Timeout('DNS lookup timed out')
+        except Timeout as error:
+            raise ConfigurationError('DNS lookup timed out') from error
+
+    with patch('modules.repositories.MongoDBRepository.MongoClient', side_effect=fail_lookup) as client:
+        yield client
+
+
+class TestOfflineConnectionStartup:
+    # Test 85 - Continue a remembered space when MongoDB DNS lookup fails.
+    # Expected: Cached data opens locally without mutation or an unhandled exception.
+    def test_continue_cached_space_after_dns_failure(self, household_environment, unavailable_mongo_dns, capsys):
+        data, repo, ui, documents = household_environment
+        before = data.read_cache()
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir)
+        with patch('builtins.input', return_value='1'):
+            assert fresh.session().start() is not None
+        assert fresh.is_local
+        assert fresh.base['_id'] == data.base['_id']
+        assert fresh.read_cache() == before
+        assert 'Opening only this household' in capsys.readouterr().out
+        unavailable_mongo_dns.assert_called_once()
+
+    # Test 86 - Create a Household Space during a MongoDB DNS failure.
+    # Expected: The space is remembered locally with pending registration and an offline message.
+    def test_create_space_keeps_pending_registration(self, tmp_path, unavailable_mongo_dns, capsys):
+        data = DB_manager(IO_manager(), database_dir=tmp_path)
+        with patch('builtins.input', side_effect=['2', 'Offline Space']):
+            assert data.session().start() is not None
+        bundle = data.read_cache()
+        assert bundle['state']['unregistered']
+        assert bundle['pending']['name'] == 'Offline Space'
+        assert data.read_preferences()['last_household_id'] == bundle['snapshot']['_id']
+        assert data.is_local
+        assert 'saved on this device' in capsys.readouterr().out
+        unavailable_mongo_dns.assert_called_once()
+
+    # Test 87 - Enter an uncached ID while MongoDB DNS is unavailable.
+    # Expected: The menu reappears with an offline explanation and no space is activated or remembered.
+    def test_enter_uncached_id_returns_to_menu(self, tmp_path, unavailable_mongo_dns, capsys):
+        data = DB_manager(IO_manager(), database_dir=tmp_path)
+        with patch('builtins.input', side_effect=['1', 'HS-ABCD-EFGH-JKLM', '3']):
+            assert data.session().start() is None
+        assert data.base is None
+        assert data.read_cache()['snapshot'] is None
+        assert not data.read_preferences()
+        output = capsys.readouterr().out
+        assert 'Cannot switch offline' in output
+        assert output.count('1. Enter Household Space ID') == 2
+        unavailable_mongo_dns.assert_called_once()
+
+    # Test 88 - Enter the cached ID after forgetting remembered access while offline.
+    # Expected: The existing local space opens with its data preserved.
+    def test_enter_cached_id_opens_local_data(self, household_environment, unavailable_mongo_dns):
+        data, repo, ui, documents = household_environment
+        data.remember()
+        fresh = DB_manager(IO_manager(), database_dir=data.database_dir)
+        with patch('builtins.input', side_effect=['1', data.base['_id']]):
+            assert fresh.session().start() is not None
+        assert fresh.is_local
+        assert fresh.base == data.base
+        unavailable_mongo_dns.assert_called_once()
+
+    # Test 89 - Construct the repository with invalid connection settings.
+    # Expected: CloudOperationError reports invalid configuration instead of ordinary offline status.
+    def test_invalid_configuration_is_not_reported_as_offline(self, monkeypatch):
+        from pymongo.errors import ConfigurationError
+        from modules.repositories.StorageErrors import CloudOperationError
+
+        monkeypatch.setenv('MONGODB_URI', 'invalid-uri')
+        monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+        with patch('modules.repositories.MongoDBRepository.MongoClient', side_effect=ConfigurationError('Invalid URI')):
+            with pytest.raises(CloudOperationError, match='configuration is invalid'):
+                MongoDBRepository()
+
+    # Test 90 - Fail the connection during client construction or ping.
+    # Expected: CloudUnavailable is raised and an existing client is closed safely.
+    @pytest.mark.parametrize('during_construction', [True, False])
+    def test_connection_failure_at_construction_or_ping(self, monkeypatch, during_construction):
+        from pymongo.errors import ConnectionFailure
+        from modules.repositories.StorageErrors import CloudUnavailable
+
+        monkeypatch.setenv('MONGODB_URI', 'mongodb://offline.example.test/')
+        monkeypatch.setenv('MONGODB_DATABASE', 'OfflineTest')
+        with patch('modules.repositories.MongoDBRepository.MongoClient') as factory:
+            client = factory.return_value
+            if during_construction:
+                factory.side_effect = ConnectionFailure('Offline')
+            else:
+                client.admin.command.side_effect = ConnectionFailure('Offline')
+            with pytest.raises(CloudUnavailable):
+                MongoDBRepository()
+            if not during_construction:
+                client.close.assert_called_once()

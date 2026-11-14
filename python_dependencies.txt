@@ -3,3 +3,6 @@ requests
 python-dotenv
 pytest
 pymongo
+# Protect local household saves and switches across processes.
+# Pin the tested patched release for CVE-2026-112940; keep both manifests aligned.
+filelock==4.2.10

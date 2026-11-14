@@ -5,4 +5,4 @@ from .OpenRouterProvider import OpenRouterProvider
 from .MockAIProvider import MockAIProvider
 from .PromptBuilder import PromptBuilder
 from .AIResponseValidator import AIResponseValidator
-from .AI_manager import AIManager, get_ai_recommendations
+from .AI_manager import AIManager

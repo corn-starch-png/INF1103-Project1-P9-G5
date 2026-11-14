@@ -1,5 +1,4 @@
 from typing import Callable
-
 from dotenv import load_dotenv
 from datetime import date, timedelta
 from dotenv import load_dotenv
@@ -14,13 +13,7 @@ from modules.core.Fridge import Fridge
 from modules.core.Cart import Cart
 from modules.core.AIRecData import AIRecData
 
-#region AI Recommendation Entry Point
-def get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next):
-    manager = AIManager(OpenRouterProvider())
-    return manager.get_ai_recommendations(household_info, consumption_history, fridge_stock, purchase_stock, remarks, days_until_next)
-#endregion
-
-#region AI Manager
+# region AI Manager
 class AIManager:
     def __init__(self, provider: AIProvider) -> None:
         self._provider = provider

@@ -23,7 +23,7 @@ class ConfidenceMetrics:
         return 1 / (1 + cv)
     
     def agreement_score(self, normalized_consumption, recAmt, fridgeAmt, days_until_next_visit):
-        #calculate recommeneded quantity based on past data
+        # calculate recommeneded quantity based on past data
         self_avg_consumption_rate = sum(normalized_consumption)/len(normalized_consumption)
         algorithm_quantity = round((self_avg_consumption_rate * days_until_next_visit) - fridgeAmt, 2)
         if algorithm_quantity < 0: # no negative recommendations
@@ -34,7 +34,7 @@ class ConfidenceMetrics:
         if algorithm_quantity == 0 and ai_quantity == 0:
             return 1.0
 
-        #compare AI and own calculation values
+        # compare AI and own calculation values
         largest_quantity = max(algorithm_quantity, ai_quantity)
         difference = abs(algorithm_quantity - ai_quantity)
         
