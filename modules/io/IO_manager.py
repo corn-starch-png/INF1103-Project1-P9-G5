@@ -213,7 +213,7 @@ class IO_manager:
     # Tell the user there are no recommended items, before the normal grocery list.
     def show_no_recommendations(self):
         print("\nNo items to recommend right now. There may not be enough recent consumption history,"
-              "\nor you still have enough in your fridge of the items you usually use.")
+              "\nor you still have enough items in your fridge.")
 
     # Collect the groceries the user plans to buy, until they say they are done.
     def enter_grocery_list(self, cart: Cart, fridge: Fridge, history: ConsumptionHistory) -> None:
