@@ -32,7 +32,7 @@ Relevant directory changes has to be reflected in both docker-compose.ci.yml AND
 If you really need to, Modify docker_input.txt AND docker-smooke-test.sh together.
 The bash script is expecting a specific output from the docker output or else the specific smoke test job WILL fail 
 
-Check *.github\scripts\docker-smoke-test.sh* if you wish to see what i am greepping
+Check *.github\scripts\docker-smoke-test.sh* if you wish to see what i am grepping
 
 ***
 
