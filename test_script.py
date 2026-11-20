@@ -1472,3 +1472,28 @@ class TestOfflineConnectionStartup:
                 MongoDBRepository()
             if not during_construction:
                 client.close.assert_called_once()
+
+class TestFirstConsumption:
+    # Empty history must not prevent recording the first consumption.
+    # Expected: One history record is created and fridge stock is reduced.
+    def test_empty_history_allows_first_consumption(self):
+        fridge = Fridge()
+        history = ConsumptionHistory()
+        today = date.today()
+
+        fridge.add_item(FridgeItem( "milk", 2, "l", today.isoformat(), (today + timedelta(days=7)).isoformat(), "none", ))
+
+        # Inputs: 7 days, no remarks, 1 litre consumed.
+        with patch("builtins.input", side_effect=["7", "", "1"]):
+            IO_manager().get_consumption(fridge, history)
+
+        records = history.get_records()
+        assert len(records) == 1, ("First consumption was not recorded: empty history must not skip consumption entry.")
+
+        record = records[0]
+        assert record.name == "milk"
+        assert record.quantity == pytest.approx(1)
+        assert record.unit == "l"
+        assert record.date_range == 7
+
+        assert fridge.get_item_total("milk", include_expired=True) == pytest.approx(1), "Consumed stock must be deducted."
