@@ -33,7 +33,9 @@ class Application:
             fridge = stores["fridge"]
             household = stores["household"]
             history = stores["consumption_history"]
+            new_user = False
             if not household.get_members():
+                new_user = True
                 self.ui.send_message(f"Complete setup for {household.name} ({household.household_id}).")
                 self.ui.initialize_household(household)
                 self.ui.show_profile(household)
@@ -46,7 +48,8 @@ class Application:
             self.ui.show_welcome_back(household)
             choice = self.ui.ask_main_menu_choice()
             if choice == "1":
-                self.ui.get_consumption(fridge, history)
+                if new_user == False: # New users have never used the app before, hence we should not collect thier consumption data
+                    self.ui.get_consumption(fridge, history)
                 if self._plan_groceries(fridge, household, history):
                     self.ui.show_exit()
                     return
